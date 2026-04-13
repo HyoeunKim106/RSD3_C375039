@@ -1,4 +1,9 @@
 <!DOCTYPE html>
+<!--
+  © Provided by Prof. Yuseon Park
+  Hongik University, Design Research Studio, 2026
+  with support from Mindy Seu, Alvin Ashiatey
+-->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -22,9 +27,7 @@
     </section>
 
     <script>
-      // 1. 시트 ID 설정
-      const SPREADSHEET_ID = "1pintIO8VNpryzS56eqXaNjqzx5f3EeAV"; // 교수님 템플릿 시트
-      const MY_SPREADSHEET_ID = "1gwxvcHqxgNHOOoS1R_NV8EH7WHNudGd7EhsvWHG76p8"; // 효은님 데이터 시트
+      const SPREADSHEET_ID = "1pintIO8VNpryzS56eqXaNjqzx5f3EeAV";
 
       const KEYS = {
         title:       "Meta-Title",
@@ -37,10 +40,9 @@
         image:       "UL-Images",
       };
 
-      const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
-      const MY_CSV_URL = `https://docs.google.com/spreadsheets/d/${MY_SPREADSHEET_ID}/export?format=csv`;
+      const CSV_URL =
+        `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
 
-      // CSV 파싱 함수
       function parseCSV(text) {
         const lines = text.trim().split("\n");
         const headers = splitCSVLine(lines[0]);
@@ -73,80 +75,66 @@
         return result;
       }
 
-      // 무작위 섞기 함수 (Fisher-Yates Shuffle)
-      function shuffleArray(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [array[i], array[j]] = [array[j], array[i]];
-        }
-        return array;
-      }
+      fetch(CSV_URL)
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.text();
+        })
+        .then((text) => {
+          const rows = parseCSV(text);
+          const first = rows[0] || {};
 
-      // 데이터 페칭 및 실행
-      Promise.all([
-        fetch(CSV_URL).then(res => res.text()),
-        fetch(MY_CSV_URL).then(res => res.text())
-      ])
-      .then(([templateText, myText]) => {
-        const rows = parseCSV(templateText);
-        const myRows = parseCSV(myText);
+          // 메타 정보
+          document.getElementById("site-title").textContent = first[KEYS.title]       || "";
+          document.getElementById("site-desc").textContent  = first[KEYS.description] || "";
+          document.getElementById("about-text").textContent = first[KEYS.about]       || "";
+          document.title = first[KEYS.title] || "";
 
-        // 1) 메타 정보 설정
-        const first = rows[0] || {};
-        document.getElementById("site-title").textContent = first[KEYS.title]       || "";
-        document.getElementById("site-desc").textContent  = first[KEYS.description] || "";
-        document.getElementById("about-text").textContent = first[KEYS.about]       || "";
-        document.title = first[KEYS.title] || "";
+          const grid = document.getElementById("grid");
 
-        // 2) 효은님 시트의 I열(9번째 열 = 인덱스 8) 텍스트 추출 및 섞기
-        // I2부터 I81까지의 데이터를 무작위로 섞습니다.
-        let randomTexts = myRows
-          .map(row => Object.values(row)[8]) 
-          .filter(val => val && val.trim() !== "");
-        
-        randomTexts = shuffleArray(randomTexts);
+          rows.forEach((row) => {
+            if (!row[KEYS.project]) return;
 
-        // 3) 그리드 생성
-        const grid = document.getElementById("grid");
-        rows.forEach((row, index) => {
-          if (!row[KEYS.project]) return;
+            const card = document.createElement("div");
+            card.className = "card";
 
-          const card = document.createElement("div");
-          card.className = "card";
+            if (row[KEYS.image]) {
+              const img = document.createElement("img");
+              img.src     = row[KEYS.image];
+              img.alt     = row[KEYS.project];
+              img.loading = "lazy";
+              card.appendChild(img);
+            }
 
-          if (row[KEYS.image]) {
-            const img = document.createElement("img");
-            img.src     = row[KEYS.image];
-            img.alt     = row[KEYS.project];
-            img.loading = "lazy";
-            card.appendChild(img);
-          }
+            const body = document.createElement("div");
+            body.className = "card-body";
 
-          const body = document.createElement("div");
-          body.className = "card-body";
+            const year     = row[KEYS.date]
+              ? Math.floor(Number(row[KEYS.date])) || row[KEYS.date]
+              : "";
+            const location = row[KEYS.location] || "";
+            const note     = row[KEYS.note]     || "";
 
-          const year     = row[KEYS.date] ? Math.floor(Number(row[KEYS.date])) || row[KEYS.date] : "";
-          const location = row[KEYS.location] || "";
-          
-          // 랜덤 텍스트 주입 (데이터가 모자라면 반복 사용)
-          const note = randomTexts.length > 0 
-            ? randomTexts[index % randomTexts.length] 
-            : (row[KEYS.note] || "");
+            body.innerHTML = `
+              <p class="project-name">${row[KEYS.project]}</p>
+              <p class="project-meta">${[year, location].filter(Boolean).join(" | ")}</p>
+              ${note ? `<p class="project-note">${note}</p>` : ""}
+            `;
 
-          body.innerHTML = `
-            <p class="project-name">${row[KEYS.project]}</p>
-            <p class="project-meta">${[year, location].filter(Boolean).join(" | ")}</p>
-            ${note ? `<p class="project-note">${note}</p>` : ""}
-          `;
-
-          card.appendChild(body);
-          grid.appendChild(card);
+            card.appendChild(body);
+            grid.appendChild(card);
+          });
+        })
+        .catch((err) => {
+          console.error("Error:", err);
+          document.getElementById("grid").innerHTML =
+            `<p style="color:red">
+              Failed to load data.<br>
+              ① Check sharing settings — set to "Anyone with the link (Viewer)"<br>
+              ② Check Spreadsheet ID<br>
+              ③ Open with Live Server or GitHub Pages (file:// won't work)
+            </p>`;
         });
-      })
-      .catch((err) => {
-        console.error("Error:", err);
-        document.getElementById("grid").innerHTML = `<p style="color:red">데이터 로드 실패: 시트 공유 설정을 확인하세요.</p>`;
-      });
     </script>
   </body>
 </html>
