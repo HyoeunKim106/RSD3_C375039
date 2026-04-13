@@ -3,15 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Grouped Memory Map</title>
+    <title>Memory Typo Map</title>
     <style>
-      /* 1. 화면 전체를 도화지로 쓰는 기본 뼈대 */
+      /* 1. 배경 설정 (새하얀 도화지) */
       body {
         margin: 0;
         padding: 0;
         width: 100vw;
         height: 100vh;
-        overflow: hidden; /* 스크롤바 방지 */
+        overflow: hidden;
         background-color: #ffffff;
         font-family: sans-serif;
       }
@@ -22,63 +22,98 @@
         height: 100%;
       }
 
-      /* 2. 텍스트 조각들의 공통 속성 */
+      /* 2. 텍스트 공통 스타일 (블랙 통일) */
       .floating-text {
         position: absolute;
         font-size: 11px;
-        color: #333333;
+        color: #000000; /* 블랙으로 통일 */
         max-width: 150px;
         word-break: keep-all;
-        line-height: 1.4;
+        line-height: 1.5;
         user-select: none;
       }
 
-      /* 3. 8가지 기억 조직 방식별 애니메이션 및 색상 부여 */
-      .type-0 { color: #ff4d4d; animation: moveY_slow 3s infinite alternate ease-in-out; }
-      @keyframes moveY_slow { from { transform: translateY(0); } to { transform: translateY(-15px); } }
+      /* =========================================================
+         3. 8가지 유형별 모션 (기억 조직 방식의 특성 반영)
+         ========================================================= */
 
-      .type-1 { color: #3498db; animation: pulse_opacity 2.5s infinite alternate ease-in-out; }
-      @keyframes pulse_opacity { from { opacity: 1; } to { opacity: 0.3; } }
-
-      .type-2 { color: #27ae60; animation: scale_gently 4s infinite alternate ease-in-out; }
-      @keyframes scale_gently { from { transform: scale(1); } to { transform: scale(1.3); } }
-
-      .type-3 { color: #8e44ad; animation: moveX_subtle 3.5s infinite alternate ease-in-out; }
-      @keyframes moveX_subtle { from { transform: translateX(-10px); } to { transform: translateX(10px); } }
-
-      .type-4 { color: #f1c40f; animation: rotate_gentle 3.2s infinite alternate ease-in-out; }
-      @keyframes rotate_gentle { from { transform: rotate(0deg); } to { transform: rotate(10deg); } }
-
-      .type-5 { color: #e67e22; animation: stretch_gentle 3.8s infinite alternate ease-in-out; }
-      @keyframes stretch_gentle { from { transform: scaleX(1); } to { transform: scaleX(1.4); } }
-
-      .type-6 { color: #e84393; animation: pulse_both 2.8s infinite alternate ease-in-out; }
-      @keyframes pulse_both { from { opacity: 1; transform: scale(1); } to { opacity: 0.4; transform: scale(1.2); } }
-
-      .type-7 { color: #7f8c8d; animation: shake_blink 2.6s infinite alternate ease-in-out; }
-      @keyframes shake_blink { 
-        0% { transform: translateY(0); opacity: 1; } 
-        50% { transform: translateY(-5px); }
-        100% { transform: translateY(5px); opacity: 0.5; }
+      /* [Type 0] 선형 서사형: 아래에서 위로 느리게 이어지듯 흐름 */
+      .type-0 { animation: fadeUpFlow 8s infinite ease-in-out; }
+      @keyframes fadeUpFlow {
+        0% { opacity: 0; transform: translateY(10px); }
+        30% { opacity: 1; transform: translateY(0); }
+        70% { opacity: 1; transform: translateY(-5px); }
+        100% { opacity: 0; transform: translateY(-15px); }
       }
+
+      /* [Type 1] 병렬 정보형: 분절되고 탁! 맞춰지는 스냅 정렬 */
+      .type-1 { animation: snapAlign 4s infinite step-end; }
+      @keyframes snapAlign {
+        0% { transform: skewX(-5deg) translateY(2px); opacity: 0.7; }
+        10% { transform: skewX(0deg) translateY(0); opacity: 1; } /* 탁! 정렬 */
+        90% { transform: skewX(0deg) translateY(0); opacity: 1; }
+        100% { transform: skewX(5deg) translateY(2px); opacity: 0.7; }
+      }
+
+      /* [Type 2] 공간 좌표형: 느리고 거리가 먼 드리프트 (위치 이동 중심) */
+      .type-2 { animation: slowDrift 10s infinite alternate linear; }
+      @keyframes slowDrift {
+        0% { transform: translate(0, 0); }
+        100% { transform: translate(20px, -10px); }
+      }
+
+      /* [Type 3] 경로·네트워크형: 자간이 움직이며 궤적 형성 */
+      .type-3 { animation: trackNetwork 6s infinite alternate ease-in-out; }
+      @keyframes trackNetwork {
+        0% { letter-spacing: 0px; transform: translateX(0); }
+        100% { letter-spacing: 2px; transform: translateX(15px); }
+      }
+
+      /* [Type 4] 추상 도식형: Y축 압축 및 골격화 (reduction) */
+      .type-4 { animation: compressSchema 5s infinite alternate ease-in-out; transform-origin: left center; }
+      @keyframes compressSchema {
+        0% { transform: scaleY(1); opacity: 1; }
+        100% { transform: scaleY(0.4) scaleX(0.9); opacity: 0.8; }
+      }
+
+      /* [Type 5] 추상 이미지형: 구조물처럼 틀어지는 3D 형상 */
+      .type-5 { animation: skewImage 8s infinite alternate ease-in-out; perspective: 1000px; }
+      @keyframes skewImage {
+        0% { transform: rotateY(0deg) rotateZ(0deg) skew(0deg); }
+        100% { transform: rotateY(20deg) rotateZ(3deg) skew(-10deg); opacity: 0.8; }
+      }
+
+      /* [Type 6] 정동·감각 잔류형: 숨쉬기 + 잔여하는 번짐(blur) */
+      .type-6 { animation: breathResidual 6s infinite alternate ease-in-out; }
+      @keyframes breathResidual {
+        0% { transform: scale(1); filter: blur(0px); opacity: 1; }
+        100% { transform: scale(1.05); filter: blur(1.5px); opacity: 0.6; }
+      }
+
+      /* [Type 7] 촉발·잔상형: 긴 지연 후 희미하게 나타났다 사라짐 (flicker/afterimage) */
+      .type-7 { animation: flashAfterimage 7s infinite; }
+      @keyframes flashAfterimage {
+        0%, 80% { opacity: 0.1; filter: blur(2px); } /* 평소엔 거의 안 보임 */
+        85% { opacity: 0.9; filter: blur(0px); } /* 잠깐 나타남 */
+        87% { opacity: 0.4; filter: blur(1px); } /* 깜빡임 */
+        90% { opacity: 0.8; filter: blur(0px); }
+        100% { opacity: 0.1; filter: blur(2px); }
+      }
+
     </style>
   </head>
   <body>
-
     <div id="canvas"></div>
 
     <script>
       const SPREADSHEET_ID = "1pintIO8VNpryzS56eqXaNjqzx5f3EeAV";
-      
-      // ★ 여기가 수정된 부분입니다: 시트의 새로운 헤더 이름과 정확히 맞춤 ★
       const KEYS = { 
-        note: "당사자의 직접 설명", // 기존 "UL-Note"에서 변경
+        note: "당사자의 직접 설명", 
         type: "기억 조직 방식" 
       }; 
 
       const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
 
-      // CSV 텍스트를 자바스크립트 객체 배열로 변환
       function parseCSV(text) {
         const lines = text.trim().split("\n");
         const headers = splitCSVLine(lines[0]);
@@ -92,32 +127,19 @@
         });
       }
 
-      // 쉼표로 구분하되, 큰따옴표 안의 쉼표는 무시하는 함수
       function splitCSVLine(line) {
-        const result = [];
-        let current = "";
-        let inQuotes = false;
+        const result = []; let current = ""; let inQuotes = false;
         for (let i = 0; i < line.length; i++) {
           const ch = line[i];
-          if (ch === '"') {
-            inQuotes = !inQuotes;
-          } else if (ch === "," && !inQuotes) {
-            result.push(current);
-            current = "";
-          } else {
-            current += ch;
-          }
+          if (ch === '"') inQuotes = !inQuotes;
+          else if (ch === "," && !inQuotes) { result.push(current); current = ""; }
+          else current += ch;
         }
-        result.push(current);
-        return result;
+        result.push(current); return result;
       }
 
-      // 시트 데이터 가져오기
       fetch(CSV_URL)
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.text();
-        })
+        .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.text(); })
         .then((text) => {
           const rows = parseCSV(text);
           const canvas = document.getElementById("canvas");
@@ -129,10 +151,8 @@
             const noteText = row[KEYS.note];
             const typeName = row[KEYS.type] || "미분류";
             
-            // 텍스트가 비어있으면 출력하지 않음
             if (!noteText || noteText.trim() === "") return;
 
-            // 새로운 유형이 나올 때마다 번호(0~7)를 순차적으로 부여
             if (!typeMap.has(typeName)) {
               typeMap.set(typeName, typeCounter % 8); 
               typeCounter++;
@@ -141,11 +161,13 @@
             const typeId = typeMap.get(typeName);
             const span = document.createElement("div");
             
-            // 기본 클래스와 해당 그룹의 애니메이션 클래스를 함께 부여
             span.className = `floating-text type-${typeId}`;
-            span.textContent = noteText;
+            
+            // ★ 낱자(글자 하나하나) 단위를 조작하기 쉽게 만들기 위한 세팅 (선택적 사용)
+            // 나중에 CSS로 글자별 딜레이를 줄 수 있도록 한 글자씩 <span>으로 쪼개서 넣음
+            const chars = noteText.split("");
+            span.innerHTML = chars.map(char => `<span>${char}</span>`).join("");
 
-            // 화면의 5% ~ 90% 사이 무작위 좌표에 배치
             const randomTop = Math.floor(Math.random() * 85) + 5;
             const randomLeft = Math.floor(Math.random() * 85) + 5;
 
@@ -157,7 +179,6 @@
         })
         .catch((err) => {
           console.error("Error:", err);
-          document.body.innerHTML = `<p style="color:red; text-align:center; margin-top:20px;">데이터를 불러오는 중 오류가 발생했습니다. 시트 공유 설정과 헤더 이름을 확인해 주세요.</p>`;
         });
     </script>
   </body>
