@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Memory Typo Map with Persistent Static Shapes</title>
+    <title>Memory Typo Map - Drifting Shapes</title>
     <style>
       body {
         margin: 0; padding: 0; width: 100vw; height: 100vh;
@@ -24,23 +24,18 @@
         text-shadow: 0 0 10px rgba(255,255,255,0.8);
       }
 
-      /* 도형 공통 애니메이션 및 설정 */
+      /* 도형 공통 설정 (유영 애니메이션을 위한 transition 추가) */
       .memory-shape {
         position: absolute; width: 45px; height: 45px;
         background-color: #333333; 
-        
-        /* forwards가 설정되어 있어 100% 프레임 상태로 화면에 정지하여 남습니다. */
-        pointer-events: none; animation: shapeFade 2s forwards;
+        pointer-events: none; 
         z-index: 5;
         margin-left: -22.5px;
         margin-top: -22.5px;
-      }
-
-      @keyframes shapeFade {
-        0% { opacity: 0; transform: scale(0.5) translateY(0) rotate(0deg); }
-        20% { opacity: 0.9; transform: scale(1.2) translateY(-10px) rotate(15deg); }
-        /* 투명도 0.8로 고정되어 최종 화면에 계속 머물게 수정 */
-        100% { opacity: 0.8; transform: scale(1) translateY(-35px) rotate(45deg); }
+        opacity: 0; /* 생성 직후 투명한 상태로 시작 */
+        
+        /* 위치(left, top), 회전(transform), 투명도(opacity)가 부드럽게 전환됨 */
+        transition: left 8s ease-in-out, top 8s ease-in-out, transform 8s ease-in-out, opacity 0.5s ease-out;
       }
 
       /* 8가지 도형 유형 (형태 유지) */
@@ -85,17 +80,42 @@
       
       const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
 
-      function createShape(typeId, x, y) {
+      // 화면을 유영하는 도형 생성 함수
+      function createDriftingShape(typeId, startX, startY) {
         const canvas = document.getElementById("canvas");
         const shape = document.createElement("div");
         
         shape.className = `memory-shape shape-${typeId}`;
-        shape.style.left = `${x}px`;
-        shape.style.top = `${y}px`;
+        
+        // 클릭한 초기 위치 설정
+        shape.style.left = `${startX}px`;
+        shape.style.top = `${startY}px`;
         
         canvas.appendChild(shape);
-        
-        // setTimeout 제거: 생성된 요소가 DOM에서 지워지지 않고 영구적으로 화면에 남습니다.
+
+        // 생성 직후 투명도를 올려 부드럽게 나타나게 함
+        setTimeout(() => {
+          shape.style.opacity = "0.7";
+        }, 10);
+
+        // 새로운 랜덤 좌표와 회전값을 생성하여 이동시키는 함수
+        function drift() {
+          if (!shape.parentElement) return; // 요소가 사라졌다면 중지
+          
+          // 화면 밖으로 나가지 않도록 여백을 둔 랜덤 좌표 생성
+          const newX = Math.floor(Math.random() * (window.innerWidth - 100)) + 50;
+          const newY = Math.floor(Math.random() * (window.innerHeight - 100)) + 50;
+          const newRot = Math.floor(Math.random() * 360);
+          
+          shape.style.left = `${newX}px`;
+          shape.style.top = `${newY}px`;
+          shape.style.transform = `rotate(${newRot}deg)`;
+        }
+
+        // 약간의 딜레이 후 첫 유영 시작
+        setTimeout(drift, 100);
+        // 이후 8초(transition 시간과 동일)마다 새로운 목적지로 계속 이동
+        setInterval(drift, 8000);
       }
 
       function parseCSV(text) {
@@ -149,8 +169,12 @@
             span.style.top = `${randomTop}vh`;
             span.style.left = `${randomLeft}vw`;
 
+            // 클릭 이벤트: 텍스트 삭제 후 떠다니는 도형 생성
             span.addEventListener("click", (e) => {
-              createShape(typeId, e.pageX, e.pageY);
+              // 1. 유영하는 도형 생성 (마우스 클릭 좌표 기준)
+              createDriftingShape(typeId, e.pageX, e.pageY);
+              // 2. 원래 있던 텍스트 노드는 DOM에서 즉시 완전히 삭제
+              span.remove(); 
             });
 
             canvas.appendChild(span);
