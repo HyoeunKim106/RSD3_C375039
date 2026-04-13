@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -70,10 +70,9 @@
     <script>
       const SPREADSHEET_ID = "1pintIO8VNpryzS56eqXaNjqzx5f3EeAV";
       
-      // 시트에서 읽어올 열 이름 지정
-      // 주의: '기억 조직 방식'이라는 헤더가 시트에 정확히 존재해야 합니다.
+      // ★ 여기가 수정된 부분입니다: 시트의 새로운 헤더 이름과 정확히 맞춤 ★
       const KEYS = { 
-        note: "UL-Note",
+        note: "당사자의 직접 설명", // 기존 "UL-Note"에서 변경
         type: "기억 조직 방식" 
       }; 
 
@@ -158,7 +157,7 @@
         })
         .catch((err) => {
           console.error("Error:", err);
-          document.body.innerHTML = `<p style="color:red; text-align:center; margin-top:20px;">Failed to load data.</p>`;
+          document.body.innerHTML = `<p style="color:red; text-align:center; margin-top:20px;">데이터를 불러오는 중 오류가 발생했습니다. 시트 공유 설정과 헤더 이름을 확인해 주세요.</p>`;
         });
     </script>
   </body>
