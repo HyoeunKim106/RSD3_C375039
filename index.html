@@ -3,116 +3,73 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Memory Typo Map</title>
+    <title>Memory Typo Map with Unified Color Shapes</title>
     <style>
-      /* 1. 배경 설정 (새하얀 도화지) */
       body {
-        margin: 0;
-        padding: 0;
-        width: 100vw;
-        height: 100vh;
-        overflow: hidden;
-        background-color: #ffffff;
-        font-family: sans-serif;
+        margin: 0; padding: 0; width: 100vw; height: 100vh;
+        overflow: hidden; background-color: #ffffff; font-family: sans-serif;
       }
 
-      #canvas {
-        position: relative;
-        width: 100%;
-        height: 100%;
-      }
+      #canvas { position: relative; width: 100%; height: 100%; }
 
-      /* 2. 텍스트 공통 스타일 (블랙 통일) */
+      /* 텍스트 스타일 */
       .floating-text {
-        position: absolute;
-        font-size: 11px;
-        color: #000000; /* 블랙으로 통일 */
-        max-width: 150px;
-        word-break: keep-all;
-        line-height: 1.5;
-        user-select: none;
-        
-        /* 호버 전환을 위해 새로 추가된 속성 */
-        transition: font-size 0.3s ease, font-weight 0.3s ease, text-shadow 0.3s ease;
-        z-index: 1; 
+        position: absolute; font-size: 11px; color: #000000;
+        max-width: 150px; word-break: keep-all; line-height: 1.5;
+        user-select: none; transition: all 0.3s ease; z-index: 10; cursor: pointer;
       }
 
-      /* 호버 시 텍스트 확대 및 시인성 확보 */
       .floating-text:hover {
-        font-size: 24px;
-        font-weight: bold;
-        z-index: 100;
-        text-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 0 4px rgba(255, 255, 255, 1);
-        cursor: pointer;
+        font-size: 18px; font-weight: bold;
+        text-shadow: 0 0 10px rgba(255,255,255,0.8);
       }
 
-      /* =========================================================
-         3. 8가지 유형별 모션 (기억 조직 방식의 특성 반영)
-         ========================================================= */
+      /* 도형 공통 애니메이션 및 설정 */
+      .memory-shape {
+        position: absolute; width: 45px; height: 45px;
+        /* ★ 색상을 통일하기 위해 공통 스타일에 추가 */
+        background-color: #333333; 
+        
+        pointer-events: none; animation: shapeFade 2s forwards;
+        z-index: 5;
+        /* 도형이 클릭한 마우스 중앙에 오도록 미세 조정 */
+        margin-left: -22.5px;
+        margin-top: -22.5px;
+      }
 
-      /* [Type 0] 선형 서사형: 아래에서 위로 느리게 이어지듯 흐름 */
+      @keyframes shapeFade {
+        0% { opacity: 0; transform: scale(0.5) translateY(0) rotate(0deg); }
+        20% { opacity: 0.9; transform: scale(1.2) translateY(-10px) rotate(15deg); }
+        100% { opacity: 0; transform: scale(1) translateY(-35px) rotate(45deg); }
+      }
+
+      /* 8가지 도형 유형 (색상 지정을 삭제하고 형태만 유지) */
+      .shape-0 { clip-path: circle(50% at 50% 50%); } /* 원 */
+      .shape-1 { clip-path: inset(5% 10% 5% 10%); } /* 사각형 */
+      .shape-2 { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); } /* 삼각형 */
+      .shape-3 { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); } /* 다이아몬드 */
+      .shape-4 { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); } /* 육각형 */
+      .shape-5 { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); } /* 별 */
+      .shape-6 { clip-path: ellipse(25% 45% at 50% 50%); } /* 타원 */
+      .shape-7 { clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%); } /* 사다리꼴 */
+
+      /* 기존 텍스트 애니메이션 (유지) */
       .type-0 { animation: fadeUpFlow 8s infinite ease-in-out; }
-      @keyframes fadeUpFlow {
-        0% { opacity: 0; transform: translateY(10px); }
-        30% { opacity: 1; transform: translateY(0); }
-        70% { opacity: 1; transform: translateY(-5px); }
-        100% { opacity: 0; transform: translateY(-15px); }
-      }
-
-      /* [Type 1] 병렬 정보형: 분절되고 탁! 맞춰지는 스냅 정렬 */
+      @keyframes fadeUpFlow { 0%, 100% { opacity: 0; transform: translateY(10px); } 50% { opacity: 1; transform: translateY(-10px); } }
       .type-1 { animation: snapAlign 4s infinite step-end; }
-      @keyframes snapAlign {
-        0% { transform: skewX(-5deg) translateY(2px); opacity: 0.7; }
-        10% { transform: skewX(0deg) translateY(0); opacity: 1; } /* 탁! 정렬 */
-        90% { transform: skewX(0deg) translateY(0); opacity: 1; }
-        100% { transform: skewX(5deg) translateY(2px); opacity: 0.7; }
-      }
-
-      /* [Type 2] 공간 좌표형: 느리고 거리가 먼 드리프트 (위치 이동 중심) */
+      @keyframes snapAlign { 0%, 100% { transform: skewX(-5deg) translateY(2px); opacity: 0.7; } 50% { transform: skewX(0deg) translateY(0); opacity: 1; } }
       .type-2 { animation: slowDrift 10s infinite alternate linear; }
-      @keyframes slowDrift {
-        0% { transform: translate(0, 0); }
-        100% { transform: translate(20px, -10px); }
-      }
-
-      /* [Type 3] 경로·네트워크형: 자간이 움직이며 궤적 형성 */
+      @keyframes slowDrift { 0% { transform: translate(0, 0); } 100% { transform: translate(20px, -10px); } }
       .type-3 { animation: trackNetwork 6s infinite alternate ease-in-out; }
-      @keyframes trackNetwork {
-        0% { letter-spacing: 0px; transform: translateX(0); }
-        100% { letter-spacing: 2px; transform: translateX(15px); }
-      }
-
-      /* [Type 4] 추상 도식형: Y축 압축 및 골격화 (reduction) */
+      @keyframes trackNetwork { 0% { letter-spacing: 0px; transform: translateX(0); } 100% { letter-spacing: 2px; transform: translateX(15px); } }
       .type-4 { animation: compressSchema 5s infinite alternate ease-in-out; transform-origin: left center; }
-      @keyframes compressSchema {
-        0% { transform: scaleY(1); opacity: 1; }
-        100% { transform: scaleY(0.4) scaleX(0.9); opacity: 0.8; }
-      }
-
-      /* [Type 5] 추상 이미지형: 구조물처럼 틀어지는 3D 형상 */
+      @keyframes compressSchema { 0% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(0.4) scaleX(0.9); opacity: 0.8; } }
       .type-5 { animation: skewImage 8s infinite alternate ease-in-out; perspective: 1000px; }
-      @keyframes skewImage {
-        0% { transform: rotateY(0deg) rotateZ(0deg) skew(0deg); }
-        100% { transform: rotateY(20deg) rotateZ(3deg) skew(-10deg); opacity: 0.8; }
-      }
-
-      /* [Type 6] 정동·감각 잔류형: 숨쉬기 + 잔여하는 번짐(blur) */
+      @keyframes skewImage { 0% { transform: rotateY(0deg) rotateZ(0deg) skew(0deg); } 100% { transform: rotateY(20deg) rotateZ(3deg) skew(-10deg); opacity: 0.8; } }
       .type-6 { animation: breathResidual 6s infinite alternate ease-in-out; }
-      @keyframes breathResidual {
-        0% { transform: scale(1); filter: blur(0px); opacity: 1; }
-        100% { transform: scale(1.05); filter: blur(1.5px); opacity: 0.6; }
-      }
-
-      /* [Type 7] 촉발·잔상형: 긴 지연 후 희미하게 나타났다 사라짐 (flicker/afterimage) */
+      @keyframes breathResidual { 0% { transform: scale(1); filter: blur(0px); opacity: 1; } 100% { transform: scale(1.05); filter: blur(1.5px); opacity: 0.6; } }
       .type-7 { animation: flashAfterimage 7s infinite; }
-      @keyframes flashAfterimage {
-        0%, 80% { opacity: 0.1; filter: blur(2px); } /* 평소엔 거의 안 보임 */
-        85% { opacity: 0.9; filter: blur(0px); } /* 잠깐 나타남 */
-        87% { opacity: 0.4; filter: blur(1px); } /* 깜빡임 */
-        90% { opacity: 0.8; filter: blur(0px); }
-        100% { opacity: 0.1; filter: blur(2px); }
-      }
-
+      @keyframes flashAfterimage { 0%, 80%, 100% { opacity: 0.1; filter: blur(2px); } 85%, 90% { opacity: 0.9; filter: blur(0px); } 87% { opacity: 0.4; filter: blur(1px); } }
     </style>
   </head>
   <body>
@@ -120,12 +77,32 @@
 
     <script>
       const SPREADSHEET_ID = "1pintIO8VNpryzS56eqXaNjqzx5f3EeAV";
+      
       const KEYS = { 
         note: "당사자의 직접 설명", 
-        type: "기억 조직 방식" 
+        type: "기억 형식" 
       }; 
-
+      
       const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
+
+      // 클릭 시 도형 생성 함수
+      function createShape(typeId, x, y) {
+        const canvas = document.getElementById("canvas");
+        const shape = document.createElement("div");
+        
+        // 클릭한 유형에 맞는 CSS 클래스 부여 (모양 결정)
+        // 색상은 이제 공통 클래스(.memory-shape)에서 처리함
+        shape.className = `memory-shape shape-${typeId}`;
+        
+        // 클릭한 마우스 좌표에 생성
+        shape.style.left = `${x}px`;
+        shape.style.top = `${y}px`;
+        
+        canvas.appendChild(shape);
+        
+        // 2초 뒤 사라지도록 처리
+        setTimeout(() => shape.remove(), 2000);
+      }
 
       function parseCSV(text) {
         const lines = text.trim().split("\n");
@@ -133,9 +110,7 @@
         return lines.slice(1).map((line) => {
           const values = splitCSVLine(line);
           const obj = {};
-          headers.forEach((h, i) => {
-            obj[h.trim()] = (values[i] || "").trim();
-          });
+          headers.forEach((h, i) => { obj[h.trim()] = (values[i] || "").trim(); });
           return obj;
         });
       }
@@ -152,11 +127,10 @@
       }
 
       fetch(CSV_URL)
-        .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.text(); })
-        .then((text) => {
+        .then(res => res.text())
+        .then(text => {
           const rows = parseCSV(text);
           const canvas = document.getElementById("canvas");
-
           const typeMap = new Map();
           let typeCounter = 0;
 
@@ -167,31 +141,26 @@
             if (!noteText || noteText.trim() === "") return;
 
             if (!typeMap.has(typeName)) {
-              typeMap.set(typeName, typeCounter % 8); 
+              typeMap.set(typeName, typeCounter % 8);
               typeCounter++;
             }
 
             const typeId = typeMap.get(typeName);
             const span = document.createElement("div");
-            
             span.className = `floating-text type-${typeId}`;
-            
-            // ★ 낱자(글자 하나하나) 단위를 조작하기 쉽게 만들기 위한 세팅 (선택적 사용)
-            // 나중에 CSS로 글자별 딜레이를 줄 수 있도록 한 글자씩 <span>으로 쪼개서 넣음
-            const chars = noteText.split("");
-            span.innerHTML = chars.map(char => `<span>${char}</span>`).join("");
+            span.innerText = noteText;
 
-            const randomTop = Math.floor(Math.random() * 85) + 5;
-            const randomLeft = Math.floor(Math.random() * 85) + 5;
-
+            const randomTop = Math.floor(Math.random() * 80) + 10;
+            const randomLeft = Math.floor(Math.random() * 80) + 10;
             span.style.top = `${randomTop}vh`;
             span.style.left = `${randomLeft}vw`;
 
+            span.addEventListener("click", (e) => {
+              createShape(typeId, e.pageX, e.pageY);
+            });
+
             canvas.appendChild(span);
           });
-        })
-        .catch((err) => {
-          console.error("Error:", err);
         });
     </script>
   </body>
