@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Memory Typo Map with Unified Color Shapes</title>
+    <title>Memory Typo Map with Persistent Static Shapes</title>
     <style>
       body {
         margin: 0; padding: 0; width: 100vw; height: 100vh;
@@ -27,12 +27,11 @@
       /* 도형 공통 애니메이션 및 설정 */
       .memory-shape {
         position: absolute; width: 45px; height: 45px;
-        /* ★ 색상을 통일하기 위해 공통 스타일에 추가 */
         background-color: #333333; 
         
+        /* forwards가 설정되어 있어 100% 프레임 상태로 화면에 정지하여 남습니다. */
         pointer-events: none; animation: shapeFade 2s forwards;
         z-index: 5;
-        /* 도형이 클릭한 마우스 중앙에 오도록 미세 조정 */
         margin-left: -22.5px;
         margin-top: -22.5px;
       }
@@ -40,20 +39,21 @@
       @keyframes shapeFade {
         0% { opacity: 0; transform: scale(0.5) translateY(0) rotate(0deg); }
         20% { opacity: 0.9; transform: scale(1.2) translateY(-10px) rotate(15deg); }
-        100% { opacity: 0; transform: scale(1) translateY(-35px) rotate(45deg); }
+        /* 투명도 0.8로 고정되어 최종 화면에 계속 머물게 수정 */
+        100% { opacity: 0.8; transform: scale(1) translateY(-35px) rotate(45deg); }
       }
 
-      /* 8가지 도형 유형 (색상 지정을 삭제하고 형태만 유지) */
-      .shape-0 { clip-path: circle(50% at 50% 50%); } /* 원 */
-      .shape-1 { clip-path: inset(5% 10% 5% 10%); } /* 사각형 */
-      .shape-2 { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); } /* 삼각형 */
-      .shape-3 { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); } /* 다이아몬드 */
-      .shape-4 { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); } /* 육각형 */
-      .shape-5 { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); } /* 별 */
-      .shape-6 { clip-path: ellipse(25% 45% at 50% 50%); } /* 타원 */
-      .shape-7 { clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%); } /* 사다리꼴 */
+      /* 8가지 도형 유형 (형태 유지) */
+      .shape-0 { clip-path: circle(50% at 50% 50%); } 
+      .shape-1 { clip-path: inset(5% 10% 5% 10%); } 
+      .shape-2 { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); } 
+      .shape-3 { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); } 
+      .shape-4 { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); } 
+      .shape-5 { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); } 
+      .shape-6 { clip-path: ellipse(25% 45% at 50% 50%); } 
+      .shape-7 { clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%); } 
 
-      /* 기존 텍스트 애니메이션 (유지) */
+      /* 기존 텍스트 애니메이션 유지 */
       .type-0 { animation: fadeUpFlow 8s infinite ease-in-out; }
       @keyframes fadeUpFlow { 0%, 100% { opacity: 0; transform: translateY(10px); } 50% { opacity: 1; transform: translateY(-10px); } }
       .type-1 { animation: snapAlign 4s infinite step-end; }
@@ -85,23 +85,17 @@
       
       const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
 
-      // 클릭 시 도형 생성 함수
       function createShape(typeId, x, y) {
         const canvas = document.getElementById("canvas");
         const shape = document.createElement("div");
         
-        // 클릭한 유형에 맞는 CSS 클래스 부여 (모양 결정)
-        // 색상은 이제 공통 클래스(.memory-shape)에서 처리함
         shape.className = `memory-shape shape-${typeId}`;
-        
-        // 클릭한 마우스 좌표에 생성
         shape.style.left = `${x}px`;
         shape.style.top = `${y}px`;
         
         canvas.appendChild(shape);
         
-        // 2초 뒤 사라지도록 처리
-        setTimeout(() => shape.remove(), 2000);
+        // setTimeout 제거: 생성된 요소가 DOM에서 지워지지 않고 영구적으로 화면에 남습니다.
       }
 
       function parseCSV(text) {
