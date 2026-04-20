@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Memory Text Map</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #ffffff;
+      overflow: hidden;
+    }
+
+    body {
+      font-family:
+        -apple-system, BlinkMacSystemFont,
+        "Apple SD Gothic Neo", "Malgun Gothic",
+        "Segoe UI", sans-serif;
+    }
+
+    #canvas {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .mem {
+      position: absolute;
+      max-width: min(28vw, 280px);
+      font-size: clamp(11px, 1.1vw, 18px);
+      font-weight: 400;
+      line-height: 1.55;
+      color: #111;
+      word-break: keep-all;
+      overflow-wrap: break-word;
+      white-space: normal;
+    }
+
+    @media (max-width: 1024px) {
+      .mem {
+        max-width: min(34vw, 240px);
+        font-size: clamp(11px, 1.5vw, 17px);
+      }
+    }
+
+    @media (max-width: 768px) {
+      #canvas {
+        overflow: auto;
+      }
+
+      .mem {
+        max-width: min(42vw, 200px);
+        font-size: clamp(10px, 2.5vw, 16px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas"></div>
+
+  <script>
+    const SPREADSHEET_ID = "1pintIO8VNpryzS56eqXaNjqzx5f3EeAV";
+    const KEYS = { note: "당사자의 직접 설명" };
+    const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
+
+    const canvas = document.getElementById("canvas");
+    let rowsData = [];
+
+    function splitCSVLine(line) {
+      const result = [];
+      let current = "";
+      let inQuotes = false;
+
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+
+        if (char === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === ',' && !inQuotes) {
+          result.push(current);
+          current = "";
+        } else {
+          current += char;
+        }
+      }
+
+      result.push(current);
+      return result;
+    }
+
+    function parseCSV(text) {
+      const lines = text.trim().split(/\r?\n/);
+      const headers = splitCSVLine(lines[0]).map(h => h.trim());
+
+      return lines.slice(1).map(line => {
+        const values = splitCSVLine(line);
+        const obj = {};
+        headers.forEach((header, i) => {
+          obj[header] = (values[i] || "").trim();
+        });
+        return obj;
+      });
+    }
+
+    const placed = [];
+
+    function findPosition(W, H, estW, estH) {
+      let x, y, tries = 0;
+
+      do {
+        x = 20 + Math.random() * Math.max(20, W - estW - 40);
+        y = 20 + Math.random() * Math.max(20, H - estH - 40);
+        tries++;
+      } while (
+        tries < 80 &&
+        placed.some(r =>
+          x < r.x + r.w + 24 &&
+          x + estW + 24 > r.x &&
+          y < r.y + r.h + 24 &&
+          y + estH + 24 > r.y
+        )
+      );
+
+      placed.push({ x, y, w: estW, h: estH });
+      return { x, y };
+    }
+
+    function render(rows) {
+      canvas.innerHTML = "";
+      placed.length = 0;
+
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+
+      rows.forEach(row => {
+        const text = (row[KEYS.note] || "").trim();
+        if (!text) return;
+
+        const estW = Math.min(text.length * 9, 280);
+        const estH = 60;
+
+        const { x, y } = findPosition(W, H, estW, estH);
+
+        const el = document.createElement("div");
+        el.className = "mem";
+        el.textContent = text;
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+
+        canvas.appendChild(el);
+      });
+    }
+
+    fetch(CSV_URL)
+      .then(res => res.text())
+      .then(text => {
+        rowsData = parseCSV(text);
+        render(rowsData);
+      })
+      .catch(err => {
+        console.error("CSV 로드 실패:", err);
+      });
+
+    let resizeTimer;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (rowsData.length) render(rowsData);
+      }, 200);
+    });
+  </script>
+</body>
+</html>
