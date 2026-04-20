@@ -4,31 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Memory Typo Map - Drifting Shapes</title>
-
-    <!-- ✅ 방법 1: CDN (파일 없이 바로 사용) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
-
-    <!-- ✅ 방법 2: 로컬 파일 사용 시 위 link 대신 아래 주석 해제
-         HTML 파일과 같은 폴더에 'pretendard' 폴더를 두고 그 안에 .woff2 파일 넣기
-    <style>
-      @font-face {
-        font-family: 'Pretendard';
-        src: url('./pretendard/Pretendard-Regular.woff2') format('woff2');
-        font-weight: 400;
-      }
-      @font-face {
-        font-family: 'Pretendard';
-        src: url('./pretendard/Pretendard-Bold.woff2') format('woff2');
-        font-weight: 700;
-      }
-    </style>
-    -->
 
     <style>
       body {
         margin: 0; padding: 0; width: 100vw; height: 100vh;
         overflow: hidden; background-color: #ffffff;
-        /* ✅ Pretendard 적용, 없을 경우 시스템 한글 폰트로 fallback */
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont,
                      'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
       }
@@ -39,7 +20,7 @@
         position: absolute; font-size: 11px; color: #000000;
         max-width: 150px; word-break: keep-all; line-height: 1.5;
         user-select: none; transition: all 0.3s ease; z-index: 10; cursor: pointer;
-        font-family: inherit; /* body에서 상속 */
+        font-family: inherit;
       }
 
       .floating-text:hover {
@@ -49,8 +30,8 @@
 
       .memory-shape {
         position: absolute; width: 45px; height: 45px;
-        background-color: #333333; 
-        pointer-events: none; 
+        background-color: #333333;
+        pointer-events: none;
         z-index: 5;
         margin-left: -22.5px;
         margin-top: -22.5px;
@@ -58,31 +39,182 @@
         transition: left 8s ease-in-out, top 8s ease-in-out, transform 8s ease-in-out, opacity 0.5s ease-out;
       }
 
-      .shape-0 { clip-path: circle(50% at 50% 50%); } 
-      .shape-1 { clip-path: inset(5% 10% 5% 10%); } 
-      .shape-2 { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); } 
-      .shape-3 { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); } 
-      .shape-4 { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); } 
-      .shape-5 { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); } 
-      .shape-6 { clip-path: ellipse(25% 45% at 50% 50%); } 
-      .shape-7 { clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%); } 
+      /* 8 shape types (cycling) */
+      .shape-0 { clip-path: circle(50% at 50% 50%); }
+      .shape-1 { clip-path: inset(5% 10% 5% 10%); }
+      .shape-2 { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+      .shape-3 { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+      .shape-4 { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); }
+      .shape-5 { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+      .shape-6 { clip-path: ellipse(25% 45% at 50% 50%); }
+      .shape-7 { clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%); }
 
-      .type-0 { animation: fadeUpFlow 8s infinite ease-in-out; }
-      @keyframes fadeUpFlow { 0%, 100% { opacity: 0; transform: translateY(10px); } 50% { opacity: 1; transform: translateY(-10px); } }
-      .type-1 { animation: snapAlign 4s infinite step-end; }
-      @keyframes snapAlign { 0%, 100% { transform: skewX(-5deg) translateY(2px); opacity: 0.7; } 50% { transform: skewX(0deg) translateY(0); opacity: 1; } }
-      .type-2 { animation: slowDrift 10s infinite alternate linear; }
-      @keyframes slowDrift { 0% { transform: translate(0, 0); } 100% { transform: translate(20px, -10px); } }
-      .type-3 { animation: trackNetwork 6s infinite alternate ease-in-out; }
-      @keyframes trackNetwork { 0% { letter-spacing: 0px; transform: translateX(0); } 100% { letter-spacing: 2px; transform: translateX(15px); } }
-      .type-4 { animation: compressSchema 5s infinite alternate ease-in-out; transform-origin: left center; }
-      @keyframes compressSchema { 0% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(0.4) scaleX(0.9); opacity: 0.8; } }
-      .type-5 { animation: skewImage 8s infinite alternate ease-in-out; perspective: 1000px; }
-      @keyframes skewImage { 0% { transform: rotateY(0deg) rotateZ(0deg) skew(0deg); } 100% { transform: rotateY(20deg) rotateZ(3deg) skew(-10deg); opacity: 0.8; } }
-      .type-6 { animation: breathResidual 6s infinite alternate ease-in-out; }
-      @keyframes breathResidual { 0% { transform: scale(1); filter: blur(0px); opacity: 1; } 100% { transform: scale(1.05); filter: blur(1.5px); opacity: 0.6; } }
-      .type-7 { animation: flashAfterimage 7s infinite; }
-      @keyframes flashAfterimage { 0%, 80%, 100% { opacity: 0.1; filter: blur(2px); } 85%, 90% { opacity: 0.9; filter: blur(0px); } 87% { opacity: 0.4; filter: blur(1px); } }
+      /* ===================== 80 UNIQUE ANIMATION TYPES ===================== */
+
+      .type-0  { animation: t0  8s infinite ease-in-out; }
+      .type-1  { animation: t1  4s infinite step-end; }
+      .type-2  { animation: t2  10s infinite alternate linear; }
+      .type-3  { animation: t3  6s infinite alternate ease-in-out; }
+      .type-4  { animation: t4  5s infinite alternate ease-in-out; transform-origin: left center; }
+      .type-5  { animation: t5  8s infinite alternate ease-in-out; }
+      .type-6  { animation: t6  6s infinite alternate ease-in-out; }
+      .type-7  { animation: t7  7s infinite; }
+      .type-8  { animation: t8  9s infinite alternate ease-in-out; }
+      .type-9  { animation: t9  3s infinite step-start; }
+      .type-10 { animation: t10 11s infinite alternate linear; }
+      .type-11 { animation: t11 5s infinite ease-in-out; }
+      .type-12 { animation: t12 7s infinite alternate ease-in-out; }
+      .type-13 { animation: t13 4s infinite; }
+      .type-14 { animation: t14 6s infinite alternate ease-in-out; }
+      .type-15 { animation: t15 8s infinite ease-in-out; }
+      .type-16 { animation: t16 5s infinite alternate ease-in-out; }
+      .type-17 { animation: t17 12s infinite alternate linear; }
+      .type-18 { animation: t18 6s infinite; }
+      .type-19 { animation: t19 9s infinite alternate ease-in-out; }
+      .type-20 { animation: t20 4s infinite ease-in-out; }
+      .type-21 { animation: t21 7s infinite alternate ease-in-out; }
+      .type-22 { animation: t22 10s infinite; }
+      .type-23 { animation: t23 5s infinite alternate ease-in-out; }
+      .type-24 { animation: t24 8s infinite ease-in-out; }
+      .type-25 { animation: t25 6s infinite alternate linear; }
+      .type-26 { animation: t26 9s infinite ease-in-out; }
+      .type-27 { animation: t27 4s infinite step-end; }
+      .type-28 { animation: t28 11s infinite alternate ease-in-out; }
+      .type-29 { animation: t29 7s infinite; }
+      .type-30 { animation: t30 5s infinite alternate ease-in-out; }
+      .type-31 { animation: t31 8s infinite ease-in-out; }
+      .type-32 { animation: t32 6s infinite alternate ease-in-out; }
+      .type-33 { animation: t33 3s infinite; }
+      .type-34 { animation: t34 9s infinite alternate linear; }
+      .type-35 { animation: t35 7s infinite ease-in-out; }
+      .type-36 { animation: t36 5s infinite alternate ease-in-out; }
+      .type-37 { animation: t37 10s infinite; }
+      .type-38 { animation: t38 4s infinite step-start; }
+      .type-39 { animation: t39 8s infinite alternate ease-in-out; }
+      .type-40 { animation: t40 6s infinite ease-in-out; }
+      .type-41 { animation: t41 7s infinite alternate linear; }
+      .type-42 { animation: t42 5s infinite; }
+      .type-43 { animation: t43 9s infinite alternate ease-in-out; }
+      .type-44 { animation: t44 4s infinite ease-in-out; }
+      .type-45 { animation: t45 11s infinite alternate ease-in-out; }
+      .type-46 { animation: t46 6s infinite; }
+      .type-47 { animation: t47 8s infinite alternate linear; }
+      .type-48 { animation: t48 5s infinite ease-in-out; }
+      .type-49 { animation: t49 7s infinite; }
+      .type-50 { animation: t50 10s infinite alternate ease-in-out; }
+      .type-51 { animation: t51 4s infinite step-end; }
+      .type-52 { animation: t52 9s infinite ease-in-out; }
+      .type-53 { animation: t53 6s infinite alternate ease-in-out; }
+      .type-54 { animation: t54 5s infinite; }
+      .type-55 { animation: t55 8s infinite alternate linear; }
+      .type-56 { animation: t56 7s infinite ease-in-out; }
+      .type-57 { animation: t57 3s infinite step-start; }
+      .type-58 { animation: t58 11s infinite alternate ease-in-out; }
+      .type-59 { animation: t59 6s infinite; }
+      .type-60 { animation: t60 9s infinite ease-in-out; }
+      .type-61 { animation: t61 5s infinite alternate ease-in-out; }
+      .type-62 { animation: t62 8s infinite; }
+      .type-63 { animation: t63 4s infinite alternate linear; }
+      .type-64 { animation: t64 7s infinite ease-in-out; }
+      .type-65 { animation: t65 10s infinite alternate ease-in-out; }
+      .type-66 { animation: t66 6s infinite; }
+      .type-67 { animation: t67 5s infinite step-end; }
+      .type-68 { animation: t68 9s infinite alternate ease-in-out; }
+      .type-69 { animation: t69 8s infinite ease-in-out; }
+      .type-70 { animation: t70 4s infinite; }
+      .type-71 { animation: t71 11s infinite alternate linear; }
+      .type-72 { animation: t72 7s infinite ease-in-out; }
+      .type-73 { animation: t73 6s infinite alternate ease-in-out; }
+      .type-74 { animation: t74 5s infinite; }
+      .type-75 { animation: t75 9s infinite ease-in-out; }
+      .type-76 { animation: t76 3s infinite step-start; }
+      .type-77 { animation: t77 8s infinite alternate ease-in-out; }
+      .type-78 { animation: t78 10s infinite; }
+      .type-79 { animation: t79 6s infinite alternate ease-in-out; }
+
+      /* ===================== KEYFRAMES ===================== */
+
+      @keyframes t0  { 0%,100%{opacity:0;transform:translateY(10px)} 50%{opacity:1;transform:translateY(-10px)} }
+      @keyframes t1  { 0%,100%{transform:skewX(-5deg) translateY(2px);opacity:0.7} 50%{transform:skewX(0deg);opacity:1} }
+      @keyframes t2  { 0%{transform:translate(0,0)} 100%{transform:translate(20px,-10px)} }
+      @keyframes t3  { 0%{letter-spacing:0px;transform:translateX(0)} 100%{letter-spacing:2px;transform:translateX(15px)} }
+      @keyframes t4  { 0%{transform:scaleY(1);opacity:1} 100%{transform:scaleY(0.4) scaleX(0.9);opacity:0.8} }
+      @keyframes t5  { 0%{transform:rotateY(0deg) rotateZ(0deg) skew(0deg)} 100%{transform:rotateY(20deg) rotateZ(3deg) skew(-10deg);opacity:0.8} }
+      @keyframes t6  { 0%{transform:scale(1);filter:blur(0px);opacity:1} 100%{transform:scale(1.05);filter:blur(1.5px);opacity:0.6} }
+      @keyframes t7  { 0%,80%,100%{opacity:0.1;filter:blur(2px)} 85%,90%{opacity:0.9;filter:blur(0px)} 87%{opacity:0.4;filter:blur(1px)} }
+      @keyframes t8  { 0%{transform:rotate(0deg);opacity:0.8} 100%{transform:rotate(15deg);opacity:0.4} }
+      @keyframes t9  { 0%{opacity:1;transform:none} 33%{opacity:0.3;transform:translateX(5px)} 66%{opacity:0.8;transform:translateX(-5px)} 100%{opacity:1;transform:none} }
+      @keyframes t10 { 0%{transform:scaleX(1)} 100%{transform:scaleX(1.3)} }
+      @keyframes t11 { 0%,100%{transform:translateX(0);opacity:1} 50%{transform:translateX(20px);opacity:0.5} }
+      @keyframes t12 { 0%{filter:blur(0px);opacity:1} 100%{filter:blur(3px);opacity:0.5} }
+      @keyframes t13 { 0%,100%{transform:scaleY(1);opacity:1} 50%{transform:scaleY(1.5);opacity:0.7} }
+      @keyframes t14 { 0%{transform:skewY(0deg)} 100%{transform:skewY(8deg)} }
+      @keyframes t15 { 0%,100%{opacity:1;letter-spacing:0px} 50%{opacity:0.4;letter-spacing:4px} }
+      @keyframes t16 { 0%{transform:translateY(0) rotate(0deg)} 100%{transform:translateY(-15px) rotate(10deg)} }
+      @keyframes t17 { 0%{opacity:0.3} 100%{opacity:1} }
+      @keyframes t18 { 0%,100%{transform:scale(1) rotate(0deg)} 50%{transform:scale(0.8) rotate(-5deg)} }
+      @keyframes t19 { 0%{transform:perspective(200px) rotateX(0deg)} 100%{transform:perspective(200px) rotateX(20deg)} }
+      @keyframes t20 { 0%,100%{transform:translateX(-10px);opacity:0.6} 50%{transform:translateX(10px);opacity:1} }
+      @keyframes t21 { 0%{letter-spacing:-2px;opacity:0.7} 100%{letter-spacing:5px;opacity:1} }
+      @keyframes t22 { 0%,100%{transform:rotate(-3deg);filter:blur(0px)} 50%{transform:rotate(3deg);filter:blur(1px)} }
+      @keyframes t23 { 0%{transform:scaleX(0.8) translateY(0)} 100%{transform:scaleX(1.1) translateY(-8px)} }
+      @keyframes t24 { 0%,100%{opacity:0.2} 50%{opacity:1} }
+      @keyframes t25 { 0%{transform:skewX(0deg) translateX(0)} 100%{transform:skewX(10deg) translateX(10px)} }
+      @keyframes t26 { 0%,100%{transform:scale(1.1);opacity:0.9} 50%{transform:scale(0.9);opacity:0.5} }
+      @keyframes t27 { 0%{opacity:1;transform:none} 50%{opacity:0;transform:translateY(-8px)} 100%{opacity:1;transform:none} }
+      @keyframes t28 { 0%{transform:rotate(0deg) scale(1)} 100%{transform:rotate(-12deg) scale(0.9)} }
+      @keyframes t29 { 0%,100%{filter:blur(2px);opacity:0.5} 50%{filter:blur(0px);opacity:1} }
+      @keyframes t30 { 0%{transform:translateX(0) scaleY(1)} 100%{transform:translateX(-20px) scaleY(0.7)} }
+      @keyframes t31 { 0%,100%{opacity:1;transform:none} 30%{opacity:0.3;transform:translateY(5px)} 60%{opacity:0.8;transform:translateY(-3px)} }
+      @keyframes t32 { 0%{letter-spacing:1px;transform:skewX(-3deg)} 100%{letter-spacing:3px;transform:skewX(3deg)} }
+      @keyframes t33 { 0%,100%{transform:scale(1)} 50%{transform:scale(1.2) rotate(5deg)} }
+      @keyframes t34 { 0%{transform:translateY(0) scaleX(1)} 100%{transform:translateY(15px) scaleX(0.85)} }
+      @keyframes t35 { 0%,100%{opacity:0.8;filter:blur(0px)} 50%{opacity:0.3;filter:blur(2px)} }
+      @keyframes t36 { 0%{transform:rotate(0deg) translateX(0)} 100%{transform:rotate(8deg) translateX(12px)} }
+      @keyframes t37 { 0%,100%{transform:scaleX(1) scaleY(1)} 25%{transform:scaleX(1.2) scaleY(0.8)} 75%{transform:scaleX(0.8) scaleY(1.2)} }
+      @keyframes t38 { 0%{transform:none;opacity:1} 50%{transform:translateX(8px);opacity:0.4} 100%{transform:none;opacity:1} }
+      @keyframes t39 { 0%{transform:perspective(300px) rotateY(0deg)} 100%{transform:perspective(300px) rotateY(-15deg)} }
+      @keyframes t40 { 0%,100%{letter-spacing:0px;opacity:1} 50%{letter-spacing:-1px;opacity:0.6} }
+      @keyframes t41 { 0%{transform:translateY(0)} 100%{transform:translateY(18px)} }
+      @keyframes t42 { 0%,100%{transform:skewX(0deg) skewY(0deg)} 50%{transform:skewX(5deg) skewY(3deg)} }
+      @keyframes t43 { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.75);opacity:0.5} }
+      @keyframes t44 { 0%,100%{transform:translateX(0) rotate(0deg)} 50%{transform:translateX(15px) rotate(-8deg)} }
+      @keyframes t45 { 0%{filter:blur(0px);transform:scale(1)} 100%{filter:blur(2px);transform:scale(1.08)} }
+      @keyframes t46 { 0%,100%{opacity:1;transform:translateY(0)} 40%{opacity:0.5;transform:translateY(8px)} 80%{opacity:0.8;transform:translateY(-4px)} }
+      @keyframes t47 { 0%{transform:rotate(0deg) scaleX(1)} 100%{transform:rotate(5deg) scaleX(1.2)} }
+      @keyframes t48 { 0%,100%{opacity:0.9;transform:skewY(0deg)} 50%{opacity:0.5;transform:skewY(-5deg)} }
+      @keyframes t49 { 0%,100%{transform:scale(1) translateX(0)} 50%{transform:scale(1.1) translateX(-10px)} }
+      @keyframes t50 { 0%{letter-spacing:0px;transform:rotate(0deg)} 100%{letter-spacing:3px;transform:rotate(-6deg)} }
+      @keyframes t51 { 0%{opacity:1;transform:none} 25%{opacity:0.2;transform:scaleX(0.9)} 50%{opacity:0.9;transform:none} 75%{opacity:0.4;transform:scaleX(1.1)} 100%{opacity:1;transform:none} }
+      @keyframes t52 { 0%,100%{transform:translateX(0) translateY(0)} 50%{transform:translateX(-12px) translateY(8px)} }
+      @keyframes t53 { 0%{transform:perspective(400px) rotateX(0deg) rotateZ(0deg)} 100%{transform:perspective(400px) rotateX(10deg) rotateZ(-5deg)} }
+      @keyframes t54 { 0%,100%{filter:blur(0px);opacity:0.9} 50%{filter:blur(1px);opacity:0.4} }
+      @keyframes t55 { 0%{transform:scaleY(1) rotate(0deg)} 100%{transform:scaleY(0.6) rotate(-10deg)} }
+      @keyframes t56 { 0%,100%{opacity:1;transform:translateY(0) scaleX(1)} 50%{opacity:0.6;transform:translateY(-12px) scaleX(0.9)} }
+      @keyframes t57 { 0%{transform:none;opacity:1} 33%{transform:skewX(8deg);opacity:0.6} 66%{transform:skewX(-4deg);opacity:0.9} 100%{transform:none;opacity:1} }
+      @keyframes t58 { 0%{transform:rotate(0deg) translateY(0)} 100%{transform:rotate(20deg) translateY(-10px)} }
+      @keyframes t59 { 0%,100%{opacity:0.6;transform:scale(0.95)} 50%{opacity:1;transform:scale(1.05)} }
+      @keyframes t60 { 0%,100%{transform:translateX(10px);opacity:0.7} 50%{transform:translateX(-10px);opacity:1} }
+      @keyframes t61 { 0%{transform:scaleX(1) skewY(0deg)} 100%{transform:scaleX(0.8) skewY(5deg)} }
+      @keyframes t62 { 0%,100%{filter:blur(1px);opacity:0.5;transform:rotate(-2deg)} 50%{filter:blur(0px);opacity:1;transform:rotate(2deg)} }
+      @keyframes t63 { 0%{transform:translateY(0) scaleY(1)} 100%{transform:translateY(-20px) scaleY(1.2)} }
+      @keyframes t64 { 0%,100%{letter-spacing:2px;transform:skewX(-2deg)} 50%{letter-spacing:-1px;transform:skewX(4deg)} }
+      @keyframes t65 { 0%{transform:perspective(500px) rotateY(0deg) scale(1)} 100%{transform:perspective(500px) rotateY(25deg) scale(0.9)} }
+      @keyframes t66 { 0%,100%{opacity:1;transform:none} 20%{opacity:0.2;transform:translateX(6px)} 60%{opacity:0.7;transform:translateX(-3px)} }
+      @keyframes t67 { 0%{transform:none;opacity:1} 50%{transform:rotate(-15deg) scale(0.85);opacity:0.4} 100%{transform:none;opacity:1} }
+      @keyframes t68 { 0%{transform:scaleY(1) translateX(0)} 100%{transform:scaleY(1.3) translateX(10px)} }
+      @keyframes t69 { 0%,100%{filter:blur(0px);transform:scale(1);opacity:1} 50%{filter:blur(3px);transform:scale(0.85);opacity:0.4} }
+      @keyframes t70 { 0%,100%{transform:rotate(5deg) scale(1)} 50%{transform:rotate(-5deg) scale(1.1)} }
+      @keyframes t71 { 0%{letter-spacing:-3px;opacity:0.5} 100%{letter-spacing:6px;opacity:1} }
+      @keyframes t72 { 0%,100%{transform:skewX(0deg) translateY(0)} 50%{transform:skewX(-8deg) translateY(6px)} }
+      @keyframes t73 { 0%{transform:perspective(300px) rotateZ(0deg)} 100%{transform:perspective(300px) rotateZ(12deg)} }
+      @keyframes t74 { 0%,100%{opacity:0.4;transform:scaleX(0.9)} 50%{opacity:1;transform:scaleX(1.1)} }
+      @keyframes t75 { 0%,100%{transform:translateY(-8px) rotate(0deg)} 50%{transform:translateY(8px) rotate(6deg)} }
+      @keyframes t76 { 0%{opacity:1;transform:none} 25%{opacity:0.5;transform:scale(1.1)} 50%{opacity:0.1;transform:scale(0.9)} 75%{opacity:0.7;transform:scale(1.05)} 100%{opacity:1;transform:none} }
+      @keyframes t77 { 0%{transform:rotate(0deg) skewX(0deg)} 100%{transform:rotate(-8deg) skewX(-6deg)} }
+      @keyframes t78 { 0%,100%{opacity:0.7;transform:translateX(0) scaleY(1)} 33%{opacity:0.3;transform:translateX(10px) scaleY(0.8)} 66%{opacity:1;transform:translateX(-5px) scaleY(1.1)} }
+      @keyframes t79 { 0%{transform:scale(1) rotate(0deg);filter:blur(0px)} 100%{transform:scale(1.15) rotate(-4deg);filter:blur(1px)} }
+
     </style>
   </head>
   <body>
@@ -90,13 +222,14 @@
 
     <script>
       const SPREADSHEET_ID = "1pintIO8VNpryzS56eqXaNjqzx5f3EeAV";
-      const KEYS = { note: "당사자의 직접 설명", type: "기억 형식" }; 
+      const KEYS = { note: "당사자의 직접 설명", type: "기억 형식" };
       const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
 
       function createDriftingShape(typeId, startX, startY) {
         const canvas = document.getElementById("canvas");
         const shape = document.createElement("div");
-        shape.className = `memory-shape shape-${typeId}`;
+        // shape는 여전히 8종류 형태 중 순환 (시각적 모양)
+        shape.className = `memory-shape shape-${typeId % 8}`;
         shape.style.left = `${startX}px`;
         shape.style.top = `${startY}px`;
         canvas.appendChild(shape);
@@ -150,7 +283,7 @@
             if (!noteText || noteText.trim() === "") return;
 
             if (!typeMap.has(typeName)) {
-              typeMap.set(typeName, typeCounter % 8);
+              typeMap.set(typeName, typeCounter % 80); // ← 80개 모션으로 순환
               typeCounter++;
             }
 
@@ -166,7 +299,7 @@
 
             span.addEventListener("click", (e) => {
               createDriftingShape(typeId, e.pageX, e.pageY);
-              span.remove(); 
+              span.remove();
             });
 
             canvas.appendChild(span);
