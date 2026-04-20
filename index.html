@@ -94,7 +94,7 @@
   const TYPES = [
     /* 0 — 부유: 물속처럼 낱자가 각자 천천히 흐느적거림 */
     {
-      font: "'Noto Serif KR', serif", size: "15px", weight: "200",
+      font: "'Noto Serif KR', serif", size: "12px", weight: "200",
       color: () => `hsla(220,60%,55%,${0.5 + Math.random() * 0.4})`,
       anim: (el, i) => {
         const dx = (Math.random()-0.5)*60, dy = (Math.random()-0.5)*40;
@@ -113,7 +113,7 @@
 
     /* 1 — 하이라이트: 노란 형광펜 + 손글씨체, 글자 위아래 살랑 */
     {
-      font: "'Gaegu', cursive", size: "15px", weight: "700",
+      font: "'Gaegu', cursive", size: "12px", weight: "700",
       color: () => "#1a1a1a",
       extraStyle: "background:linear-gradient(transparent 58%,#ffe066 58%);padding:0 1px;",
       anim: (el, i) => {
@@ -149,7 +149,7 @@
 
     /* 3 — 흩어짐: 낱자들이 바깥으로 분열하다 돌아옴 */
     {
-      font: "'Black Han Sans', sans-serif", size: "17px", weight: "400",
+      font: "'Black Han Sans', sans-serif", size: "12px", weight: "400",
       color: () => `hsla(${10+Math.random()*20},80%,${38+Math.random()*12}%,${0.6+Math.random()*0.4})`,
       anim: (el, i, total) => {
         const tx = (i - total/2) * 9;
@@ -170,7 +170,7 @@
 
     /* 4 — 전류: 낱자가 순차적으로 번쩍임 */
     {
-      font: "'IBM Plex Mono', monospace", size: "13px", weight: "600",
+      font: "'IBM Plex Mono', monospace", size: "12px", weight: "600",
       color: () => `hsla(45,100%,${30+Math.random()*20}%,0.9)`,
       anim: (el, i) => {
         const dur = 2000;
@@ -190,7 +190,7 @@
 
     /* 5 — 파동: 소리굽쇠처럼 위아래 출렁이는 사인파 */
     {
-      font: "'Noto Serif KR', serif", size: "14px", weight: "400",
+      font: "'Noto Serif KR', serif", size: "12px", weight: "400",
       color: () => `hsla(260,70%,${40+Math.random()*30}%,0.85)`,
       anim: (el, i) => {
         let start = null;
@@ -206,7 +206,7 @@
 
     /* 6 — 희미: 아주 크고 투명하게 출렁이는 배경 텍스처 */
     {
-      font: "'Noto Serif KR', serif", size: "22px", weight: "900",
+      font: "'Noto Serif KR', serif", size: "12px", weight: "900",
       color: () => `rgba(0,0,0,${0.06+Math.random()*0.12})`,
       anim: (el, i) => {
         const dur = 6500 + i*400;
@@ -224,7 +224,7 @@
 
     /* 7 — 먹물: 흐릿하게 번지다 선명해지는 잉크 */
     {
-      font: "'Noto Serif KR', serif", size: "15px", weight: "700",
+      font: "'Noto Serif KR', serif", size: "12px", weight: "700",
       color: () => `rgba(0,0,0,${0.7+Math.random()*0.3})`,
       anim: (el, i) => {
         const cycle = 5500;
@@ -268,7 +268,7 @@
 
     /* 9 — 중력: 낱자가 떨어지다 통통 튐 */
     {
-      font: "'Gaegu', cursive", size: "16px", weight: "300",
+      font: "'Gaegu', cursive", size: "12px", weight: "300",
       color: () => `hsla(340,60%,${40+Math.random()*25}%,0.75)`,
       anim: (el, i) => {
         let vy = 0, y = 0, startTs = null;
@@ -287,7 +287,7 @@
 
     /* 10 — 거울: 낱자가 좌우 뒤집히며 투명도 흔들림 */
     {
-      font: "'Noto Serif KR', serif", size: "14px", weight: "200",
+      font: "'Noto Serif KR', serif", size: "12px", weight: "200",
       color: () => `rgba(80,80,105,0.62)`,
       anim: (el, i) => {
         let s = null;
@@ -304,7 +304,7 @@
 
     /* 11 — 깨짐: 낱자들이 사방으로 흩어졌다 다시 조립 */
     {
-      font: "'Black Han Sans', sans-serif", size: "18px", weight: "400",
+      font: "'Black Han Sans', sans-serif", size: "12px", weight: "400",
       color: () => `rgba(20,20,20,${0.6+Math.random()*0.4})`,
       anim: (el, i) => {
         const ox = (Math.random()-0.5)*85, oy = (Math.random()-0.5)*65, rot = (Math.random()-0.5)*95;
@@ -327,7 +327,7 @@
 
     /* 12 — 밑줄파동: 손글씨체 + 밑줄 굵기가 같이 흔들림 */
     {
-      font: "'Gaegu', cursive", size: "15px", weight: "700",
+      font: "'Gaegu', cursive", size: "12px", weight: "700",
       color: () => `hsla(120,50%,${28+Math.random()*22}%,0.9)`,
       anim: (el, i) => {
         let s = null;
@@ -346,7 +346,7 @@
 
     /* 13 — 소용돌이: 낱자들이 원형 궤도를 그리며 나선 */
     {
-      font: "'IBM Plex Mono', monospace", size: "13px", weight: "600",
+      font: "'IBM Plex Mono', monospace", size: "12px", weight: "600",
       color: () => `hsla(${270+Math.random()*40},70%,${38+Math.random()*28}%,0.88)`,
       anim: (el, i, total) => {
         let s = null;
@@ -391,12 +391,14 @@
   /* ─────────────────────────────────────────────
      DOM 노드 생성: 텍스트 → .mem > .ch 구조
   ───────────────────────────────────────────── */
-  function buildNode(text, typeId, x, y) {
+  function buildNode(text, typeId, x, y, windowW, windowH) {
     const T = TYPES[typeId];
     const wrap = document.createElement('div');
     wrap.className = 'mem';
-    wrap.style.left = x + "px";
-    wrap.style.top  = y + "px";
+    
+    // 반응형 대응을 위해 px 대신 화면 크기 대비 비율(%)로 위치를 지정합니다.
+    wrap.style.left = ((x / windowW) * 100) + "%";
+    wrap.style.top  = ((y / windowH) * 100) + "%";
     wrap.style.fontFamily = T.font;
     wrap.style.fontSize   = T.size;
     wrap.style.fontWeight = T.weight;
@@ -495,11 +497,12 @@
           fallbackCounter++;
         }
 
-        const estW = Math.min([...noteText].length * parseInt(TYPES[typeId].size) * 0.82, 240);
+        // 폰트 크기가 12px로 통일되었으므로 estW 계산값도 이에 맞게 고정합니다.
+        const estW = Math.min([...noteText].length * 12 * 0.82, 240);
         const estH = 44;
         const { x, y } = findPos(W, H, estW, estH);
 
-        const { wrap, chEls, total, T } = buildNode(noteText, typeId, x, y);
+        const { wrap, chEls, total, T } = buildNode(noteText, typeId, x, y, W, H);
         canvas.appendChild(wrap);
         wraps.push(wrap);
 
