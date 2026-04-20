@@ -57,10 +57,10 @@
   </svg>
 
   <div id="bg-layer" class="layer">
-    <img src="./assets/sample2.jpg" alt="background" />
+    <img src="./assets/sample2.jpg?v=2" alt="background" />
   </div>
   <div id="reveal-layer" class="layer">
-    <img src="./assets/sample1.jpg" alt="reveal" />
+    <img src="./assets/sample1.jpg?v=2" alt="reveal" />
   </div>
   <canvas id="text-canvas"></canvas>
 
@@ -295,20 +295,18 @@
       currentR += (targetR - currentR) * R_EASE;
 
       // 2. 마스크 형태 왜곡 연산 (Wobble & Pulse)
-      // 삼각함수를 활용하여 위치가 끊임없이 유기적으로 흔들리게 구성
       const waveX = Math.sin(time * 2.0) * 12;
       const waveY = Math.cos(time * 1.5) * 12;
       const pulseR = Math.sin(time * 3.0) * 8;
       
       const activeR = Math.max(0, currentR + pulseR);
 
-      // 그라데이션 페더링 구간을 넓혀 빛 번짐 효과 강화 (0% -> 40% -> 100%)
+      // 그라데이션 페더링 구간 확대
       reveal.style.webkitMaskImage = reveal.style.maskImage =
         `radial-gradient(circle ${activeR}px at ${currentX + waveX}px ${currentY + waveY}px, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0) 100%)`;
 
       // 3. SVG 굴절(Displacement) 강도 연산
-      // 호버 면적이 커질수록 scale 값을 증폭시키고, 시간에 따라 일렁임을 추가
-      const hoverIntensity = currentR / RADIUS; // 0 ~ 1 범위
+      const hoverIntensity = currentR / RADIUS;
       if (displacement) {
         const scaleValue = (hoverIntensity * 35) + (Math.sin(time * 4) * 10);
         displacement.setAttribute('scale', Math.max(0, scaleValue));
