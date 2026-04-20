@@ -4,27 +4,43 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Memory Typo Map - Drifting Shapes</title>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+    
     <style>
       body {
         margin: 0; padding: 0; width: 100vw; height: 100vh;
-        overflow: hidden; background-color: #ffffff; font-family: sans-serif;
+        overflow: hidden; background-color: #ffffff; 
+        /* 전체 폰트 설정: 프리텐다드, 두께 500(Medium), 자간 -3%(-0.03em) */
+        font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+        font-weight: 500;
+        letter-spacing: -0.03em;
       }
 
       #canvas { position: relative; width: 100%; height: 100%; }
 
       /* 텍스트 스타일 */
       .floating-text {
-        position: absolute; font-size: 11px; color: #000000;
-        max-width: 150px; word-break: keep-all; line-height: 1.5;
-        user-select: none; transition: all 0.3s ease; z-index: 10; cursor: pointer;
+        position: absolute; 
+        font-size: 11px; 
+        color: #000000;
+        font-weight: 500; /* Medium 설정 */
+        letter-spacing: -0.03em; /* 자간 -3% 설정 */
+        max-width: 150px; 
+        word-break: keep-all; 
+        line-height: 1.5;
+        user-select: none; 
+        transition: all 0.3s ease; 
+        z-index: 10; 
+        cursor: pointer;
       }
 
       .floating-text:hover {
-        font-size: 18px; font-weight: bold;
+        font-size: 18px; 
+        font-weight: 700; /* 호버 시에는 더 굵게 */
         text-shadow: 0 0 10px rgba(255,255,255,0.8);
       }
 
-      /* 도형 공통 설정 (유영 애니메이션을 위한 transition 추가) */
+      /* 도형 설정 */
       .memory-shape {
         position: absolute; width: 45px; height: 45px;
         background-color: #333333; 
@@ -32,13 +48,11 @@
         z-index: 5;
         margin-left: -22.5px;
         margin-top: -22.5px;
-        opacity: 0; /* 생성 직후 투명한 상태로 시작 */
-        
-        /* 위치(left, top), 회전(transform), 투명도(opacity)가 부드럽게 전환됨 */
+        opacity: 0;
         transition: left 8s ease-in-out, top 8s ease-in-out, transform 8s ease-in-out, opacity 0.5s ease-out;
       }
 
-      /* 8가지 도형 유형 (형태 유지) */
+      /* 8가지 도형 유형 클립패스 */
       .shape-0 { clip-path: circle(50% at 50% 50%); } 
       .shape-1 { clip-path: inset(5% 10% 5% 10%); } 
       .shape-2 { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); } 
@@ -48,7 +62,7 @@
       .shape-6 { clip-path: ellipse(25% 45% at 50% 50%); } 
       .shape-7 { clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%); } 
 
-      /* 기존 텍스트 애니메이션 유지 */
+      /* 애니메이션 타입들 */
       .type-0 { animation: fadeUpFlow 8s infinite ease-in-out; }
       @keyframes fadeUpFlow { 0%, 100% { opacity: 0; transform: translateY(10px); } 50% { opacity: 1; transform: translateY(-10px); } }
       .type-1 { animation: snapAlign 4s infinite step-end; }
@@ -56,7 +70,7 @@
       .type-2 { animation: slowDrift 10s infinite alternate linear; }
       @keyframes slowDrift { 0% { transform: translate(0, 0); } 100% { transform: translate(20px, -10px); } }
       .type-3 { animation: trackNetwork 6s infinite alternate ease-in-out; }
-      @keyframes trackNetwork { 0% { letter-spacing: 0px; transform: translateX(0); } 100% { letter-spacing: 2px; transform: translateX(15px); } }
+      @keyframes trackNetwork { 0% { letter-spacing: -0.03em; transform: translateX(0); } 100% { letter-spacing: 0.02em; transform: translateX(15px); } }
       .type-4 { animation: compressSchema 5s infinite alternate ease-in-out; transform-origin: left center; }
       @keyframes compressSchema { 0% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(0.4) scaleX(0.9); opacity: 0.8; } }
       .type-5 { animation: skewImage 8s infinite alternate ease-in-out; perspective: 1000px; }
@@ -71,7 +85,8 @@
     <div id="canvas"></div>
 
     <script>
-      const SPREADSHEET_ID = "1pintIO8VNpryzS56eqXaNjqzx5f3EeAV";
+      // 사용자 스프레드시트 ID
+      const SPREADSHEET_ID = "1gwxvcHqxgNHOOoS1R_NV8EH7WHNudGd7EhsvWHG76p8";
       
       const KEYS = { 
         note: "당사자의 직접 설명", 
@@ -80,41 +95,28 @@
       
       const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
 
-      // 화면을 유영하는 도형 생성 함수
+      // 유영하는 도형 생성
       function createDriftingShape(typeId, startX, startY) {
         const canvas = document.getElementById("canvas");
         const shape = document.createElement("div");
-        
         shape.className = `memory-shape shape-${typeId}`;
-        
-        // 클릭한 초기 위치 설정
         shape.style.left = `${startX}px`;
         shape.style.top = `${startY}px`;
-        
         canvas.appendChild(shape);
 
-        // 생성 직후 투명도를 올려 부드럽게 나타나게 함
-        setTimeout(() => {
-          shape.style.opacity = "0.7";
-        }, 10);
+        setTimeout(() => { shape.style.opacity = "0.7"; }, 10);
 
-        // 새로운 랜덤 좌표와 회전값을 생성하여 이동시키는 함수
         function drift() {
-          if (!shape.parentElement) return; // 요소가 사라졌다면 중지
-          
-          // 화면 밖으로 나가지 않도록 여백을 둔 랜덤 좌표 생성
+          if (!shape.parentElement) return;
           const newX = Math.floor(Math.random() * (window.innerWidth - 100)) + 50;
           const newY = Math.floor(Math.random() * (window.innerHeight - 100)) + 50;
           const newRot = Math.floor(Math.random() * 360);
-          
           shape.style.left = `${newX}px`;
           shape.style.top = `${newY}px`;
           shape.style.transform = `rotate(${newRot}deg)`;
         }
 
-        // 약간의 딜레이 후 첫 유영 시작
         setTimeout(drift, 100);
-        // 이후 8초(transition 시간과 동일)마다 새로운 목적지로 계속 이동
         setInterval(drift, 8000);
       }
 
@@ -151,7 +153,6 @@
           rows.forEach((row) => {
             const noteText = row[KEYS.note];
             const typeName = row[KEYS.type] || "미분류";
-            
             if (!noteText || noteText.trim() === "") return;
 
             if (!typeMap.has(typeName)) {
@@ -169,11 +170,8 @@
             span.style.top = `${randomTop}vh`;
             span.style.left = `${randomLeft}vw`;
 
-            // 클릭 이벤트: 텍스트 삭제 후 떠다니는 도형 생성
             span.addEventListener("click", (e) => {
-              // 1. 유영하는 도형 생성 (마우스 클릭 좌표 기준)
               createDriftingShape(typeId, e.pageX, e.pageY);
-              // 2. 원래 있던 텍스트 노드는 DOM에서 즉시 완전히 삭제
               span.remove(); 
             });
 
