@@ -15,232 +15,113 @@
     html, body {
       width: 100%;
       height: 100%;
-      background: #ffffff;
       overflow: hidden;
+      background: #000;
     }
 
-    body {
-      font-family:
-        -apple-system, BlinkMacSystemFont,
-        "Apple SD Gothic Neo", "Malgun Gothic",
-        "Segoe UI", sans-serif;
+    /* ── 공통: 두 레이어 모두 화면 꽉 채움 ── */
+    .layer {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
     }
 
-    #canvas {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-    }
-
-    /* ── 이미지 카드 ── */
-    .mem {
-      position: absolute;
-      width: 240px;
-      height: 180px;
-      border-radius: 6px;
-      overflow: hidden;
-      cursor: pointer;
-      transform-style: preserve-3d;
-      will-change: transform;
-      transition: box-shadow 0.4s ease;
-    }
-
-    .mem:hover {
-      z-index: 100;
-      box-shadow:
-        0 20px 60px rgba(0, 0, 0, 0.15),
-        0 0 0 1px rgba(0, 0, 0, 0.04);
-    }
-
-    .mem img {
-      display: block;
+    .layer img {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transition: filter 0.4s ease;
     }
 
-    .mem:hover img {
-      filter: brightness(1.05);
+    /* ── ① 배경 레이어: 항상 보임 ── */
+    #bg-layer {
+      z-index: 1;
     }
 
-    /* 글레어 (빛 반사) */
-    .mem-glare {
-      position: absolute;
-      inset: 0;
-      border-radius: 6px;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s ease;
+    /* ── ② 개체 레이어: 마스크로 가려짐 ── */
+    #reveal-layer {
       z-index: 2;
-    }
 
-    @media (max-width: 768px) {
-      #canvas { overflow: auto; }
-      .mem { width: 160px; height: 120px; }
+      /* 처음엔 완전히 안 보임 (마스크 크기 0) */
+      -webkit-mask-image: radial-gradient(
+        circle 0px at 50% 50%,
+        rgba(0,0,0,1) 0%,
+        rgba(0,0,0,0.3) 60%,
+        rgba(0,0,0,0) 100%
+      );
+      mask-image: radial-gradient(
+        circle 0px at 50% 50%,
+        rgba(0,0,0,1) 0%,
+        rgba(0,0,0,0.3) 60%,
+        rgba(0,0,0,0) 100%
+      );
     }
   </style>
 </head>
 <body>
-  <div id="canvas"></div>
+
+  <!-- ① 배경 (개체 없는 이미지) -->
+  <div id="bg-layer" class="layer">
+    <img src="./assets/sample2.png" alt="background" />
+  </div>
+
+  <!-- ② 개체 (호버 시 보임) -->
+  <div id="reveal-layer" class="layer">
+    <img src="./assets/sample1.png" alt="reveal" />
+  </div>
 
   <script>
-    const SPREADSHEET_ID = "1pintIO8VNpryzS56eqXaNjqzx5f3EeAV";
-    const KEYS = { note: "당사자의 직접 설명" };
-    const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
-    const IMG_BASE = "./assets/";
+    const reveal = document.getElementById("reveal-layer");
 
-    const canvas = document.getElementById("canvas");
-    let rowsData = [];
+    /* ── Lerp 보간용 변수 ── */
+    let targetX = window.innerWidth / 2;
+    let targetY = window.innerHeight / 2;
+    let currentX = targetX;
+    let currentY = targetY;
 
-    /* ── CSV 파서 ── */
-    function splitCSVLine(line) {
-      const result = [];
-      let current = "";
-      let inQuotes = false;
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        if (char === '"') {
-          if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
-          else inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          result.push(current); current = "";
-        } else { current += char; }
-      }
-      result.push(current);
-      return result;
-    }
+    /* spotlight 크기 */
+    let targetR = 0;       // 마우스가 화면 밖이면 0
+    let currentR = 0;
+    const RADIUS = 180;    // 호버 시 spotlight 반지름 (px)
+    const EASE = 0.07;     // 따라오는 속도 (작을수록 느리고 부드러움)
+    const R_EASE = 0.06;   // 크기 변화 속도
 
-    function parseCSV(text) {
-      const lines = text.trim().split(/\r?\n/);
-      const headers = splitCSVLine(lines[0]).map(h => h.trim());
-      return lines.slice(1).map(line => {
-        const values = splitCSVLine(line);
-        const obj = {};
-        headers.forEach((header, i) => {
-          obj[header] = (values[i] || "").trim();
-        });
-        return obj;
-      });
-    }
-
-    /* ── 겹침 방지 배치 ── */
-    const placed = [];
-
-    function findPosition(W, H, estW, estH) {
-      let x, y, tries = 0;
-      do {
-        x = 20 + Math.random() * Math.max(20, W - estW - 40);
-        y = 20 + Math.random() * Math.max(20, H - estH - 40);
-        tries++;
-      } while (
-        tries < 80 &&
-        placed.some(r =>
-          x < r.x + r.w + 24 &&
-          x + estW + 24 > r.x &&
-          y < r.y + r.h + 24 &&
-          y + estH + 24 > r.y
-        )
-      );
-      placed.push({ x, y, w: estW, h: estH });
-      return { x, y };
-    }
-
-    /* ══════════════════════════════════
-       ★ immersive-g 스타일 3D Tilt 호버
-       ══════════════════════════════════ */
-    function addTiltEffect(card) {
-      const TILT = 15;       // 최대 기울기 (도)
-      const GLARE = 0.18;    // 글레어 최대 밝기
-
-      const glare = document.createElement("div");
-      glare.className = "mem-glare";
-      card.appendChild(glare);
-
-      card.addEventListener("mouseenter", () => {
-        card.style.transition = "transform 0.08s ease-out, box-shadow 0.4s ease";
-      });
-
-      card.addEventListener("mousemove", (e) => {
-        const rect = card.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top  + rect.height / 2;
-
-        const px = (e.clientX - cx) / (rect.width / 2);   // -1 ~ 1
-        const py = (e.clientY - cy) / (rect.height / 2);
-
-        card.style.transform =
-          `perspective(600px) rotateX(${-py * TILT}deg) rotateY(${px * TILT}deg) scale(1.04)`;
-
-        const gx = ((e.clientX - rect.left) / rect.width) * 100;
-        const gy = ((e.clientY - rect.top)  / rect.height) * 100;
-        glare.style.background =
-          `radial-gradient(circle at ${gx}% ${gy}%, rgba(255,255,255,${GLARE}), transparent 55%)`;
-        glare.style.opacity = "1";
-      });
-
-      card.addEventListener("mouseleave", () => {
-        card.style.transition = "transform 0.45s cubic-bezier(0.25,0.46,0.45,0.94), box-shadow 0.4s ease";
-        card.style.transform  = "perspective(600px) rotateX(0) rotateY(0) scale(1)";
-        glare.style.opacity   = "0";
-      });
-    }
-
-    /* ── 렌더링 ── */
-    function render(rows) {
-      canvas.innerHTML = "";
-      placed.length = 0;
-
-      const W = window.innerWidth;
-      const H = window.innerHeight;
-      const cardW = W < 768 ? 160 : 240;
-      const cardH = W < 768 ? 120 : 180;
-
-      rows.forEach(row => {
-        const fileName = (row[KEYS.note] || "").trim();
-        if (!fileName) return;
-
-        // .png 파일만 처리
-        if (!/\.png$/i.test(fileName)) return;
-
-        const { x, y } = findPosition(W, H, cardW, cardH);
-
-        const el = document.createElement("div");
-        el.className = "mem";
-        el.style.left = `${x}px`;
-        el.style.top  = `${y}px`;
-
-        const img = document.createElement("img");
-        img.src = IMG_BASE + fileName;
-        img.alt = fileName;
-        el.appendChild(img);
-
-        // ★ 3D Tilt 호버 적용
-        addTiltEffect(el);
-
-        canvas.appendChild(el);
-      });
-    }
-
-    /* ── 데이터 로드 ── */
-    fetch(CSV_URL)
-      .then(res => res.text())
-      .then(text => {
-        rowsData = parseCSV(text);
-        render(rowsData);
-      })
-      .catch(err => {
-        console.error("CSV 로드 실패:", err);
-      });
-
-    let resizeTimer;
-    window.addEventListener("resize", () => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        if (rowsData.length) render(rowsData);
-      }, 200);
+    /* ── 마우스 이벤트 ── */
+    document.addEventListener("mousemove", (e) => {
+      targetX = e.clientX;
+      targetY = e.clientY;
+      targetR = RADIUS;
     });
+
+    document.addEventListener("mouseleave", () => {
+      targetR = 0;   // 화면 밖으로 나가면 닫힘
+    });
+
+    document.addEventListener("mouseenter", () => {
+      targetR = RADIUS;
+    });
+
+    /* ── 애니메이션 루프 ── */
+    function animate() {
+      // lerp: 현재값을 목표값 쪽으로 부드럽게 이동
+      currentX += (targetX - currentX) * EASE;
+      currentY += (targetY - currentY) * EASE;
+      currentR += (targetR - currentR) * R_EASE;
+
+      const mask = `radial-gradient(
+        circle ${currentR}px at ${currentX}px ${currentY}px,
+        rgba(0,0,0,1) 0%,
+        rgba(0,0,0,0.6) 50%,
+        rgba(0,0,0,0) 100%
+      )`;
+
+      reveal.style.webkitMaskImage = mask;
+      reveal.style.maskImage = mask;
+
+      requestAnimationFrame(animate);
+    }
+
+    animate();
   </script>
 </body>
 </html>
