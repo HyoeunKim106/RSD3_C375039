@@ -3,108 +3,323 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Memory Image Map</title>
+  <title>Apple Text Motion</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700;900&display=swap" rel="stylesheet" />
 
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
       overflow: hidden;
-      background: #000;
+      background: #1a1f1e;
+      font-family: 'Noto Serif KR', serif;
     }
 
-    .layer {
+    canvas {
       position: fixed;
       inset: 0;
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
     }
 
-    .layer img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
+    /* 안내 문구 */
+    #hint {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.25);
+      font-size: 13px;
+      letter-spacing: 1px;
+      pointer-events: none;
+      transition: opacity 0.5s;
+      font-family: 'Noto Serif KR', serif;
     }
-
-    #bg-layer {
-      z-index: 1;
-    }
-
-    #reveal-layer {
-      z-index: 2;
-      -webkit-mask-image: radial-gradient(
-        circle 0px at 50% 50%,
-        rgba(0,0,0,1) 0%,
-        rgba(0,0,0,0.3) 60%,
-        rgba(0,0,0,0) 100%
-      );
-      mask-image: radial-gradient(
-        circle 0px at 50% 50%,
-        rgba(0,0,0,1) 0%,
-        rgba(0,0,0,0.3) 60%,
-        rgba(0,0,0,0) 100%
-      );
-    }
+    #hint.hide { opacity: 0; }
   </style>
 </head>
 <body>
 
-  <div id="bg-layer" class="layer">
-    <img src="./assets/sample2.jpg" alt="background" />
-  </div>
-
-  <div id="reveal-layer" class="layer">
-    <img src="./assets/sample1.jpg" alt="reveal" />
-  </div>
+  <canvas id="c"></canvas>
+  <div id="hint">길게 클릭하세요</div>
 
   <script>
-    const reveal = document.getElementById("reveal-layer");
+    const canvas = document.getElementById("c");
+    const ctx = canvas.getContext("2d");
+    const hint = document.getElementById("hint");
 
-    let targetX = window.innerWidth / 2;
-    let targetY = window.innerHeight / 2;
-    let currentX = targetX;
-    let currentY = targetY;
+    let W, H;
+    function resize() {
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener("resize", resize);
 
-    let targetR = 0;
-    let currentR = 0;
-    const RADIUS = 180;
-    const EASE = 0.07;
-    const R_EASE = 0.06;
+    /* ═══════════ 설정 ═══════════ */
+    const TEXT = "사과의 시각적 표상은 없지만, 벡터가 포함된 완벽한 3D 모델을 가지고 있어요.";
+    const CYAN = "#00f0ff";
+    const MAROON = "rgba(120, 10, 20, 0.85)";
+    const FONT_SIZE_BASE = 28;
 
-    document.addEventListener("mousemove", (e) => {
-      targetX = e.clientX;
-      targetY = e.clientY;
-      targetR = RADIUS;
-    });
+    /* ═══════════ 사과 형상 (2D 경로) ═══════════ */
+    // 사과의 외곽선을 점으로 정의 (중심 기준, 반지름 ~150)
+    function isInsideApple(x, y, cx, cy, scale) {
+      const dx = (x - cx) / scale;
+      const dy = (y - cy) / scale;
 
-    document.addEventListener("mouseleave", () => {
-      targetR = 0;
-    });
+      // 사과 몸통: 약간 위가 움푹한 원
+      const bodyR = 140;
+      const bodyY = dy + 15;
+      const bodyDist = Math.sqrt(dx * dx + bodyY * bodyY);
 
-    document.addEventListener("mouseenter", () => {
-      targetR = RADIUS;
-    });
+      // 위쪽 움푹한 부분
+      const topDent = dx * dx * 0.003;
+      const inBody = bodyDist < bodyR + topDent - Math.max(0, -bodyY) * 0.15;
+
+      return inBody && dy > -bodyR * 1.05 && dy < bodyR * 0.95;
+    }
+
+    /* ═══════════ 글자 파티클 ═══════════ */
+    const chars = [];
+    let isHolding = false;
+    let holdTime = 0;
+    let spawnTimer = 0;
+    let spawnIndex = 0;
+
+    class Char {
+      constructor(char, index) {
+        this.char = char;
+        this.index = index;
+
+        // 사과 형상 안 랜덤 위치에서 시작
+        const angle = Math.random() * Math.PI * 2;
+        const r = Math.random() * 100;
+        this.x = Math.cos(angle) * r;
+        this.y = Math.sin(angle) * r - 10;
+        this.z = (Math.random() - 0.5) * 200;
+
+        // 속도
+        this.vx = (Math.random() - 0.5) * 1.5;
+        this.vy = (Math.random() - 0.5) * 1.5;
+        this.vz = (Math.random() - 0.5) * 2;
+
+        // 회전
+        this.rotX = Math.random() * Math.PI * 2;
+        this.rotY = Math.random() * Math.PI * 2;
+        this.rotSpeed = (Math.random() - 0.5) * 0.06;
+
+        this.life = 1.0;
+        this.maxLife = 1.0;
+        this.alive = true;
+        this.fontSize = FONT_SIZE_BASE + Math.random() * 14 - 7;
+      }
+
+      update(cx, cy, scale) {
+        // 3D 회전
+        this.rotX += this.rotSpeed * 0.7;
+        this.rotY += this.rotSpeed;
+
+        if (isHolding) {
+          // 사과 안에서 떠다님
+          this.x += this.vx;
+          this.y += this.vy;
+          this.z += this.vz;
+
+          // 사과 경계에서 반사
+          if (!isInsideApple(this.x + cx, this.y + cy, cx, cy, scale)) {
+            // 중심 방향으로 되돌림
+            const toCenterX = -this.x * 0.03;
+            const toCenterY = -this.y * 0.03;
+            this.vx += toCenterX;
+            this.vy += toCenterY;
+          }
+
+          // z축 바운스
+          if (Math.abs(this.z) > 120) {
+            this.vz *= -0.8;
+          }
+
+          // 약간의 감속
+          this.vx *= 0.995;
+          this.vy *= 0.995;
+          this.vz *= 0.995;
+
+          // 미세한 랜덤 가속
+          this.vx += (Math.random() - 0.5) * 0.15;
+          this.vy += (Math.random() - 0.5) * 0.15;
+          this.vz += (Math.random() - 0.5) * 0.2;
+
+        } else {
+          // 놓으면 서서히 사라짐
+          this.life -= 0.012;
+          this.vy += 0.08; // 중력
+          this.y += this.vy;
+          this.x += this.vx;
+
+          if (this.life <= 0) this.alive = false;
+        }
+      }
+
+      draw(cx, cy) {
+        if (!this.alive) return;
+
+        // z축 기반 perspective
+        const perspective = 600;
+        const projScale = perspective / (perspective + this.z);
+        const screenX = cx + this.x * projScale;
+        const screenY = cy + this.y * projScale;
+
+        // z축 기반 크기/투명도
+        const size = this.fontSize * projScale;
+        const zAlpha = Math.max(0.2, Math.min(1, projScale));
+        const alpha = this.life * zAlpha;
+
+        if (alpha <= 0) return;
+
+        ctx.save();
+        ctx.translate(screenX, screenY);
+
+        // Y축 회전 시뮬레이션 (scaleX)
+        const scaleX = Math.cos(this.rotY);
+        ctx.scale(scaleX, 1);
+
+        // 박스 배경
+        const metrics = ctx.measureText(this.char);
+        ctx.font = `900 ${size}px 'Noto Serif KR', serif`;
+        const charW = ctx.measureText(this.char).width;
+        const padX = size * 0.15;
+        const padY = size * 0.1;
+
+        ctx.fillStyle = MAROON.replace("0.85", (alpha * 0.85).toFixed(2));
+        ctx.fillRect(
+          -charW / 2 - padX,
+          -size * 0.38 - padY,
+          charW + padX * 2,
+          size * 0.5 + padY * 2
+        );
+
+        // 글자
+        ctx.fillStyle = CYAN;
+        ctx.globalAlpha = alpha;
+        ctx.font = `900 ${size}px 'Noto Serif KR', serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.letterSpacing = "-2px";
+        ctx.fillText(this.char, 0, 0);
+
+        ctx.restore();
+      }
+    }
+
+    /* ═══════════ 사과 외곽선 그리기 ═══════════ */
+    function drawAppleOutline(cx, cy, scale, alpha) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(scale, scale);
+
+      ctx.beginPath();
+
+      // 사과 몸통
+      ctx.moveTo(0, -120);
+
+      // 왼쪽 위 곡선 (움푹)
+      ctx.bezierCurveTo(-15, -130, -50, -140, -90, -110);
+      // 왼쪽
+      ctx.bezierCurveTo(-145, -70, -150, -10, -140, 30);
+      // 왼쪽 아래
+      ctx.bezierCurveTo(-130, 80, -90, 125, -40, 135);
+      // 아래
+      ctx.bezierCurveTo(-10, 140, 10, 140, 40, 135);
+      // 오른쪽 아래
+      ctx.bezierCurveTo(90, 125, 130, 80, 140, 30);
+      // 오른쪽
+      ctx.bezierCurveTo(150, -10, 145, -70, 90, -110);
+      // 오른쪽 위 (움푹)
+      ctx.bezierCurveTo(50, -140, 15, -130, 0, -120);
+
+      ctx.closePath();
+
+      ctx.strokeStyle = `rgba(0, 240, 255, ${alpha * 0.15})`;
+      ctx.lineWidth = 1.5 / scale;
+      ctx.stroke();
+
+      // 꼭지
+      ctx.beginPath();
+      ctx.moveTo(0, -120);
+      ctx.bezierCurveTo(5, -145, 3, -165, -2, -175);
+      ctx.strokeStyle = `rgba(0, 240, 255, ${alpha * 0.2})`;
+      ctx.lineWidth = 2 / scale;
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    /* ═══════════ 마우스 / 터치 ═══════════ */
+    function startHold() {
+      isHolding = true;
+      holdTime = 0;
+      spawnIndex = 0;
+      hint.classList.add("hide");
+    }
+
+    function endHold() {
+      isHolding = false;
+    }
+
+    canvas.addEventListener("mousedown", startHold);
+    canvas.addEventListener("mouseup", endHold);
+    canvas.addEventListener("mouseleave", endHold);
+    canvas.addEventListener("touchstart", (e) => { e.preventDefault(); startHold(); });
+    canvas.addEventListener("touchend", endHold);
+
+    /* ═══════════ 메인 루프 ═══════════ */
+    let time = 0;
 
     function animate() {
-      currentX += (targetX - currentX) * EASE;
-      currentY += (targetY - currentY) * EASE;
-      currentR += (targetR - currentR) * R_EASE;
+      time += 0.016;
+      ctx.clearRect(0, 0, W, H);
 
-      const mask = `radial-gradient(
-        circle ${currentR}px at ${currentX}px ${currentY}px,
-        rgba(0,0,0,1) 0%,
-        rgba(0,0,0,0.6) 50%,
-        rgba(0,0,0,0) 100%
-      )`;
+      const cx = W / 2;
+      const cy = H / 2;
+      const scale = Math.min(W, H) / 420;
 
-      reveal.style.webkitMaskImage = mask;
-      reveal.style.maskImage = mask;
+      // 클릭 중이면 글자 스폰
+      if (isHolding) {
+        holdTime += 0.016;
+        spawnTimer += 0.016;
+
+        // 0.06초마다 한 글자씩
+        while (spawnTimer > 0.06 && spawnIndex < TEXT.length) {
+          chars.push(new Char(TEXT[spawnIndex], spawnIndex));
+          spawnIndex++;
+          spawnTimer -= 0.06;
+
+          // 텍스트 끝까지 가면 다시 처음부터
+          if (spawnIndex >= TEXT.length) {
+            spawnIndex = 0;
+          }
+        }
+      }
+
+      // 사과 외곽선 (은은하게)
+      const outlineAlpha = isHolding
+        ? Math.min(1, holdTime * 2)
+        : Math.max(0, chars.filter(c => c.alive).length / TEXT.length * 0.5);
+      drawAppleOutline(cx, cy, scale, outlineAlpha);
+
+      // z축 기준 정렬 (뒤에 있는 것 먼저 그리기)
+      chars.sort((a, b) => b.z - a.z);
+
+      // 업데이트 & 그리기
+      for (let i = chars.length - 1; i >= 0; i--) {
+        chars[i].update(cx, cy, scale);
+        chars[i].draw(cx, cy);
+
+        if (!chars[i].alive) {
+          chars.splice(i, 1);
+        }
+      }
 
       requestAnimationFrame(animate);
     }
