@@ -39,11 +39,11 @@
         position: absolute; font-size: 11px; color: #000000;
         max-width: 150px; word-break: keep-all; line-height: 1.5;
         user-select: none; transition: all 0.3s ease; z-index: 10; cursor: pointer;
-        font-family: inherit; font-weight: 700;
+        font-family: inherit; /* body에서 상속 */
       }
 
       .floating-text:hover {
-        font-size: 18px; font-weight: 900;
+        font-size: 18px; font-weight: 700;
         text-shadow: 0 0 10px rgba(255,255,255,0.8);
       }
 
