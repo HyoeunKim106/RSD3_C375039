@@ -17,8 +17,10 @@
       height: 100%;
       overflow: hidden;
       background: #000;
+      cursor: none;
     }
 
+    /* ── 공통 레이어 ── */
     .layer {
       position: fixed;
       inset: 0;
@@ -32,54 +34,116 @@
       object-fit: cover;
     }
 
+    /* ── ① 배경: 어둡고 desaturated ── */
     #bg-layer {
       z-index: 1;
     }
 
+    #bg-layer img {
+      filter: brightness(0.3) saturate(0.2);
+      transition: filter 0.8s ease;
+    }
+
+    /* ── ② 개체 레이어 ── */
     #reveal-layer {
       z-index: 2;
       -webkit-mask-image: radial-gradient(
         circle 0px at 50% 50%,
         rgba(0,0,0,1) 0%,
-        rgba(0,0,0,0.3) 60%,
         rgba(0,0,0,0) 100%
       );
       mask-image: radial-gradient(
         circle 0px at 50% 50%,
         rgba(0,0,0,1) 0%,
-        rgba(0,0,0,0.3) 60%,
         rgba(0,0,0,0) 100%
       );
+    }
+
+    #reveal-layer img {
+      filter: brightness(1.1) saturate(1.2) contrast(1.05);
+    }
+
+    /* ── 커스텀 커서 ── */
+    #cursor-dot {
+      position: fixed;
+      z-index: 100;
+      width: 8px;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 50%;
+      pointer-events: none;
+      mix-blend-mode: difference;
+      transform: translate(-50%, -50%);
+    }
+
+    #cursor-ring {
+      position: fixed;
+      z-index: 100;
+      width: 48px;
+      height: 48px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      border-radius: 50%;
+      pointer-events: none;
+      mix-blend-mode: difference;
+      transform: translate(-50%, -50%);
+      transition: width 0.3s ease, height 0.3s ease, border-color 0.3s ease;
     }
   </style>
 </head>
 <body>
 
+  <!-- ① 배경 (어둡게) -->
   <div id="bg-layer" class="layer">
     <img src="./assets/sample2.jpg" alt="background" />
   </div>
 
+  <!-- ② 개체 (spotlight reveal) -->
   <div id="reveal-layer" class="layer">
     <img src="./assets/sample1.jpg" alt="reveal" />
   </div>
 
-  <script>
-    const reveal = document.getElementById("reveal-layer");
+  <!-- 커스텀 커서 -->
+  <div id="cursor-dot"></div>
+  <div id="cursor-ring"></div>
 
-    let targetX = window.innerWidth / 2;
-    let targetY = window.innerHeight / 2;
+  <script>
+    const reveal    = document.getElementById("reveal-layer");
+    const cursorDot = document.getElementById("cursor-dot");
+    const cursorRing = document.getElementById("cursor-ring");
+
+    /* ═══════════ Lerp 변수 ═══════════ */
+
+    // 마스크 위치
+    let targetX  = window.innerWidth / 2;
+    let targetY  = window.innerHeight / 2;
     let currentX = targetX;
     let currentY = targetY;
 
-    let targetR = 0;
+    // 마스크 반지름
+    let targetR  = 0;
     let currentR = 0;
-    const RADIUS = 180;
-    const EASE = 0.07;
-    const R_EASE = 0.06;
+    const RADIUS = 320;       // ★ 훨씬 넓은 spotlight
+
+    // 속도
+    const POS_EASE = 0.055;   // 위치 따라오는 속도 (느리고 묵직)
+    const R_EASE   = 0.045;   // 크기 변화 속도
+
+    // 커서 위치
+    let cursorTargetX = targetX;
+    let cursorTargetY = targetY;
+    let cursorX = targetX;
+    let cursorY = targetY;
+
+    // 일렁임 (distortion)
+    let time = 0;
+
+    /* ═══════════ 이벤트 ═══════════ */
 
     document.addEventListener("mousemove", (e) => {
       targetX = e.clientX;
       targetY = e.clientY;
+      cursorTargetX = e.clientX;
+      cursorTargetY = e.clientY;
       targetR = RADIUS;
     });
 
@@ -91,20 +155,53 @@
       targetR = RADIUS;
     });
 
+    /* ═══════════ 애니메이션 루프 ═══════════ */
+
     function animate() {
-      currentX += (targetX - currentX) * EASE;
-      currentY += (targetY - currentY) * EASE;
+      time += 0.015;
+
+      // ── lerp 위치 ──
+      currentX += (targetX - currentX) * POS_EASE;
+      currentY += (targetY - currentY) * POS_EASE;
       currentR += (targetR - currentR) * R_EASE;
 
+      // ── 일렁임: sin/cos로 반지름과 위치 흔들기 ──
+      const wobbleR = Math.sin(time * 3.2) * 18 + Math.cos(time * 2.1) * 12;
+      const wobbleX = Math.sin(time * 2.5) * 6;
+      const wobbleY = Math.cos(time * 1.8) * 6;
+
+      const finalR = Math.max(0, currentR + wobbleR);
+      const finalX = currentX + wobbleX;
+      const finalY = currentY + wobbleY;
+
+      // ── 마스크 적용 (넓고 부드러운 가장자리) ──
       const mask = `radial-gradient(
-        circle ${currentR}px at ${currentX}px ${currentY}px,
+        ellipse ${finalR}px ${finalR * 0.85}px at ${finalX}px ${finalY}px,
         rgba(0,0,0,1) 0%,
-        rgba(0,0,0,0.6) 50%,
+        rgba(0,0,0,0.95) 20%,
+        rgba(0,0,0,0.7) 45%,
+        rgba(0,0,0,0.3) 70%,
         rgba(0,0,0,0) 100%
       )`;
 
       reveal.style.webkitMaskImage = mask;
       reveal.style.maskImage = mask;
+
+      // ── 배경 미세 이동 (패럴렉스) ──
+      const px = (currentX / window.innerWidth  - 0.5) * -12;
+      const py = (currentY / window.innerHeight - 0.5) * -12;
+      document.getElementById("bg-layer").style.transform =
+        `scale(1.05) translate(${px}px, ${py}px)`;
+      document.getElementById("reveal-layer").style.transform =
+        `scale(1.05) translate(${px * 0.5}px, ${py * 0.5}px)`;
+
+      // ── 커스텀 커서 ──
+      cursorX += (cursorTargetX - cursorX) * 0.15;
+      cursorY += (cursorTargetY - cursorY) * 0.15;
+      cursorDot.style.left  = cursorTargetX + "px";
+      cursorDot.style.top   = cursorTargetY + "px";
+      cursorRing.style.left = cursorX + "px";
+      cursorRing.style.top  = cursorY + "px";
 
       requestAnimationFrame(animate);
     }
