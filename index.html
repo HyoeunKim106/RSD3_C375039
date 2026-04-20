@@ -66,34 +66,19 @@
     let isHolding = false;
     let holdAlpha = 0;
     let rotY = 0;
-    let morphTo = 0;
-    let currentShape = 0; // 0=구, 1=큐브, 2=원기둥, 3=토러스, 4=피라미드
 
-    /* ═══════ 3D 사과 메쉬 생성 ═══════ */
-
-    // 사과 몸통 프로파일
+    /* ═══════ 3D 사과 메쉬 ═══════ */
     function appleRadius(v) {
-      const t = v / Math.PI; // 0(위)~1(아래)
+      const t = v / Math.PI;
       let r = Math.sin(v);
-
-      // 위쪽 움푹
-      if (t < 0.15) {
-        r *= 0.3 + 0.7 * (t / 0.15);
-      }
-      // 가장 볼록한 부분을 살짝 아래로
+      if (t < 0.15) r *= 0.3 + 0.7 * (t / 0.15);
       r *= 1.0 + 0.2 * Math.sin(v * 0.9 - 0.1);
-      // 아래 살짝 모임
-      if (t > 0.85) {
-        r *= 1.0 - (t - 0.85) / 0.15 * 0.3;
-      }
+      if (t > 0.85) r *= 1.0 - (t - 0.85) / 0.15 * 0.3;
       return r * 90;
     }
 
-    function appleY(v) {
-      return -Math.cos(v) * 100;
-    }
+    function appleY(v) { return -Math.cos(v) * 100; }
 
-    // 사과 포인트
     const applePoints = [];
     const ROWS = 16, COLS = 22;
     let charIdx = 0;
@@ -102,155 +87,125 @@
       const v = (row + 0.5) / ROWS * Math.PI;
       const r = appleRadius(v);
       const y = appleY(v);
-
       for (let col = 0; col < COLS; col++) {
         const u = (col / COLS) * Math.PI * 2;
         applePoints.push({
-          // 사과 좌표
-          ax: r * Math.cos(u),
-          ay: y,
-          az: r * Math.sin(u),
-          char: TEXT[charIdx % TEXT.length],
-          row, col,
-          u, v
+          ax: r * Math.cos(u), ay: y, az: r * Math.sin(u),
+          char: TEXT[charIdx % TEXT.length], row, col
         });
         charIdx++;
       }
     }
 
-    // 꼭지 (줄기)
-    const stemPoints = [];
     for (let i = 0; i < 6; i++) {
       const t = i / 5;
-      stemPoints.push({
-        ax: Math.sin(t * 0.3) * 3,
-        ay: -105 - t * 30,
-        az: Math.cos(t * 0.2) * 2,
-        char: "│",
-        row: -1, col: i, u: 0, v: 0
+      applePoints.push({
+        ax: Math.sin(t * 0.3) * 3, ay: -105 - t * 30, az: Math.cos(t * 0.2) * 2,
+        char: "│", isStem: true, row: -1, col: i
       });
     }
 
-    // 나뭇잎
-    const leafPoints = [];
-    const LEAF_CHARS = "잎잎잎잎잎잎잎잎잎잎잎잎";
     for (let i = 0; i < 18; i++) {
       const t = i / 17;
-      // 잎 형태: 타원 곡선
-      const leafLen = 40;
-      const leafWid = 14;
-      const along = t * leafLen;
-      const across = Math.sin(t * Math.PI) * leafWid;
-
-      // 잎이 오른쪽 위로 뻗음
-      const angle = -0.6; // 기울기
-      const lx = along * Math.cos(angle) - across * Math.sin(angle);
-      const ly = along * Math.sin(angle) - across * Math.cos(angle);
-
-      leafPoints.push({
-        ax: lx + 5,
-        ay: -128 + ly,
+      const len = 40, wid = 14;
+      const along = t * len, across = Math.sin(t * Math.PI) * wid;
+      const ang = -0.6;
+      applePoints.push({
+        ax: along * Math.cos(ang) - across * Math.sin(ang) + 5,
+        ay: -128 + along * Math.sin(ang) - across * Math.cos(ang),
         az: across * 0.3,
-        char: LEAF_CHARS[i % LEAF_CHARS.length],
-        isLeaf: true,
-        row: -2, col: i, u: 0, v: 0
+        char: "잎", isLeaf: true, row: -2, col: i
       });
     }
-
-    // 전체 포인트 합치기
-    const allPoints = [...applePoints, ...stemPoints, ...leafPoints];
-
-    // 각 포인트에 도형 좌표 미리 계산
-    allPoints.forEach((p, i) => {
-      const t = i / allPoints.length;
-      const v = p.v || t * Math.PI;
-      const u = p.u || t * Math.PI * 2;
-
-      // 구
-      p.sx = Math.sin(v) * Math.cos(u) * 90;
-      p.sy = -Math.cos(v) * 90;
-      p.sz = Math.sin(v) * Math.sin(u) * 90;
-
-      // 큐브
-      const ci = i % 6; // 6면
-      const ct = (i % 50) / 50;
-      const cs = 70;
-      if (ci === 0) { p.cx = cs; p.cy = (ct-0.5)*cs*2; p.cz = (((i*7)%50)/50-0.5)*cs*2; }
-      else if (ci === 1) { p.cx = -cs; p.cy = (ct-0.5)*cs*2; p.cz = (((i*7)%50)/50-0.5)*cs*2; }
-      else if (ci === 2) { p.cy = cs; p.cx = (ct-0.5)*cs*2; p.cz = (((i*7)%50)/50-0.5)*cs*2; }
-      else if (ci === 3) { p.cy = -cs; p.cx = (ct-0.5)*cs*2; p.cz = (((i*7)%50)/50-0.5)*cs*2; }
-      else if (ci === 4) { p.cz = cs; p.cx = (ct-0.5)*cs*2; p.cy = (((i*7)%50)/50-0.5)*cs*2; }
-      else { p.cz = -cs; p.cx = (ct-0.5)*cs*2; p.cy = (((i*7)%50)/50-0.5)*cs*2; }
-
-      // 원기둥
-      const cylA = (i / allPoints.length) * Math.PI * 2 * 3;
-      const cylH = ((i % 30) / 30 - 0.5) * 180;
-      p.ylx = Math.cos(cylA) * 60;
-      p.yly = cylH;
-      p.ylz = Math.sin(cylA) * 60;
-
-      // 토러스
-      const torU = (i / allPoints.length) * Math.PI * 2 * 4;
-      const torV = ((i * 3) % allPoints.length) / allPoints.length * Math.PI * 2;
-      const torR = 70, torr = 28;
-      p.tx = (torR + torr * Math.cos(torV)) * Math.cos(torU);
-      p.ty = torr * Math.sin(torV);
-      p.tz = (torR + torr * Math.cos(torV)) * Math.sin(torU);
-
-      // 피라미드
-      const pyrT = (i % 40) / 40;
-      const pyrH = ((i % 8) / 8 - 0.5) * 160;
-      const pyrR2 = Math.max(0, 80 * (1 - (pyrH + 80) / 160));
-      const pyrA2 = pyrT * Math.PI * 2;
-      p.px = pyrR2 * Math.cos(pyrA2);
-      p.py = pyrH;
-      p.pz = pyrR2 * Math.sin(pyrA2);
-    });
 
     /* ═══════ 투영 ═══════ */
     function project(x, y, z, cx, cy, ry) {
       const c = Math.cos(ry), s = Math.sin(ry);
-      const rx2 = x * c - z * s;
-      const rz2 = x * s + z * c;
+      const rx2 = x * c - z * s, rz2 = x * s + z * c;
       const p = 500 / (500 + rz2);
       return { x: cx + rx2 * p, y: cy + y * p, s: p, z: rz2 };
     }
 
-    /* ═══════ 도형 좌표 얻기 ═══════ */
-    function getShapePos(pt, shape) {
-      switch(shape) {
-        case 0: return { x: pt.sx, y: pt.sy, z: pt.sz };
-        case 1: return { x: pt.cx, y: pt.cy, z: pt.cz };
-        case 2: return { x: pt.ylx, y: pt.yly, z: pt.ylz };
-        case 3: return { x: pt.tx, y: pt.ty, z: pt.tz };
-        case 4: return { x: pt.px, y: pt.py, z: pt.pz };
-        default: return { x: pt.sx, y: pt.sy, z: pt.sz };
+    /* ═══════ 부유 도형 (1개) ═══════ */
+    let floatingShape = null;
+
+    class FloatingShape {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 0.8;
+        this.vy = -0.3 - Math.random() * 0.5;
+        this.size = 25 + Math.random() * 35;
+        this.rot = 0;
+        this.rotSpeed = (Math.random() - 0.5) * 0.008;
+        this.life = 1.0;
+        this.alive = true;
+        this.alpha = 0;
+        this.type = Math.floor(Math.random() * 5);
+      }
+
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.rot += this.rotSpeed;
+        this.vx += (Math.random() - 0.5) * 0.01;
+        this.vy += (Math.random() - 0.5) * 0.01;
+        this.alpha = Math.min(0.5, this.alpha + 0.01);
+        this.life -= 0.0015;
+        if (this.life < 0.3) this.alpha = this.life / 0.3 * 0.5;
+        if (this.life <= 0) this.alive = false;
+      }
+
+      draw() {
+        if (!this.alive) return;
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rot);
+
+        const a = this.alpha, s = this.size;
+        ctx.strokeStyle = `rgba(0, 240, 255, ${a.toFixed(2)})`;
+        ctx.lineWidth = 1;
+        ctx.fillStyle = `rgba(0, 240, 255, ${(a * 0.1).toFixed(2)})`;
+
+        switch(this.type) {
+          case 0:
+            ctx.beginPath(); ctx.arc(0, 0, s/2, 0, Math.PI*2);
+            ctx.fill(); ctx.stroke(); break;
+          case 1:
+            ctx.beginPath();
+            for (let i = 0; i < 3; i++) {
+              const ang = i/3*Math.PI*2 - Math.PI/2;
+              i===0 ? ctx.moveTo(Math.cos(ang)*s/2, Math.sin(ang)*s/2)
+                    : ctx.lineTo(Math.cos(ang)*s/2, Math.sin(ang)*s/2);
+            }
+            ctx.closePath(); ctx.fill(); ctx.stroke(); break;
+          case 2:
+            ctx.fillRect(-s/2,-s/2,s,s);
+            ctx.strokeRect(-s/2,-s/2,s,s); break;
+          case 3:
+            ctx.beginPath();
+            ctx.moveTo(0,-s/2); ctx.lineTo(s/3,0);
+            ctx.lineTo(0,s/2); ctx.lineTo(-s/3,0);
+            ctx.closePath(); ctx.fill(); ctx.stroke(); break;
+          case 4:
+            ctx.beginPath(); ctx.arc(0,0,s/2,0,Math.PI*2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(0,0,s/3,0,Math.PI*2); ctx.stroke(); break;
+        }
+        ctx.restore();
       }
     }
 
-    /* ═══════ 그리기 ═══════ */
-    function drawAll(time) {
+    /* ═══════ 사과 그리기 ═══════ */
+    function drawApple() {
       const cx = mouseX, cy = mouseY;
       const drawList = [];
 
-      for (const pt of allPoints) {
-        const m = morphTo;
-        const sh = getShapePos(pt, currentShape);
-
-        const x3 = pt.ax * (1-m) + sh.x * m;
-        const y3 = pt.ay * (1-m) + sh.y * m;
-        const z3 = pt.az * (1-m) + sh.z * m;
-
-        const proj = project(x3, y3, z3, cx, cy, rotY);
-        const facing = proj.z < 50 ? 1.0 : 0.12;
-
+      for (const pt of applePoints) {
+        const proj = project(pt.ax, pt.ay, pt.az, cx, cy, rotY);
         drawList.push({
-          x: proj.x, y: proj.y,
-          s: proj.s, z: proj.z,
-          facing,
-          char: pt.char,
-          isLeaf: pt.isLeaf || false,
-          isStem: pt.row === -1
+          x: proj.x, y: proj.y, s: proj.s, z: proj.z,
+          facing: proj.z < 50 ? 1.0 : 0.12,
+          char: pt.char, isLeaf: pt.isLeaf||false, isStem: pt.isStem||false
         });
       }
 
@@ -259,39 +214,24 @@
       for (const d of drawList) {
         const alpha = holdAlpha * d.facing;
         if (alpha < 0.02) continue;
-
         const size = Math.max(6, 13 * d.s);
 
         ctx.save();
         ctx.translate(d.x, d.y);
-
         ctx.font = `300 ${size}px 'Noto Serif KR', serif`;
         const cw = ctx.measureText(d.char).width;
-
-        // 박스
         const padX = 2, padY = 1;
-        if (d.isLeaf) {
-          ctx.fillStyle = `rgba(20, 80, 20, ${(alpha * 0.7).toFixed(2)})`;
-        } else if (d.isStem) {
-          ctx.fillStyle = `rgba(80, 40, 10, ${(alpha * 0.7).toFixed(2)})`;
-        } else {
-          ctx.fillStyle = `rgba(120, 10, 20, ${(alpha * 0.7).toFixed(2)})`;
-        }
-        ctx.fillRect(-cw/2 - padX, -size/2 - padY, cw + padX*2, size + padY*2);
 
-        // 글자
+        ctx.fillStyle = d.isLeaf ? `rgba(20,80,20,${(alpha*0.7).toFixed(2)})`
+          : d.isStem ? `rgba(80,40,10,${(alpha*0.7).toFixed(2)})`
+          : `rgba(120,10,20,${(alpha*0.7).toFixed(2)})`;
+        ctx.fillRect(-cw/2-padX, -size/2-padY, cw+padX*2, size+padY*2);
+
         ctx.globalAlpha = alpha;
-        if (d.isLeaf) {
-          ctx.fillStyle = LEAF_GREEN;
-        } else if (d.isStem) {
-          ctx.fillStyle = "#8B6914";
-        } else {
-          ctx.fillStyle = CYAN;
-        }
+        ctx.fillStyle = d.isLeaf ? LEAF_GREEN : d.isStem ? "#8B6914" : CYAN;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(d.char, 0, 0);
-
         ctx.restore();
       }
     }
@@ -303,11 +243,13 @@
     });
     tc.addEventListener("mouseleave", () => { targetR = 0; });
     tc.addEventListener("mouseenter", () => { targetR = RADIUS; });
+
     tc.addEventListener("mousedown", () => { isHolding = true; });
     tc.addEventListener("mouseup", () => {
       isHolding = false;
-      currentShape = Math.floor(Math.random() * 5);
+      floatingShape = new FloatingShape(mouseX, mouseY);
     });
+
     tc.addEventListener("touchstart", (e) => {
       e.preventDefault(); isHolding = true;
       mouseX = e.touches[0].clientX; mouseY = e.touches[0].clientY;
@@ -319,7 +261,7 @@
     });
     tc.addEventListener("touchend", () => {
       isHolding = false;
-      currentShape = Math.floor(Math.random() * 5);
+      floatingShape = new FloatingShape(mouseX, mouseY);
     });
 
     /* ═══════ 루프 ═══════ */
@@ -328,29 +270,29 @@
     function animate() {
       time += 0.016;
 
-      // spotlight
       currentX += (targetX - currentX) * EASE;
       currentY += (targetY - currentY) * EASE;
       currentR += (targetR - currentR) * R_EASE;
       reveal.style.webkitMaskImage = reveal.style.maskImage =
         `radial-gradient(circle ${currentR}px at ${currentX}px ${currentY}px, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0) 100%)`;
 
-      // 텍스트
       ctx.clearRect(0, 0, W, H);
 
       if (isHolding) {
         holdAlpha = Math.min(1, holdAlpha + 0.03);
-        morphTo = Math.max(0, morphTo - 0.025);
       } else {
-        if (holdAlpha > 0) {
-          morphTo = Math.min(1, morphTo + 0.018);
-          if (morphTo > 0.85) holdAlpha = Math.max(0, holdAlpha - 0.01);
-        }
+        holdAlpha = Math.max(0, holdAlpha - 0.015);
       }
 
       rotY += 0.015;
 
-      if (holdAlpha > 0.01) drawAll(time);
+      if (holdAlpha > 0.01) drawApple();
+
+      if (floatingShape) {
+        floatingShape.update();
+        floatingShape.draw();
+        if (!floatingShape.alive) floatingShape = null;
+      }
 
       requestAnimationFrame(animate);
     }
