@@ -3,487 +3,512 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Memory Typo Map - 80 Auto Drifting Motions</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+  <title>Memory Typo Map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200;400;700;900&family=IBM+Plex+Mono:wght@300;600&family=Gaegu:wght@300;700&family=Black+Han+Sans&display=swap" rel="stylesheet">
 
   <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      margin: 0; padding: 0; width: 100vw; height: 100vh;
-      overflow: hidden; background-color: #ffffff;
-      font-family: 'Pretendard', sans-serif;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #ffffff;
     }
-    #canvas { position: relative; width: 100%; height: 100%; }
 
-    /* 기본 기억 래퍼 (절대 위치) */
-    .memory-item {
+    #canvas {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .mem {
       position: absolute;
-      font-size: 13px; font-weight: 300; color: #111;
-      max-width: 250px; word-break: keep-all; line-height: 1.6;
-      transform-style: preserve-3d;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      max-width: 280px;
+      line-height: 1.6;
+      pointer-events: none;
     }
 
-    /* 단어와 낱자 기본 속성 */
-    .word { display: inline-block; white-space: nowrap; transform-style: preserve-3d; }
-    .char { display: inline-block; transform-style: preserve-3d; }
-    .space { width: 4px; }
-
-    /* ==========================================
-       80개의 각기 다른 독립 자동 애니메이션 CSS
-       --w(단어 인덱스), --c(낱자 인덱스)를 활용한 개별 제어
-    ========================================== */
-    
-    /* 0. 남의 일처럼 읽기 - 전체가 멀리서 아주 천천히 떠다님 */
-    .type-0 { animation: k0 15s infinite ease-in-out alternate; filter: blur(1px); opacity: 0.4; transform: scale(0.7); }
-    @keyframes k0 { to { transform: scale(0.75) translate(40px, -20px); opacity: 0.6; } }
-
-    /* 1. 증거 자료 확인하기 - 단어 단위로 끊어지며 순차 등장 */
-    .type-1 .word { animation: k1 6s infinite step-end; opacity: 0.2; }
-    .type-1 .word { animation-delay: calc(var(--w) * 0.4s); text-decoration: underline; text-underline-offset: 4px; }
-    @keyframes k1 { 0% { opacity: 0.2; } 50%, 100% { opacity: 1; } }
-
-    /* 2. 남남인 사건 연결 - (수정됨) 낱자들이 양쪽에서 출발해 가운데로 모임 */
-    .type-2 .char:nth-child(odd) { animation: k2_odd 8s infinite ease-in-out; }
-    .type-2 .char:nth-child(even) { animation: k2_even 8s infinite ease-in-out; }
-    @keyframes k2_odd { 0%, 100% { transform: translateX(-30px); opacity: 0.3; } 50% { transform: translateX(0); opacity: 1; } }
-    @keyframes k2_even { 0%, 100% { transform: translateX(30px); opacity: 0.3; } 50% { transform: translateX(0); opacity: 1; } }
-
-    /* 3. 키워드로 요약하기 - 자간이 극도로 좁아지며 글자들이 겹침 */
-    .type-3 .char { animation: k3 7s infinite alternate ease-in-out; }
-    @keyframes k3 { 0% { transform: translateX(0); opacity: 1; } 100% { transform: translateX(calc(var(--c) * -6px)); opacity: 0.4; } }
-
-    /* 4. 눈앞에 있을 때만 작동 - 전체가 깜빡임 */
-    .type-4 { animation: k4 5s infinite; opacity: 0; }
-    @keyframes k4 { 10%, 15% { opacity: 1; filter: blur(0); } 0%, 25%, 100% { opacity: 0; filter: blur(4px); } }
-
-    /* 5. 외부 신호로 불러오기 - 왼쪽 밖에서 파동처럼 밀려옴 */
-    .type-5 .word { animation: k5 6s infinite cubic-bezier(0.1, 0.9, 0.2, 1); opacity: 0; transform: translateX(-50px); animation-delay: calc(var(--w) * 0.15s); }
-    @keyframes k5 { 20%, 80% { opacity: 1; transform: translateX(0); } 100% { opacity: 0; transform: translateX(20px); } }
-
-    /* 6. 슬픔의 논리적 이해 - (수정됨) 단어들이 위아래 지그재그 격자로 정렬 */
-    .type-6 .word:nth-child(odd) { animation: k6_odd 8s infinite alternate ease-in-out; }
-    .type-6 .word:nth-child(even) { animation: k6_even 8s infinite alternate ease-in-out; }
-    @keyframes k6_odd { to { transform: translateY(15px); font-family: monospace; letter-spacing: 1px; } }
-    @keyframes k6_even { to { transform: translateY(0); font-family: monospace; letter-spacing: 1px; } }
-
-    /* 7. 감정에 이름표 달기 - 첫 단어만 라벨처럼 위로 솟음 */
-    .type-7 .word:first-child { animation: k7 6s infinite alternate; font-weight: 800; font-size: 10px; border: 1px solid #000; padding: 2px 4px; display: block; width: max-content; margin-bottom: 4px; }
-    @keyframes k7 { 0% { transform: translateY(-10px); opacity: 0.5; } 100% { transform: translateY(0); opacity: 1; } }
-
-    /* 8. 수학적인 규칙 찾기 - 낱자들이 정확한 사인 곡선을 그림 */
-    .type-8 .char { animation: k8 3s infinite linear; animation-delay: calc(var(--c) * -0.2s); }
-    @keyframes k8 { 0%, 100% { transform: translateY(0); } 25% { transform: translateY(-8px); } 75% { transform: translateY(8px); } }
-
-    /* 9. 사전적 정의 내리기 - 들여쓰기 롤다운 */
-    .type-9 .word { animation: k9 7s infinite; transform-origin: top; }
-    @keyframes k9 { 0%, 10% { opacity: 0; transform: scaleY(0); } 30%, 80% { opacity: 1; transform: scaleY(1); } 100% { opacity: 0; transform: scaleY(0); } }
-
-    /* 10. 거리와 위치 계산 - 단어 사이 간격 팽창/수축 */
-    .type-10 .word { animation: k10 8s infinite alternate ease-in-out; }
-    @keyframes k10 { 0% { margin-right: 4px; } 100% { margin-right: 30px; border-bottom: 1px dashed #ccc; } }
-
-    /* 11. 차트처럼 분류하기 - 글자들이 바닥을 기준으로 그래프 막대처럼 솟음 */
-    .type-11 .char { animation: k11 6s infinite alternate ease-in-out; animation-delay: calc(var(--c) * 0.1s); transform-origin: bottom; }
-    @keyframes k11 { 0% { transform: scaleY(1) translateY(0); } 100% { transform: scaleY(3) translateY(-5px); opacity: 0.5; } }
-
-    /* 12. 칸칸이 나누어 담기 - 모든 낱자가 박스화 됨 */
-    .type-12 .char { animation: k12 7s infinite alternate; }
-    @keyframes k12 { 100% { border: 1px solid #eee; padding: 2px; margin: 1px; } }
-
-    /* 13. 관계망 중심으로 엮기 - 1번 글자를 중심으로 나머지 글자들이 방사형 회전 */
-    .type-13 { transform-origin: 0 0; animation: k13 10s infinite linear; }
-    @keyframes k13 { to { transform: rotate(360deg) scale(0.9); } }
-
-    /* 14. 몸의 거리 측정 - z축 스케일로 다가왔다 멀어짐 */
-    .type-14 { animation: k14 6s infinite ease-in-out; text-shadow: 0 0 10px rgba(0,0,0,0.2); }
-    @keyframes k14 { 0%, 100% { transform: scale(0.5); opacity: 0.3; } 50% { transform: scale(1.8); opacity: 1; } }
-
-    /* 15. 확신으로만 기억하기 - 심하게 흔들리다 멈춤 */
-    .type-15 { animation: k15 4s infinite; }
-    @keyframes k15 { 0%, 80% { transform: skewX(10deg) translateX(2px); filter: blur(2px); opacity: 0.5; } 85%, 100% { transform: skewX(0) translateX(0); filter: blur(0); opacity: 1; font-weight: 700; } }
-
-    /* 16. 여러 갈래로 찾아가기 - 텍스트 잔상이 3방향으로 복제됨 */
-    .type-16 { animation: k16 8s infinite alternate ease-in-out; }
-    @keyframes k16 { 100% { text-shadow: -20px -20px 0 #ddd, 20px -20px 0 #bbb, 0 30px 0 #eee; opacity: 0.7; } }
-
-    /* 17. 숫자와 사실만 남기기 - 건조하게 좁아지고 투명도 낮아짐 */
-    .type-17 { font-family: monospace; animation: k17 7s infinite alternate; }
-    @keyframes k17 { 0% { letter-spacing: 2px; color: #000; } 100% { letter-spacing: -1px; color: #888; } }
-
-    /* 18. 글자로 옮겨 적기 - 뿌연 상태에서 먹물 번지듯 선명해짐 */
-    .type-18 .char { opacity: 0; filter: blur(5px); animation: k18 6s infinite forwards; animation-delay: calc(var(--c) * 0.08s); }
-    @keyframes k18 { 50%, 100% { opacity: 1; filter: blur(0); } }
-
-    /* 19. 핵심 내용만 추리기 - 짝수 단어들만 서서히 사라짐 */
-    .type-19 .word:nth-child(even) { animation: k19 8s infinite alternate; }
-    @keyframes k19 { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(0); margin: 0; width: 0; } }
-
-    /* 20. 간접 지식으로 보관 - 본문 위로 회색 괄호가 덮임 */
-    .type-20::before { content: "[ 인용됨 ] "; color: #999; animation: k20_1 6s infinite; }
-    .type-20 { animation: k20_2 6s infinite; }
-    @keyframes k20_1 { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0.3; } }
-    @keyframes k20_2 { 0%, 50% { opacity: 0.3; } 51%, 100% { opacity: 1; } }
-
-    /* 21. 기록 보관소에 넣기 - 밑으로 훅 꺼짐 */
-    .type-21 { animation: k21 5s infinite cubic-bezier(0.5, 0, 1, 1); }
-    @keyframes k21 { 80% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(50px) scale(0.8) rotateX(45deg); opacity: 0; } }
-
-    /* 22. 몸의 경고등 켜기 - 특정 단어만 빨갛게 점멸 */
-    .type-22 .word:nth-child(3n) { animation: k22 2s infinite step-end; color: red; font-weight: bold; }
-    @keyframes k22 { 0%, 100% { opacity: 1; } 50% { opacity: 0.1; } }
-
-    /* 23. 말과 느낌의 결합 - 이동+기울기+두께 변화 동시 */
-    .type-23 { animation: k23 6s infinite alternate ease-in-out; }
-    @keyframes k23 { 0% { transform: translateY(-10px) skewX(10deg); font-weight: 100; } 100% { transform: translateY(10px) skewX(-10deg); font-weight: 800; } }
-
-    /* 24. 신체 부위에 각인 - 맥박처럼 크게 뜀 */
-    .type-24 { animation: k24 3s infinite; transform-origin: center; }
-    @keyframes k24 { 0%, 100% { transform: scale(1); } 10%, 25% { transform: scale(1.15); } }
-
-    /* 25. 외부 기록과 선 긋기 - 단어 위로 연결선 생성 */
-    .type-25 .word { border-top: 1px solid transparent; animation: k25 7s infinite alternate; }
-    @keyframes k25 { 100% { border-top: 1px solid #000; padding-top: 5px; transform: translateY(5px); } }
-
-    /* 26. 조건 맞춰 불러내기 - 안보이다 딜레이 후 팝업 */
-    .type-26 { animation: k26 8s infinite step-end; opacity: 0; }
-    @keyframes k26 { 50%, 90% { opacity: 1; } }
-
-    /* 27. 중요 지점만 찍기 - 낱자 하나만 크게, 나머지 점(.) 처리 */
-    .type-27 .char { animation: k27 6s infinite alternate; }
-    @keyframes k27 { 100% { opacity: 0.1; transform: scale(0.5); filter: blur(2px); } }
-    .type-27 .char:nth-child(5n) { animation: none; font-weight: 900; opacity: 1; transform: scale(1.5); }
-
-    /* 28. 드문드문 점 찍기 - 낱자들이 랜덤하게 보였다 안보였다 함 */
-    .type-28 .char { animation: k28 4s infinite step-end; animation-delay: calc(var(--c) * 0.3s); opacity: 0; }
-    @keyframes k28 { 10%, 30% { opacity: 1; } }
-
-    /* 29. 좌표로 위치 확인 - 격자 스냅 이동 */
-    .type-29 { animation: k29 6s infinite step-end; }
-    @keyframes k29 { 25% { transform: translate(20px, 0); } 50% { transform: translate(20px, 20px); } 75% { transform: translate(0, 20px); } }
-
-    /* 30. 틀에 맞춰 짜 넣기 - 흩어진 글자들이 사각형 안으로 모임 */
-    .type-30 .char { animation: k30 7s infinite alternate ease-in-out; }
-    @keyframes k30 { 0% { transform: translate(calc(var(--c) * 2px), calc(var(--c) * -1px)); } 100% { transform: translate(0,0); background: #f0f0f0; } }
-
-    /* 31. 폴더별로 정리하기 - 아코디언처럼 접힘 */
-    .type-31 { animation: k31 8s infinite alternate ease-in-out; overflow: hidden; white-space: nowrap; }
-    @keyframes k31 { 0% { max-width: 250px; opacity: 1; } 100% { max-width: 20px; opacity: 0.3; } }
-
-    /* 32. 정답지만 보고 알기 - 마지막 단어 빼고 다 흐려짐 */
-    .type-32 .word:not(:last-child) { animation: k32 6s infinite alternate; }
-    @keyframes k32 { 100% { opacity: 0; filter: blur(5px); transform: translateX(-10px); } }
-
-    /* 33. 지식으로 통합하기 - 낱자들이 한 덩어리로 뭉침 */
-    .type-33 .char { animation: k33 7s infinite alternate ease-in-out; }
-    @keyframes k33 { 100% { letter-spacing: -5px; opacity: 0.8; } }
-
-    /* 34. 지도로 경로 파악 - 단어들이 계단식 배열됨 */
-    .type-34 .word { display: block; animation: k34 8s infinite alternate; transform: translateX(0); }
-    @keyframes k34 { 100% { transform: translateX(calc(var(--w) * 10px)); border-left: 1px solid #ccc; padding-left: 5px; } }
-
-    /* 35. 힌트 보고 길 찾기 - 낱자 1개씩만 차례대로 발광 */
-    .type-35 .char { opacity: 0.1; animation: k35 5s infinite linear; animation-delay: calc(var(--c) * 0.1s); }
-    @keyframes k35 { 0%, 10% { opacity: 1; text-shadow: 0 0 5px #000; } }
-
-    /* 36. 사실 위주로 거르기 - 모음만 축소됨 (시각적 은유) */
-    .type-36 .char:nth-child(even) { animation: k36 6s infinite alternate; }
-    @keyframes k36 { 100% { transform: scale(0.5); opacity: 0.2; } }
-
-    /* 37. 상태 보고서 작성 - 리스트 UI 모양으로 변신 */
-    .type-37::before { content: "- "; animation: k37 6s infinite alternate; }
-    @keyframes k37 { 100% { padding-right: 10px; border-right: 2px solid #000; } }
-
-    /* 38. 글로 읽고 이해하기 - (수정됨) 위아래 섞인 글자들이 정렬됨 */
-    .type-38 .char:nth-child(3n+1) { animation: k38_1 8s infinite alternate ease-out; }
-    .type-38 .char:nth-child(3n+2) { animation: k38_2 8s infinite alternate ease-out; }
-    .type-38 .char:nth-child(3n) { animation: k38_3 8s infinite alternate ease-out; }
-    @keyframes k38_1 { 0% { transform: translateY(-15px); opacity: 0.2; } 100% { transform: translateY(0); opacity: 1; } }
-    @keyframes k38_2 { 0% { transform: translateY(0); opacity: 0.2; } 100% { transform: translateY(0); opacity: 1; } }
-    @keyframes k38_3 { 0% { transform: translateY(15px); opacity: 0.2; } 100% { transform: translateY(0); opacity: 1; } }
-
-    /* 39. 희미하게 위치 잡기 - 3겹 잔상 흔들림 */
-    .type-39 { animation: k39 5s infinite ease-in-out; color: transparent; text-shadow: -2px 0 2px rgba(0,0,0,0.4), 2px 0 2px rgba(0,0,0,0.4); }
-    @keyframes k39 { 50% { text-shadow: -5px 0 5px rgba(0,0,0,0.2), 5px 0 5px rgba(0,0,0,0.2); } }
-
-    /* 40. 그물망처럼 연결 - (수정됨) 단어 사이 상하 간격 벌어짐 */
-    .type-40 .word:nth-child(odd) { animation: k40_odd 7s infinite alternate ease-in-out; display: inline-block; }
-    .type-40 .word:nth-child(even) { animation: k40_even 7s infinite alternate ease-in-out; display: inline-block; }
-    @keyframes k40_odd { 100% { transform: translateY(20px); margin: 0 10px; } }
-    @keyframes k40_even { 100% { transform: translateY(0); margin: 0 10px; } }
-
-    /* 41. 결과물만 저장하기 - 네모 박스 안에 갇힘 */
-    .type-41 { padding: 0; border: 0px solid transparent; animation: k41 6s infinite alternate; }
-    @keyframes k41 { 100% { padding: 10px; border: 1px solid #000; background: #fafafa; transform: scale(0.9); } }
-
-    /* 42. 주변에 물어보기 - 가장자리 낱자들이 빙글빙글 돎 */
-    .type-42 .char { animation: k42 9s infinite linear; transform-origin: 0 50px; }
-    @keyframes k42 { 100% { transform: rotate(360deg); } }
-
-    /* 43. 수수께끼 풀듯 추측 - _ 밑줄에서 글자로 바뀜 */
-    .type-43 .char { color: transparent; border-bottom: 1px solid #000; animation: k43 7s infinite; animation-delay: calc(var(--c) * 0.2s); }
-    @keyframes k43 { 50%, 100% { color: #000; border-color: transparent; } }
-
-    /* 44. 강렬한 조각 남기기 - 스케일 훅 커짐 */
-    .type-44 .word:nth-child(2) { animation: k44 5s infinite alternate; display: inline-block; }
-    @keyframes k44 { 100% { transform: scale(2.5) translate(10px, 5px); background: #000; color: #fff; z-index: 10; } }
-
-    /* 45. 감정 온도 빼기 - 이탤릭에서 노멀로, 회색으로 차갑게 식음 */
-    .type-45 { font-style: italic; color: #333; animation: k45 8s infinite alternate; }
-    @keyframes k45 { 100% { font-style: normal; color: #aaa; letter-spacing: 0; } }
-
-    /* 46. 머리로 감정 계산 - 글자가 숫자로 치환되는 연출 (모양 찌그러짐) */
-    .type-46 .char { animation: k46 6s infinite step-end; }
-    @keyframes k46 { 50% { transform: scaleX(0.5) scaleY(1.2); opacity: 0.6; font-family: monospace; } }
-
-    /* 47. 필요한 부분 발췌 - 하이라이트 펜 효과 */
-    .type-47 .word:nth-child(2), .type-47 .word:nth-child(3) { animation: k47 6s infinite alternate; background: linear-gradient(to right, transparent 50%, #ffff00 50%); background-size: 200% 100%; background-position: left bottom; }
-    @keyframes k47 { 100% { background-position: right bottom; } }
-
-    /* 48. 보이지 않는 충격 - 파형처럼 훑고 지나감 */
-    .type-48 .char { animation: k48 4s infinite; animation-delay: calc(var(--c) * 0.05s); }
-    @keyframes k48 { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); font-weight: bold; } }
-
-    /* 49. 교훈만 남기기 - 문장 압축 (Y축 축소) */
-    .type-49 { animation: k49 7s infinite alternate ease-in-out; overflow: hidden; max-height: 100px; }
-    @keyframes k49 { 100% { max-height: 18px; opacity: 0.7; } }
-
-    /* 50. 소리에 집중하기 - 위아래 진동 */
-    .type-50 .char { animation: k50 0.5s infinite alternate; animation-delay: calc(var(--c) * 0.05s); }
-    @keyframes k50 { to { transform: translateY(2px); } }
-
-    /* 51. 문장으로 변환하기 - 흩어진 자모가 조립됨 */
-    .type-51 .char { animation: k51 8s infinite alternate ease-in-out; }
-    @keyframes k51 { 0% { letter-spacing: 15px; filter: blur(3px); } 100% { letter-spacing: 0; filter: blur(0); } }
-
-    /* 52. 차례대로 줄 세우기 - 들여쓰기 계단 정렬 */
-    .type-52 .word { display: block; animation: k52 7s infinite alternate ease-in-out; }
-    @keyframes k52 { 100% { margin-left: calc(var(--w) * 15px); border-bottom: 1px solid #eee; } }
-
-    /* 53. 개념으로만 소유 - 옅고 투명한 외곽선만 남음 */
-    .type-53 { color: #000; animation: k53 6s infinite alternate; }
-    @keyframes k53 { 100% { color: transparent; -webkit-text-stroke: 1px #999; } }
-
-    /* 54. 멀리서 관찰하기 - 극도로 축소 */
-    .type-54 { animation: k54 9s infinite alternate ease-in-out; }
-    @keyframes k54 { 100% { transform: scale(0.3); opacity: 0.5; } }
-
-    /* 55. 구조물 돌려보기 - 3D X/Y축 회전 */
-    .type-55 { perspective: 500px; animation: k55 12s infinite linear; }
-    @keyframes k55 { to { transform: rotateY(360deg) rotateX(15deg); } }
-
-    /* 56. 특징 리스트 만들기 - 불릿 포인트화 */
-    .type-56 .word { display: block; animation: k56 8s infinite alternate; }
-    @keyframes k56 { 100% { padding-left: 10px; border-left: 2px dotted #000; margin-bottom: 2px; } }
-
-    /* 57. 부피 느껴보기 - 텍스트 섀도우로 3D 덩어리 생성 */
-    .type-57 { animation: k57 5s infinite alternate ease-in-out; }
-    @keyframes k57 { 100% { text-shadow: 1px 1px 0 #ccc, 2px 2px 0 #bbb, 3px 3px 0 #aaa, 4px 4px 0 #999; transform: translate(-4px, -4px); } }
-
-    /* 58. 조각 맞춰 복구하기 - 깨진 파편들이 모임 */
-    .type-58 .char { animation: k58 9s infinite alternate ease-in-out; }
-    @keyframes k58 { 0% { transform: translate(calc(var(--c)*10px), calc(var(--c)*-5px)) rotate(45deg); opacity: 0; } 100% { transform: translate(0,0) rotate(0); opacity: 1; } }
-
-    /* 59. 주소 찍기 - 단어 위에 핀(pin) 형태의 점 생성 */
-    .type-59 .word { position: relative; animation: k59 6s infinite alternate; }
-    .type-59 .word::after { content: "▼"; position: absolute; top: -15px; left: 50%; transform: translateX(-50%); font-size: 8px; color: red; opacity: 0; animation: k59_2 6s infinite alternate; }
-    @keyframes k59 { 100% { padding-top: 15px; } }
-    @keyframes k59_2 { 100% { opacity: 1; top: 0; } }
-
-    /* 60. 레이아웃 기억하기 - 글자 내용은 흐리고 박스 윤곽선만 또렷 */
-    .type-60 { border: 1px dashed transparent; animation: k60 7s infinite alternate; }
-    @keyframes k60 { 100% { color: transparent; border-color: #000; box-shadow: 2px 2px 0 rgba(0,0,0,0.1); } }
-
-    /* 61. 방향과 길이 계산 - X축 스케일로 늘어남 (벡터) */
-    .type-61 { transform-origin: left; animation: k61 6s infinite alternate ease-in-out; }
-    @keyframes k61 { 100% { transform: scaleX(1.5); letter-spacing: 2px; } }
-
-    /* 62. 서로의 거리 재기 - 단어 사이 마진 극대화 */
-    .type-62 .word { animation: k62 8s infinite alternate ease-in-out; }
-    @keyframes k62 { 100% { margin-right: 40px; } }
-
-    /* 63. 반사된 신호 읽기 - 본문 아래로 거울 반사 */
-    .type-63 { position: relative; }
-    .type-63::after { content: attr(data-text); position: absolute; left: 0; top: 100%; transform: scaleY(-0.5); opacity: 0.2; filter: blur(1px); animation: k63 6s infinite alternate; }
-    @keyframes k63 { 100% { opacity: 0.6; filter: blur(0); transform: scaleY(-1) translateY(-5px); } }
-
-    /* 64. 행동 순서 기억 - 번호 매기기 step */
-    .type-64 .word { opacity: 0.2; animation: k64 8s infinite step-end; animation-delay: calc(var(--w) * 0.5s); }
-    @keyframes k64 { 10%, 30% { opacity: 1; font-weight: bold; background: #eee; } }
-
-    /* 65. 몸의 움직임 기록 - 궤적을 따라 단어가 물결침 */
-    .type-65 .word { animation: k65 5s infinite ease-in-out; animation-delay: calc(var(--w) * 0.2s); display: inline-block; }
-    @keyframes k65 { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(10px) rotate(5deg); } }
-
-    /* 66. 공간끼리 이어 붙이기 - 블록끼리 자석처럼 붙음 */
-    .type-66 .word { display: inline-block; padding: 2px; border: 1px solid #ccc; margin: 5px; animation: k66 7s infinite alternate ease-in-out; }
-    @keyframes k66 { 100% { margin: 0; border-color: transparent; border-right: 1px solid #000; } }
-
-    /* 67. 도면 위로 걷기 - 바닥 평면으로 눕혀짐 */
-    .type-67 { transform: perspective(400px) rotateX(60deg); animation: k67 10s infinite alternate; text-shadow: 0 10px 5px rgba(0,0,0,0.2); }
-    @keyframes k67 { 100% { transform: perspective(400px) rotateX(0deg); text-shadow: none; } }
-
-    /* 68. 머릿속 기계 작동 - 톱니바퀴처럼 개별 회전 */
-    .type-68 .word { display: inline-block; animation: k68 4s infinite linear; transform-origin: center; }
-    @keyframes k68 { 100% { transform: rotate(360deg); } }
-
-    /* 69. 표 형식으로 담기 - 그리드 레이아웃 강제 적용 */
-    .type-69 { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; animation: k69 8s infinite alternate; }
-    .type-69 .word { border: 1px solid #eee; padding: 2px; text-align: center; }
-    @keyframes k69 { 100% { grid-template-columns: 1fr; gap: 0; } }
-
-    /* 70. 말로 풀어서 보관 - 압축 키워드에서 문장으로 풀림 */
-    .type-70 .char { animation: k70 9s infinite alternate ease-in-out; }
-    @keyframes k70 { 0% { opacity: 0; transform: scaleX(0); letter-spacing: -10px; } 50%, 100% { opacity: 1; transform: scaleX(1); letter-spacing: 0; } }
-
-    /* 71. 역사적 사실로 저장 - 타임라인 바 생성 */
-    .type-71 { border-left: 2px solid #000; padding-left: 10px; animation: k71 6s infinite alternate; }
-    @keyframes k71 { 100% { height: 100px; padding-top: 20px; } }
-
-    /* 72. 좌표값 설정하기 - 단어 밑에 작은 [x,y] 좌표 생성 */
-    .type-72 .word { position: relative; margin-bottom: 15px; }
-    .type-72 .word::after { content: "[x,y]"; position: absolute; bottom: -12px; left: 0; font-size: 8px; color: #aaa; animation: k72 4s infinite alternate; }
-    @keyframes k72 { 100% { opacity: 0; } }
-
-    /* 73. 공간 부품 끼워맞추기 - 지그소 퍼즐처럼 어긋났다 맞음 */
-    .type-73 .word:nth-child(odd) { animation: k73_odd 6s infinite alternate ease-in-out; }
-    .type-73 .word:nth-child(even) { animation: k73_even 6s infinite alternate ease-in-out; }
-    @keyframes k73_odd { 0% { transform: translateY(-10px); } 100% { transform: translateY(0); } }
-    @keyframes k73_even { 0% { transform: translateY(10px); } 100% { transform: translateY(0); } }
-
-    /* 74. 시간을 길로 만들기 - 긴 한 줄로 이어져서 지나감 */
-    .type-74 { white-space: nowrap; animation: k74 15s infinite linear; }
-    @keyframes k74 { 0% { transform: translateX(50px); opacity: 0.2; } 50% { opacity: 1; } 100% { transform: translateX(-150px); opacity: 0.2; } }
-
-    /* 75. 지도의 점으로 표시 - 글자는 사라지고 동그란 점만 남음 */
-    .type-75 { animation: k75 7s infinite alternate; border-radius: 50%; overflow: hidden; }
-    @keyframes k75 { 100% { width: 10px; height: 10px; background: #000; color: transparent; padding: 0; } }
-
-    /* 76. 나를 중심으로 찾기 - 원형 벤딩 (회전) */
-    .type-76 .char { transform-origin: 0 40px; animation: k76 8s infinite alternate ease-in-out; display: inline-block; }
-    @keyframes k76 { 100% { transform: rotate(calc(var(--c) * 10deg)); } }
-
-    /* 77. 너와 나의 거리 재기 - 1번 단어와 끝 단어만 남고 중간이 벌어짐 */
-    .type-77 .word:not(:first-child):not(:last-child) { animation: k77 6s infinite alternate; }
-    @keyframes k77 { 100% { width: 50px; opacity: 0; color: transparent; } }
-
-    /* 78. 보이지 않는 부피 감지 - 주변 여백이 거대해짐 */
-    .type-78 { animation: k78 8s infinite alternate ease-in-out; display: inline-block; }
-    @keyframes k78 { 100% { padding: 30px; background: rgba(0,0,0,0.03); border-radius: 20px; } }
-
-    /* 79. 작동 원리 파악하기 - 텍스트 뒤에 소스코드나 기호가 비침 */
-    .type-79::before { content: "{ obj: true, id: log }"; position: absolute; z-index: -1; color: #eee; font-family: monospace; animation: k79 7s infinite alternate; }
-    @keyframes k79 { 0% { opacity: 0; transform: translateY(-5px); } 100% { opacity: 1; transform: translateY(0); color: #ccc; } }
+    .ch {
+      display: inline-block;
+      position: relative;
+      transform-origin: center bottom;
+      will-change: transform, opacity;
+    }
   </style>
 </head>
 <body>
-  <div id="canvas"></div>
+<div id="canvas"></div>
 
-  <script>
-    const SPREADSHEET_ID = "1pintIO8VNpryzS56eqXaNjqzx5f3EeAV";
-    const KEYS = { note: "당사자의 직접 설명", type: "기억 형식" };
-    const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
+<script>
+  /* ─────────────────────────────────────────────
+     설정: 스프레드시트 ID와 컬럼 키
+  ───────────────────────────────────────────── */
+  const SPREADSHEET_ID = "1pintIO8VNpryzS56eqXaNjqzx5f3EeAV";
+  const KEYS = { note: "당사자의 직접 설명", type: "기억 형식" };
+  const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
 
-    // 기존 80개 타입 매핑 (이름 -> 0~79 ID)
-    const TYPE_NAME_TO_ID = {
-      "남의 일처럼 읽기":0, "증거 자료 확인하기":1, "남남인 사건 연결":2, "키워드로 요약하기":3, "눈앞에 있을 때만 작동":4, "외부 신호로 불러오기":5,
-      "슬픔의 논리적 이해":6, "감정에 이름표 달기":7, "수학적인 규칙 찾기":8, "사전적 정의 내리기":9, "거리와 위치 계산":10, "차트처럼 분류하기":11,
-      "칸칸이 나누어 담기":12, "관계망 중심으로 엮기":13, "몸의 거리 측정":14, "확신으로만 기억하기":15, "여러 갈래로 찾아가기":16, "숫자와 사실만 남기기":17,
-      "글자로 옮겨 적기":18, "핵심 내용만 추리기":19, "간접 지식으로 보관":20, "기록 보관소에 넣기":21, "몸의 경고등 켜기":22, "말과 느낌의 결합":23,
-      "신체 부위에 각인":24, "외부 기록과 선 긋기":25, "조건 맞춰 불러내기":26, "중요 지점만 찍기":27, "드문드문 점 찍기":28, "좌표로 위치 확인":29,
-      "틀에 맞춰 짜 넣기":30, "폴더별로 정리하기":31, "정답지만 보고 알기":32, "지식으로 통합하기":33, "지도로 경로 파악":34, "힌트 보고 길 찾기":35,
-      "사실 위주로 거르기":36, "상태 보고서 작성":37, "글로 읽고 이해하기":38, "희미하게 위치 잡기":39, "그물망처럼 연결":40, "결과물만 저장하기":41,
-      "주변에 물어보기":42, "수수께끼 풀듯 추측":43, "강렬한 조각 남기기":44, "감정 온도 빼기":45, "머리로 감정 계산":46, "필요한 부분 발췌":47,
-      "보이지 않는 충격":48, "교훈만 남기기":49, "소리에 집중하기":50, "문장으로 변환하기":51, "차례대로 줄 세우기":52, "개념으로만 소유":53,
-      "멀리서 관찰하기":54, "구조물 돌려보기":55, "특징 리스트 만들기":56, "부피 느껴보기":57, "조각 맞춰 복구하기":58, "주소 찍기":59,
-      "레이아웃 기억하기":60, "방향과 길이 계산":61, "서로의 거리 재기":62, "반사된 신호 읽기":63, "행동 순서 기억":64, "몸의 움직임 기록":65,
-      "공간끼리 이어 붙이기":66, "도면 위로 걷기":67, "머릿속 기계 작동":68, "표 형식으로 담기":69, "말로 풀어서 보관":70, "역사적 사실로 저장":71,
-      "좌표값 설정하기":72, "공간 부품 끼워맞추기":73, "시간을 길로 만들기":74, "지도의 점으로 표시":75, "나를 중심으로 찾기":76, "너와 나의 거리 재기":77,
-      "보이지 않는 부피 감지":78, "작동 원리 파악하기":79
-    };
+  /* ─────────────────────────────────────────────
+     기억 형식 이름 → 타입 ID 매핑 (0~13)
+     원본 80개 이름을 14개 시각 타입에 골고루 배분
+  ───────────────────────────────────────────── */
+  const TYPE_NAME_TO_ID = {
+    "남의 일처럼 읽기":0,       "증거 자료 확인하기":1,     "남남인 사건 연결":2,
+    "키워드로 요약하기":3,       "눈앞에 있을 때만 작동":4,  "외부 신호로 불러오기":5,
+    "슬픔의 논리적 이해":6,      "감정에 이름표 달기":7,     "수학적인 규칙 찾기":8,
+    "사전적 정의 내리기":9,      "거리와 위치 계산":10,      "차트처럼 분류하기":11,
+    "칸칸이 나누어 담기":12,     "관계망 중심으로 엮기":13,  "몸의 거리 측정":0,
+    "확신으로만 기억하기":1,     "여러 갈래로 찾아가기":2,   "숫자와 사실만 남기기":3,
+    "글자로 옮겨 적기":7,        "핵심 내용만 추리기":8,     "간접 지식으로 보관":9,
+    "기록 보관소에 넣기":10,     "몸의 경고등 켜기":4,       "말과 느낌의 결합":5,
+    "신체 부위에 각인":6,        "외부 기록과 선 긋기":11,   "조건 맞춰 불러내기":12,
+    "중요 지점만 찍기":13,       "드문드문 점 찍기":4,       "좌표로 위치 확인":9,
+    "틀에 맞춰 짜 넣기":10,      "폴더별로 정리하기":3,      "정답지만 보고 알기":8,
+    "지식으로 통합하기":13,      "지도로 경로 파악":2,       "힌트 보고 길 찾기":6,
+    "사실 위주로 거르기":3,      "상태 보고서 작성":9,       "글로 읽고 이해하기":7,
+    "희미하게 위치 잡기":5,      "그물망처럼 연결":1,        "결과물만 저장하기":11,
+    "주변에 물어보기":12,        "수수께끼 풀듯 추측":13,    "강렬한 조각 남기기":11,
+    "감정 온도 빼기":0,          "머리로 감정 계산":3,       "필요한 부분 발췌":1,
+    "보이지 않는 충격":5,        "교훈만 남기기":8,          "소리에 집중하기":6,
+    "문장으로 변환하기":7,       "차례대로 줄 세우기":9,     "개념으로만 소유":0,
+    "멀리서 관찰하기":5,         "구조물 돌려보기":12,       "특징 리스트 만들기":3,
+    "부피 느껴보기":13,          "조각 맞춰 복구하기":11,    "주소 찍기":2,
+    "레이아웃 기억하기":9,       "방향과 길이 계산":10,      "서로의 거리 재기":4,
+    "반사된 신호 읽기":6,        "행동 순서 기억":7,         "몸의 움직임 기록":1,
+    "공간끼리 이어 붙이기":8,    "도면 위로 걷기":13,        "머릿속 기계 작동":12,
+    "표 형식으로 담기":3,        "말로 풀어서 보관":0,       "역사적 사실로 저장":9,
+    "좌표값 설정하기":2,         "공간 부품 끼워맞추기":11,  "시간을 길로 만들기":4,
+    "지도의 점으로 표시":5,      "나를 중심으로 찾기":13,    "너와 나의 거리 재기":6,
+    "보이지 않는 부피 감지":0,   "작동 원리 파악하기":3,
+  };
 
-    function parseCSV(text) {
-      const lines = text.trim().split("\n");
-      const headers = splitCSVLine(lines[0]);
-      return lines.slice(1).map(line => {
-        const values = splitCSVLine(line), obj = {};
-        headers.forEach((h,i) => { obj[h.trim()] = (values[i]||"").trim(); });
-        return obj;
-      });
-    }
-
-    function splitCSVLine(line) {
-      const result=[]; let cur="", inQ=false;
-      for(let i=0; i<line.length; i++){
-        const ch=line[i];
-        if(ch==='"') inQ=!inQ;
-        else if(ch===','&&!inQ){result.push(cur);cur="";}
-        else cur+=ch;
+  /* ─────────────────────────────────────────────
+     14가지 시각 타입 정의
+     각각: 폰트 / 색상 / 낱자 애니메이션 로직
+  ───────────────────────────────────────────── */
+  const TYPES = [
+    /* 0 — 부유: 물속처럼 낱자가 각자 천천히 흐느적거림 */
+    {
+      font: "'Noto Serif KR', serif", size: "15px", weight: "200",
+      color: () => `hsla(220,60%,55%,${0.5 + Math.random() * 0.4})`,
+      anim: (el, i) => {
+        const dx = (Math.random()-0.5)*60, dy = (Math.random()-0.5)*40;
+        const dur = 4000 + Math.random()*3000;
+        let start = null;
+        const tick = ts => {
+          if (!start) start = ts;
+          const t = (ts - start) / dur;
+          el.style.transform = `translate(${dx*Math.sin(t*Math.PI*2)}px,${dy*Math.cos(t*Math.PI*1.7+i)}px) rotate(${Math.sin(t*Math.PI*2)*3}deg)`;
+          el.style.opacity = 0.4 + 0.55*(0.5 + 0.5*Math.sin(t*Math.PI*2+i));
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
       }
-      result.push(cur); return result;
+    },
+
+    /* 1 — 하이라이트: 노란 형광펜 + 손글씨체, 글자 위아래 살랑 */
+    {
+      font: "'Gaegu', cursive", size: "15px", weight: "700",
+      color: () => "#1a1a1a",
+      extraStyle: "background:linear-gradient(transparent 58%,#ffe066 58%);padding:0 1px;",
+      anim: (el, i) => {
+        const dur = 3000 + i*200;
+        let start = null;
+        const tick = ts => {
+          if (!start) start = ts;
+          const t = ((ts-start)%dur)/dur;
+          el.style.transform = `scaleY(${1 + 0.08*Math.sin(t*Math.PI*2+i*0.8)}) translateY(${Math.sin(t*Math.PI*2+i)*2}px)`;
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+    },
+
+    /* 2 — 모노: 낱자가 순간 ░▒▓ 또는 가타카나로 치환됨 */
+    {
+      font: "'IBM Plex Mono', monospace", size: "12px", weight: "300",
+      color: () => `hsla(140,50%,${35 + Math.random()*20}%,0.9)`,
+      anim: (el, i) => {
+        const glitch = "01アイウエオ░▒▓イロハ";
+        const orig = el.textContent;
+        let frame = 0;
+        setInterval(() => {
+          frame++;
+          if (frame % 20 === i % 20) {
+            el.textContent = glitch[Math.floor(Math.random()*glitch.length)];
+            setTimeout(() => { el.textContent = orig; }, 100 + Math.random()*80);
+          }
+        }, 100);
+      }
+    },
+
+    /* 3 — 흩어짐: 낱자들이 바깥으로 분열하다 돌아옴 */
+    {
+      font: "'Black Han Sans', sans-serif", size: "17px", weight: "400",
+      color: () => `hsla(${10+Math.random()*20},80%,${38+Math.random()*12}%,${0.6+Math.random()*0.4})`,
+      anim: (el, i, total) => {
+        const tx = (i - total/2) * 9;
+        const ty = (Math.random()-0.5)*22;
+        const dur = 5500 + i*280;
+        let start = null;
+        const tick = ts => {
+          if (!start) start = ts;
+          const t = ((ts-start)%dur)/dur;
+          const ease = 0.5 - 0.5*Math.cos(t*Math.PI*2);
+          el.style.transform = `translate(${tx*ease}px,${ty*ease}px) scale(${1+0.18*ease}) rotate(${tx/9*ease}deg)`;
+          el.style.opacity = 0.25 + 0.75*(1-ease);
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+    },
+
+    /* 4 — 전류: 낱자가 순차적으로 번쩍임 */
+    {
+      font: "'IBM Plex Mono', monospace", size: "13px", weight: "600",
+      color: () => `hsla(45,100%,${30+Math.random()*20}%,0.9)`,
+      anim: (el, i) => {
+        const dur = 2000;
+        let start = null;
+        const tick = ts => {
+          if (!start) start = ts;
+          const t = ((ts-start + i*140) % dur) / dur;
+          const lit = t < 0.09;
+          el.style.opacity = lit ? 1 : 0.13;
+          el.style.textShadow = lit ? `0 0 8px hsla(45,100%,65%,0.9)` : "none";
+          el.style.transform = lit ? `scaleY(1.35)` : `scaleY(1)`;
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+    },
+
+    /* 5 — 파동: 소리굽쇠처럼 위아래 출렁이는 사인파 */
+    {
+      font: "'Noto Serif KR', serif", size: "14px", weight: "400",
+      color: () => `hsla(260,70%,${40+Math.random()*30}%,0.85)`,
+      anim: (el, i) => {
+        let start = null;
+        const tick = ts => {
+          if (!start) start = ts;
+          const t = (ts-start)/1000;
+          el.style.transform = `translateY(${Math.sin(t*2.5+i*0.7)*6}px) scale(${0.9+0.15*Math.abs(Math.sin(t*1.8+i))})`;
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+    },
+
+    /* 6 — 희미: 아주 크고 투명하게 출렁이는 배경 텍스처 */
+    {
+      font: "'Noto Serif KR', serif", size: "22px", weight: "900",
+      color: () => `rgba(0,0,0,${0.06+Math.random()*0.12})`,
+      anim: (el, i) => {
+        const dur = 6500 + i*400;
+        let start = null;
+        const tick = ts => {
+          if (!start) start = ts;
+          const t = ((ts-start)%dur)/dur;
+          el.style.opacity = 0.04 + 0.22*Math.abs(Math.sin(t*Math.PI+i));
+          el.style.transform = `scale(${1.5+0.3*Math.sin(t*Math.PI*2)}) translateY(${Math.cos(t*Math.PI*3+i)*3}px)`;
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+    },
+
+    /* 7 — 먹물: 흐릿하게 번지다 선명해지는 잉크 */
+    {
+      font: "'Noto Serif KR', serif", size: "15px", weight: "700",
+      color: () => `rgba(0,0,0,${0.7+Math.random()*0.3})`,
+      anim: (el, i) => {
+        const cycle = 5500;
+        const delay = i * 280;
+        const appear = () => {
+          el.style.opacity = "0";
+          el.style.filter = "blur(9px)";
+          el.style.transform = "scale(1.45)";
+          setTimeout(() => {
+            let s = null;
+            const tick = ts => {
+              if (!s) s = ts;
+              const p = Math.min((ts-s)/900, 1);
+              const e = 1 - Math.pow(1-p, 3);
+              el.style.opacity = e;
+              el.style.filter = `blur(${9*(1-e)}px)`;
+              el.style.transform = `scale(${1.45-0.45*e})`;
+              if (p < 1) requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+          }, delay % 300);
+        };
+        appear();
+        setInterval(appear, cycle);
+      }
+    },
+
+    /* 8 — 점멸: 불규칙하게 깜빡이는 신호등 */
+    {
+      font: "'IBM Plex Mono', monospace", size: "12px", weight: "300",
+      color: () => `hsla(200,80%,${45+Math.random()*20}%,0.85)`,
+      anim: (el, i) => {
+        const pulse = () => {
+          el.style.opacity = Math.random() > 0.28 ? (0.35+Math.random()*0.65) : 0.04;
+          el.style.transform = `scale(${0.78+Math.random()*0.45})`;
+          setTimeout(pulse, 280 + Math.random()*2200);
+        };
+        setTimeout(pulse, i*75 + Math.random()*500);
+      }
+    },
+
+    /* 9 — 중력: 낱자가 떨어지다 통통 튐 */
+    {
+      font: "'Gaegu', cursive", size: "16px", weight: "300",
+      color: () => `hsla(340,60%,${40+Math.random()*25}%,0.75)`,
+      anim: (el, i) => {
+        let vy = 0, y = 0, startTs = null;
+        const tick = ts => {
+          if (!startTs) startTs = ts;
+          vy += 0.28;
+          y += vy;
+          if (y > 14) { vy = -vy * 0.58; y = 14; }
+          if (Math.abs(vy) < 0.1 && y > 11) vy = -(2.5 + Math.random()*3);
+          el.style.transform = `translateY(${y}px) rotate(${(i%2===0?1:-1)*y*0.45}deg)`;
+          requestAnimationFrame(tick);
+        };
+        setTimeout(() => requestAnimationFrame(tick), i*190);
+      }
+    },
+
+    /* 10 — 거울: 낱자가 좌우 뒤집히며 투명도 흔들림 */
+    {
+      font: "'Noto Serif KR', serif", size: "14px", weight: "200",
+      color: () => `rgba(80,80,105,0.62)`,
+      anim: (el, i) => {
+        let s = null;
+        const tick = ts => {
+          if (!s) s = ts;
+          const t = (ts-s)/1000;
+          el.style.transform = `scaleX(${Math.cos(t*0.65+i*0.4) > 0 ? 1 : -1}) translateY(${Math.sin(t*1.2+i)*4}px)`;
+          el.style.opacity = 0.25 + 0.55*Math.abs(Math.sin(t*0.9+i));
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+    },
+
+    /* 11 — 깨짐: 낱자들이 사방으로 흩어졌다 다시 조립 */
+    {
+      font: "'Black Han Sans', sans-serif", size: "18px", weight: "400",
+      color: () => `rgba(20,20,20,${0.6+Math.random()*0.4})`,
+      anim: (el, i) => {
+        const ox = (Math.random()-0.5)*85, oy = (Math.random()-0.5)*65, rot = (Math.random()-0.5)*95;
+        const dur = 8500;
+        let s = null;
+        const tick = ts => {
+          if (!s) s = ts;
+          const t = ((ts-s)%dur)/dur;
+          const scatter = t < 0.45 ? (t/0.45) : 0;
+          const gather = t > 0.6 ? Math.min((t-0.6)/0.32, 1) : 0;
+          const g = 1 - Math.pow(1-gather, 3);
+          const sc = scatter*(1-g);
+          el.style.transform = `translate(${ox*sc}px,${oy*sc}px) rotate(${rot*sc}deg)`;
+          el.style.opacity = g > 0 ? g : Math.max(1 - sc*0.7, 0.1);
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+    },
+
+    /* 12 — 밑줄파동: 손글씨체 + 밑줄 굵기가 같이 흔들림 */
+    {
+      font: "'Gaegu', cursive", size: "15px", weight: "700",
+      color: () => `hsla(120,50%,${28+Math.random()*22}%,0.9)`,
+      anim: (el, i) => {
+        let s = null;
+        const tick = ts => {
+          if (!s) s = ts;
+          const t = (ts-s)/1000;
+          const v = Math.sin(t*2+i*0.6);
+          el.style.transform = `translateY(${v*3}px) rotate(${v*2}deg)`;
+          el.style.borderBottom = `${1+Math.abs(v)*2.5}px solid currentColor`;
+          el.style.paddingBottom = "2px";
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+    },
+
+    /* 13 — 소용돌이: 낱자들이 원형 궤도를 그리며 나선 */
+    {
+      font: "'IBM Plex Mono', monospace", size: "13px", weight: "600",
+      color: () => `hsla(${270+Math.random()*40},70%,${38+Math.random()*28}%,0.88)`,
+      anim: (el, i, total) => {
+        let s = null;
+        const tick = ts => {
+          if (!s) s = ts;
+          const t = (ts-s)/1000;
+          const angle = t*(0.5+i*0.05) + (i/total)*Math.PI*2;
+          const r = (20+i*3)*(1 - Math.sin(t*0.28)*0.3);
+          el.style.transform = `translate(${Math.cos(angle)*r/4}px,${Math.sin(angle)*r/6}px) rotate(${angle*30}deg) scale(${0.68+0.42*Math.abs(Math.sin(t+i))})`;
+          el.style.opacity = 0.38 + 0.62*Math.abs(Math.sin(t*0.8+i));
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+    },
+  ];
+
+  /* ─────────────────────────────────────────────
+     CSV 파싱 유틸
+  ───────────────────────────────────────────── */
+  function parseCSV(text) {
+    const lines = text.trim().split("\n");
+    const headers = splitCSVLine(lines[0]);
+    return lines.slice(1).map(line => {
+      const vals = splitCSVLine(line), obj = {};
+      headers.forEach((h, i) => { obj[h.trim()] = (vals[i] || "").trim(); });
+      return obj;
+    });
+  }
+
+  function splitCSVLine(line) {
+    const res = []; let cur = "", inQ = false;
+    for (const ch of line) {
+      if (ch === '"') inQ = !inQ;
+      else if (ch === ',' && !inQ) { res.push(cur); cur = ""; }
+      else cur += ch;
     }
+    res.push(cur);
+    return res;
+  }
 
-    // 텍스트를 DOM 노드(.word, .char)로 정밀 분할하는 함수
-    function buildMemoryNode(text, typeId) {
-      const wrapper = document.createElement('div');
-      wrapper.className = `memory-item type-${typeId}`;
-      wrapper.setAttribute('data-text', text); // Type-63 반사 효과용
-      
-      // 랜덤 위치 배치
-      wrapper.style.left = `${Math.floor(Math.random()*70) + 15}vw`;
-      wrapper.style.top = `${Math.floor(Math.random()*70) + 15}vh`;
+  /* ─────────────────────────────────────────────
+     DOM 노드 생성: 텍스트 → .mem > .ch 구조
+  ───────────────────────────────────────────── */
+  function buildNode(text, typeId, x, y) {
+    const T = TYPES[typeId];
+    const wrap = document.createElement('div');
+    wrap.className = 'mem';
+    wrap.style.left = x + "px";
+    wrap.style.top  = y + "px";
+    wrap.style.fontFamily = T.font;
+    wrap.style.fontSize   = T.size;
+    wrap.style.fontWeight = T.weight;
 
-      const words = text.split(' ');
-      let charGlobalIndex = 0;
+    const chars = [...text];
+    const chEls = [];
 
-      words.forEach((wordText, wIdx) => {
-        const wordSpan = document.createElement('span');
-        wordSpan.className = 'word';
-        wordSpan.style.setProperty('--w', wIdx);
+    chars.forEach((ch, ci) => {
+      if (ch === ' ') {
+        const sp = document.createElement('span');
+        sp.style.display = 'inline-block';
+        sp.style.width = '0.32em';
+        wrap.appendChild(sp);
+        return;
+      }
+      const el = document.createElement('span');
+      el.className = 'ch';
+      el.textContent = ch;
+      el.style.color = T.color();
+      if (T.extraStyle) el.style.cssText += T.extraStyle;
+      wrap.appendChild(el);
+      chEls.push({ el, ci });
+    });
 
-        // 글자 단위 쪼개기
-        wordText.split('').forEach((charText) => {
-          const charSpan = document.createElement('span');
-          charSpan.className = 'char';
-          charSpan.style.setProperty('--c', charGlobalIndex++);
-          charSpan.innerText = charText;
-          wordSpan.appendChild(charSpan);
-        });
+    return { wrap, chEls, total: chEls.length, T };
+  }
 
-        // 띄어쓰기용 공백 추가
-        const space = document.createElement('span');
-        space.className = 'char space';
-        space.innerHTML = '&nbsp;';
-        wordSpan.appendChild(space);
+  /* ─────────────────────────────────────────────
+     배치 충돌 방지
+  ───────────────────────────────────────────── */
+  const placed = [];
+  function findPos(W, H, estW, estH) {
+    let x, y, tries = 0;
+    do {
+      x = 20 + Math.random() * (W - estW - 40);
+      y = 10 + Math.random() * (H - estH - 20);
+      tries++;
+    } while (tries < 50 && placed.some(r =>
+      x < r.x+r.w+28 && x+estW+28 > r.x && y < r.y+r.h+28 && y+estH+28 > r.y
+    ));
+    placed.push({ x, y, w: estW, h: estH });
+    return { x, y };
+  }
 
-        wrapper.appendChild(wordSpan);
+  /* ─────────────────────────────────────────────
+     컨테이너 자체의 완만한 부유 드리프트
+  ───────────────────────────────────────────── */
+  function startDrift(nodes) {
+    const seeds = nodes.map(() => ({
+      dx: (Math.random()-0.5)*55,
+      dy: (Math.random()-0.5)*38,
+      phase: Math.random()*Math.PI*2,
+      spd: 0.00025 + Math.random()*0.00035
+    }));
+    let start = null;
+    const tick = ts => {
+      if (!start) start = ts;
+      const elapsed = ts - start;
+      nodes.forEach((wrap, i) => {
+        const s = seeds[i];
+        wrap.style.transform = `translate(${s.dx*Math.sin(elapsed*s.spd+s.phase)}px,${s.dy*Math.cos(elapsed*s.spd*0.7+s.phase+1)}px)`;
+      });
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  /* ─────────────────────────────────────────────
+     데이터 로드 및 렌더링
+  ───────────────────────────────────────────── */
+  const canvas = document.getElementById("canvas");
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  let fallbackCounter = 0;
+  const fallbackMap = new Map();
+
+  fetch(CSV_URL)
+    .then(r => r.text())
+    .then(text => {
+      const rows = parseCSV(text);
+      const wraps = [];
+
+      rows.forEach(row => {
+        const noteText = (row[KEYS.note] || "").trim();
+        const typeName = (row[KEYS.type] || "").trim();
+        if (!noteText) return;
+
+        let typeId;
+        if (TYPE_NAME_TO_ID.hasOwnProperty(typeName)) {
+          typeId = TYPE_NAME_TO_ID[typeName];
+        } else if (fallbackMap.has(typeName)) {
+          typeId = fallbackMap.get(typeName);
+        } else {
+          typeId = fallbackCounter % TYPES.length;
+          fallbackMap.set(typeName, typeId);
+          fallbackCounter++;
+        }
+
+        const estW = Math.min([...noteText].length * parseInt(TYPES[typeId].size) * 0.82, 240);
+        const estH = 44;
+        const { x, y } = findPos(W, H, estW, estH);
+
+        const { wrap, chEls, total, T } = buildNode(noteText, typeId, x, y);
+        canvas.appendChild(wrap);
+        wraps.push(wrap);
+
+        chEls.forEach(({ el, ci }) => T.anim(el, ci, total));
       });
 
-      return wrapper;
-    }
-
-    // 데이터 로드 및 실행
-    fetch(CSV_URL)
-      .then(r => r.text())
-      .then(text => {
-        const rows = parseCSV(text);
-        const canvas = document.getElementById("canvas");
-        const fallback = new Map(); 
-        let fc = 0;
-
-        rows.forEach(row => {
-          const noteText = row[KEYS.note];
-          const typeName = (row[KEYS.type]||"").trim();
-          if (!noteText || !noteText.trim()) return;
-
-          const typeId = TYPE_NAME_TO_ID.hasOwnProperty(typeName)
-            ? TYPE_NAME_TO_ID[typeName]
-            : (fallback.has(typeName) ? fallback.get(typeName) : (fallback.set(typeName, fc%80), fc++, fallback.get(typeName)));
-
-          // 노드 생성 및 캔버스 부착
-          const memoryNode = buildMemoryNode(noteText, typeId);
-          canvas.appendChild(memoryNode);
-        });
-      })
-      .catch(err => console.error("CSV 로드 실패:", err));
-  </script>
+      startDrift(wraps);
+    })
+    .catch(err => console.error("CSV 로드 실패:", err));
+</script>
 </body>
 </html>
