@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Memory Text Map</title>
+  <title>Memory Image Map</title>
 
   <style>
     * {
@@ -33,34 +33,52 @@
       overflow: hidden;
     }
 
+    /* ── 이미지 카드 ── */
     .mem {
       position: absolute;
-      max-width: min(28vw, 280px);
-      font-size: clamp(11px, 1.1vw, 18px);
-      font-weight: 400;
-      line-height: 1.55;
-      color: #111;
-      word-break: keep-all;
-      overflow-wrap: break-word;
-      white-space: normal;
+      width: 240px;
+      height: 180px;
+      border-radius: 6px;
+      overflow: hidden;
+      cursor: pointer;
+      transform-style: preserve-3d;
+      will-change: transform;
+      transition: box-shadow 0.4s ease;
     }
 
-    @media (max-width: 1024px) {
-      .mem {
-        max-width: min(34vw, 240px);
-        font-size: clamp(11px, 1.5vw, 17px);
-      }
+    .mem:hover {
+      z-index: 100;
+      box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.15),
+        0 0 0 1px rgba(0, 0, 0, 0.04);
+    }
+
+    .mem img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: filter 0.4s ease;
+    }
+
+    .mem:hover img {
+      filter: brightness(1.05);
+    }
+
+    /* 글레어 (빛 반사) */
+    .mem-glare {
+      position: absolute;
+      inset: 0;
+      border-radius: 6px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      z-index: 2;
     }
 
     @media (max-width: 768px) {
-      #canvas {
-        overflow: auto;
-      }
-
-      .mem {
-        max-width: min(42vw, 200px);
-        font-size: clamp(10px, 2.5vw, 16px);
-      }
+      #canvas { overflow: auto; }
+      .mem { width: 160px; height: 120px; }
     }
   </style>
 </head>
@@ -71,33 +89,25 @@
     const SPREADSHEET_ID = "1pintIO8VNpryzS56eqXaNjqzx5f3EeAV";
     const KEYS = { note: "당사자의 직접 설명" };
     const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
+    const IMG_BASE = "./assets/";
 
     const canvas = document.getElementById("canvas");
     let rowsData = [];
 
+    /* ── CSV 파서 ── */
     function splitCSVLine(line) {
       const result = [];
       let current = "";
       let inQuotes = false;
-
       for (let i = 0; i < line.length; i++) {
         const char = line[i];
-
         if (char === '"') {
-          if (inQuotes && line[i + 1] === '"') {
-            current += '"';
-            i++;
-          } else {
-            inQuotes = !inQuotes;
-          }
+          if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+          else inQuotes = !inQuotes;
         } else if (char === ',' && !inQuotes) {
-          result.push(current);
-          current = "";
-        } else {
-          current += char;
-        }
+          result.push(current); current = "";
+        } else { current += char; }
       }
-
       result.push(current);
       return result;
     }
@@ -105,7 +115,6 @@
     function parseCSV(text) {
       const lines = text.trim().split(/\r?\n/);
       const headers = splitCSVLine(lines[0]).map(h => h.trim());
-
       return lines.slice(1).map(line => {
         const values = splitCSVLine(line);
         const obj = {};
@@ -116,11 +125,11 @@
       });
     }
 
+    /* ── 겹침 방지 배치 ── */
     const placed = [];
 
     function findPosition(W, H, estW, estH) {
       let x, y, tries = 0;
-
       do {
         x = 20 + Math.random() * Math.max(20, W - estW - 40);
         y = 20 + Math.random() * Math.max(20, H - estH - 40);
@@ -134,37 +143,87 @@
           y + estH + 24 > r.y
         )
       );
-
       placed.push({ x, y, w: estW, h: estH });
       return { x, y };
     }
 
+    /* ══════════════════════════════════
+       ★ immersive-g 스타일 3D Tilt 호버
+       ══════════════════════════════════ */
+    function addTiltEffect(card) {
+      const TILT = 15;       // 최대 기울기 (도)
+      const GLARE = 0.18;    // 글레어 최대 밝기
+
+      const glare = document.createElement("div");
+      glare.className = "mem-glare";
+      card.appendChild(glare);
+
+      card.addEventListener("mouseenter", () => {
+        card.style.transition = "transform 0.08s ease-out, box-shadow 0.4s ease";
+      });
+
+      card.addEventListener("mousemove", (e) => {
+        const rect = card.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top  + rect.height / 2;
+
+        const px = (e.clientX - cx) / (rect.width / 2);   // -1 ~ 1
+        const py = (e.clientY - cy) / (rect.height / 2);
+
+        card.style.transform =
+          `perspective(600px) rotateX(${-py * TILT}deg) rotateY(${px * TILT}deg) scale(1.04)`;
+
+        const gx = ((e.clientX - rect.left) / rect.width) * 100;
+        const gy = ((e.clientY - rect.top)  / rect.height) * 100;
+        glare.style.background =
+          `radial-gradient(circle at ${gx}% ${gy}%, rgba(255,255,255,${GLARE}), transparent 55%)`;
+        glare.style.opacity = "1";
+      });
+
+      card.addEventListener("mouseleave", () => {
+        card.style.transition = "transform 0.45s cubic-bezier(0.25,0.46,0.45,0.94), box-shadow 0.4s ease";
+        card.style.transform  = "perspective(600px) rotateX(0) rotateY(0) scale(1)";
+        glare.style.opacity   = "0";
+      });
+    }
+
+    /* ── 렌더링 ── */
     function render(rows) {
       canvas.innerHTML = "";
       placed.length = 0;
 
       const W = window.innerWidth;
       const H = window.innerHeight;
+      const cardW = W < 768 ? 160 : 240;
+      const cardH = W < 768 ? 120 : 180;
 
       rows.forEach(row => {
-        const text = (row[KEYS.note] || "").trim();
-        if (!text) return;
+        const fileName = (row[KEYS.note] || "").trim();
+        if (!fileName) return;
 
-        const estW = Math.min(text.length * 9, 280);
-        const estH = 60;
+        // .png 파일만 처리
+        if (!/\.png$/i.test(fileName)) return;
 
-        const { x, y } = findPosition(W, H, estW, estH);
+        const { x, y } = findPosition(W, H, cardW, cardH);
 
         const el = document.createElement("div");
         el.className = "mem";
-        el.textContent = text;
         el.style.left = `${x}px`;
-        el.style.top = `${y}px`;
+        el.style.top  = `${y}px`;
+
+        const img = document.createElement("img");
+        img.src = IMG_BASE + fileName;
+        img.alt = fileName;
+        el.appendChild(img);
+
+        // ★ 3D Tilt 호버 적용
+        addTiltEffect(el);
 
         canvas.appendChild(el);
       });
     }
 
+    /* ── 데이터 로드 ── */
     fetch(CSV_URL)
       .then(res => res.text())
       .then(text => {
