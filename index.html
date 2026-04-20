@@ -19,7 +19,6 @@
       background: #000;
     }
 
-    /* ── 공통: 두 레이어 모두 화면 꽉 채움 ── */
     .layer {
       position: fixed;
       inset: 0;
@@ -33,16 +32,12 @@
       object-fit: cover;
     }
 
-    /* ── ① 배경 레이어: 항상 보임 ── */
     #bg-layer {
       z-index: 1;
     }
 
-    /* ── ② 개체 레이어: 마스크로 가려짐 ── */
     #reveal-layer {
       z-index: 2;
-
-      /* 처음엔 완전히 안 보임 (마스크 크기 0) */
       -webkit-mask-image: radial-gradient(
         circle 0px at 50% 50%,
         rgba(0,0,0,1) 0%,
@@ -60,33 +55,28 @@
 </head>
 <body>
 
-  <!-- ① 배경 (개체 없는 이미지) -->
   <div id="bg-layer" class="layer">
-    <img src="./assets/sample2.png" alt="background" />
+    <img src="./assets/sample2.jpg" alt="background" />
   </div>
 
-  <!-- ② 개체 (호버 시 보임) -->
   <div id="reveal-layer" class="layer">
-    <img src="./assets/sample1.png" alt="reveal" />
+    <img src="./assets/sample1.jpg" alt="reveal" />
   </div>
 
   <script>
     const reveal = document.getElementById("reveal-layer");
 
-    /* ── Lerp 보간용 변수 ── */
     let targetX = window.innerWidth / 2;
     let targetY = window.innerHeight / 2;
     let currentX = targetX;
     let currentY = targetY;
 
-    /* spotlight 크기 */
-    let targetR = 0;       // 마우스가 화면 밖이면 0
+    let targetR = 0;
     let currentR = 0;
-    const RADIUS = 180;    // 호버 시 spotlight 반지름 (px)
-    const EASE = 0.07;     // 따라오는 속도 (작을수록 느리고 부드러움)
-    const R_EASE = 0.06;   // 크기 변화 속도
+    const RADIUS = 180;
+    const EASE = 0.07;
+    const R_EASE = 0.06;
 
-    /* ── 마우스 이벤트 ── */
     document.addEventListener("mousemove", (e) => {
       targetX = e.clientX;
       targetY = e.clientY;
@@ -94,16 +84,14 @@
     });
 
     document.addEventListener("mouseleave", () => {
-      targetR = 0;   // 화면 밖으로 나가면 닫힘
+      targetR = 0;
     });
 
     document.addEventListener("mouseenter", () => {
       targetR = RADIUS;
     });
 
-    /* ── 애니메이션 루프 ── */
     function animate() {
-      // lerp: 현재값을 목표값 쪽으로 부드럽게 이동
       currentX += (targetX - currentX) * EASE;
       currentY += (targetY - currentY) * EASE;
       currentR += (targetR - currentR) * R_EASE;
