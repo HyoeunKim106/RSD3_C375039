@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Memory Image Map - Liquid Ripple Effect</title>
+  <title>Memory Image Map - Ink Brush Effect</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300&display=swap" rel="stylesheet" />
 
   <style>
@@ -24,20 +24,18 @@
     
     #reveal-layer {
       z-index: 2;
-      /* SVG 굴절 필터 적용 */
-      filter: url('#liquid-ripple');
-      -webkit-mask-image: radial-gradient(circle 0px at 50% 50%, rgba(0,0,0,1) 0%, rgba(0,0,0,0.3) 60%, rgba(0,0,0,0) 100%);
-      mask-image: radial-gradient(circle 0px at 50% 50%, rgba(0,0,0,1) 0%, rgba(0,0,0,0.3) 60%, rgba(0,0,0,0) 100%);
+      /* 붓결 및 먹 번짐 필터 적용 */
+      filter: url('#ink-spread');
+      -webkit-mask-image: radial-gradient(circle 0px at 50% 50%, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0) 80%);
+      mask-image: radial-gradient(circle 0px at 50% 50%, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0) 80%);
     }
     
     #text-canvas {
       position: fixed; inset: 0;
       z-index: 3;
-      /* 필터 영역의 가장자리 잘림 방지를 위해 이벤트 포인터 유지 */
       pointer-events: auto;
     }
 
-    /* SVG 렌더링 영역에서 숨김 처리 */
     .svg-filters {
       position: absolute;
       width: 0; height: 0;
@@ -49,32 +47,35 @@
 
   <svg class="svg-filters">
     <defs>
-      <filter id="liquid-ripple" x="-20%" y="-20%" width="140%" height="140%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="3" result="noise" />
-        <feDisplacementMap id="displacement" in="SourceGraphic" in2="noise" scale="0" xChannelSelector="R" yChannelSelector="G" />
+      <filter id="ink-spread" x="-20%" y="-20%" width="140%" height="140%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.003 0.006" numOctaves="4" result="noise" />
+        <feDisplacementMap id="displacement" in="SourceGraphic" in2="noise" scale="40" xChannelSelector="R" yChannelSelector="G" />
       </filter>
     </defs>
   </svg>
 
   <div id="bg-layer" class="layer">
-    <img src="./assets/sample2.jpg?v=2" alt="background" />
+    <img src="./assets/sample2.jpg?v=3" alt="background" />
   </div>
   <div id="reveal-layer" class="layer">
-    <img src="./assets/sample1.jpg?v=2" alt="reveal" />
+    <img src="./assets/sample1.jpg?v=3" alt="reveal" />
   </div>
   <canvas id="text-canvas"></canvas>
 
   <script>
-    /* ═══════ Spotlight & Filters ═══════ */
     const reveal = document.getElementById("reveal-layer");
     const displacement = document.getElementById("displacement");
     
     let targetX = window.innerWidth/2, targetY = window.innerHeight/2;
     let currentX = targetX, currentY = targetY;
     let targetR = 0, currentR = 0;
+    
+    // 속도 연산을 위한 이전 프레임 좌표
+    let prevMouseX = targetX, prevMouseY = targetY;
+    let currentScale = 40; // 필터 초기 스케일 (먹 번짐 강도)
+
     const RADIUS = 180, EASE = 0.07, R_EASE = 0.06;
 
-    /* ═══════ Canvas ═══════ */
     const tc = document.getElementById("text-canvas");
     const ctx = tc.getContext("2d");
     let W, H;
@@ -91,7 +92,6 @@
     let holdAlpha = 0;
     let rotY = 0;
 
-    /* ═══════ 3D 사과 메쉬 ═══════ */
     function appleRadius(v) {
       const t = v / Math.PI;
       let r = Math.sin(v);
@@ -142,7 +142,6 @@
       });
     }
 
-    /* ═══════ 투영 ═══════ */
     function project(x, y, z, cx, cy, ry) {
       const c = Math.cos(ry), s = Math.sin(ry);
       const rx2 = x * c - z * s, rz2 = x * s + z * c;
@@ -150,7 +149,6 @@
       return { x: cx + rx2 * p, y: cy + y * p, s: p, z: rz2 };
     }
 
-    /* ═══════ 부유 도형 ═══════ */
     let floatingShape = null;
 
     class FloatingShape {
@@ -215,7 +213,6 @@
       }
     }
 
-    /* ═══════ 사과 그리기 ═══════ */
     function drawApple() {
       const cx = mouseX, cy = mouseY;
       const drawList = [];
@@ -256,7 +253,6 @@
       }
     }
 
-    /* ═══════ 이벤트 ═══════ */
     tc.addEventListener("mousemove", (e) => {
       targetX = e.clientX; targetY = e.clientY; targetR = RADIUS;
       mouseX = e.clientX; mouseY = e.clientY;
@@ -284,32 +280,35 @@
       floatingShape = new FloatingShape(mouseX, mouseY);
     });
 
-    /* ═══════ 루프 및 모션 제어 ═══════ */
     let time = 0;
 
     function animate() {
-      time += 0.016; // 초당 60프레임 기준 시간 변수
+      time += 0.016;
+
+      // 물리적 마우스 이동 벡터(속도) 연산
+      const dx = targetX - prevMouseX;
+      const dy = targetY - prevMouseY;
+      const velocity = Math.sqrt(dx * dx + dy * dy);
+      
+      prevMouseX = targetX;
+      prevMouseY = targetY;
 
       currentX += (targetX - currentX) * EASE;
       currentY += (targetY - currentY) * EASE;
       currentR += (targetR - currentR) * R_EASE;
 
-      // 2. 마스크 형태 왜곡 연산 (Wobble & Pulse)
-      const waveX = Math.sin(time * 2.0) * 12;
-      const waveY = Math.cos(time * 1.5) * 12;
-      const pulseR = Math.sin(time * 3.0) * 8;
-      
-      const activeR = Math.max(0, currentR + pulseR);
-
-      // 그라데이션 페더링 구간 확대
+      // 마스크 좌표 적용 (제자리 떨림 삭제)
+      // 그라데이션 경계를 소프트하게(0.6 opacity) 주어 디스플레이스먼트 맵이 먹처럼 뜯어내게 유도
       reveal.style.webkitMaskImage = reveal.style.maskImage =
-        `radial-gradient(circle ${activeR}px at ${currentX + waveX}px ${currentY + waveY}px, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0) 100%)`;
+        `radial-gradient(circle ${currentR}px at ${currentX}px ${currentY}px, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0) 80%)`;
 
-      // 3. SVG 굴절(Displacement) 강도 연산
-      const hoverIntensity = currentR / RADIUS;
+      // 붓질/번짐 스케일 동적 계산
+      // 빠르게 이동할수록 값이 커져 붓질이 찢어지는 효과 생성
+      const targetScale = 40 + Math.min(velocity * 1.5, 70);
+      currentScale += (targetScale - currentScale) * 0.1; // 보간하여 자연스럽게 복원
+
       if (displacement) {
-        const scaleValue = (hoverIntensity * 35) + (Math.sin(time * 4) * 10);
-        displacement.setAttribute('scale', Math.max(0, scaleValue));
+        displacement.setAttribute('scale', currentScale);
       }
 
       ctx.clearRect(0, 0, W, H);
