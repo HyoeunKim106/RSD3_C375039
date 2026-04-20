@@ -31,7 +31,15 @@
       align-items: flex-start;
       max-width: 280px;
       line-height: 1.6;
-      pointer-events: none;
+      /* 클릭 이벤트를 받기 위해 auto로 변경 */
+      pointer-events: auto; 
+      cursor: pointer;
+      transition: transform 0.3s ease;
+      z-index: 1;
+    }
+
+    .mem:hover {
+      z-index: 10;
     }
 
     .ch {
@@ -39,6 +47,36 @@
       position: relative;
       transform-origin: center bottom;
       will-change: transform, opacity;
+      /* 도형 전환 시 부드럽게 사라지도록 트랜지션 추가 */
+      transition: opacity 0.4s ease, transform 0.4s ease; 
+    }
+
+    /* ─── 추가된 도형 박스 스타일 ─── */
+    .shape-box {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 50px;
+      height: 50px;
+      margin-top: -25px;
+      margin-left: -25px;
+      opacity: 0;
+      transform: scale(0) rotate(-20deg);
+      transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      pointer-events: none;
+    }
+
+    /* 클릭 시 텍스트 숨기기 */
+    .mem.is-shape .ch {
+      opacity: 0 !important;
+      transform: scale(0) !important;
+    }
+
+    /* 클릭 시 도형 나타내기 */
+    .mem.is-shape .shape-box {
+      opacity: 1;
+      transform: scale(1) rotate(0deg);
+      pointer-events: auto;
     }
   </style>
 </head>
@@ -88,11 +126,30 @@
   };
 
   /* ─────────────────────────────────────────────
+     80개의 고유한 도형(Polygon) 생성 함수 추가
+  ───────────────────────────────────────────── */
+  function getUniqueShapePath(index) {
+    const sides = 3 + (index % 10); // 3각형부터 12각형까지 다양하게 생성
+    const points = [];
+    const radius = 50;
+    const center = 50;
+    const randomness = 15 + (index % 20); // 각 도형마다 불규칙한 형태 부여
+
+    for (let i = 0; i < sides; i++) {
+      const angle = (i / sides) * Math.PI * 2;
+      const r = radius - (Math.random() * randomness);
+      const x = center + r * Math.cos(angle);
+      const y = center + r * Math.sin(angle);
+      points.push(`${x.toFixed(1)}% ${y.toFixed(1)}%`);
+    }
+    return `polygon(${points.join(', ')})`;
+  }
+
+  /* ─────────────────────────────────────────────
      14가지 시각 타입 정의
      각각: 폰트 / 색상 / 낱자 애니메이션 로직
   ───────────────────────────────────────────── */
   const TYPES = [
-    /* 0 — 부유: 물속처럼 낱자가 각자 천천히 흐느적거림 */
     {
       font: "'Noto Serif KR', serif", size: "12px", weight: "200",
       color: () => `hsla(220,60%,55%,${0.5 + Math.random() * 0.4})`,
@@ -110,8 +167,6 @@
         requestAnimationFrame(tick);
       }
     },
-
-    /* 1 — 하이라이트: 노란 형광펜 + 손글씨체, 글자 위아래 살랑 */
     {
       font: "'Gaegu', cursive", size: "12px", weight: "700",
       color: () => "#1a1a1a",
@@ -128,8 +183,6 @@
         requestAnimationFrame(tick);
       }
     },
-
-    /* 2 — 모노: 낱자가 순간 ░▒▓ 또는 가타카나로 치환됨 */
     {
       font: "'IBM Plex Mono', monospace", size: "12px", weight: "300",
       color: () => `hsla(140,50%,${35 + Math.random()*20}%,0.9)`,
@@ -146,8 +199,6 @@
         }, 100);
       }
     },
-
-    /* 3 — 흩어짐: 낱자들이 바깥으로 분열하다 돌아옴 */
     {
       font: "'Black Han Sans', sans-serif", size: "12px", weight: "400",
       color: () => `hsla(${10+Math.random()*20},80%,${38+Math.random()*12}%,${0.6+Math.random()*0.4})`,
@@ -167,8 +218,6 @@
         requestAnimationFrame(tick);
       }
     },
-
-    /* 4 — 전류: 낱자가 순차적으로 번쩍임 */
     {
       font: "'IBM Plex Mono', monospace", size: "12px", weight: "600",
       color: () => `hsla(45,100%,${30+Math.random()*20}%,0.9)`,
@@ -187,8 +236,6 @@
         requestAnimationFrame(tick);
       }
     },
-
-    /* 5 — 파동: 소리굽쇠처럼 위아래 출렁이는 사인파 */
     {
       font: "'Noto Serif KR', serif", size: "12px", weight: "400",
       color: () => `hsla(260,70%,${40+Math.random()*30}%,0.85)`,
@@ -203,8 +250,6 @@
         requestAnimationFrame(tick);
       }
     },
-
-    /* 6 — 희미: 아주 크고 투명하게 출렁이는 배경 텍스처 */
     {
       font: "'Noto Serif KR', serif", size: "12px", weight: "900",
       color: () => `rgba(0,0,0,${0.06+Math.random()*0.12})`,
@@ -221,8 +266,6 @@
         requestAnimationFrame(tick);
       }
     },
-
-    /* 7 — 먹물: 흐릿하게 번지다 선명해지는 잉크 */
     {
       font: "'Noto Serif KR', serif", size: "12px", weight: "700",
       color: () => `rgba(0,0,0,${0.7+Math.random()*0.3})`,
@@ -251,8 +294,6 @@
         setInterval(appear, cycle);
       }
     },
-
-    /* 8 — 점멸: 불규칙하게 깜빡이는 신호등 */
     {
       font: "'IBM Plex Mono', monospace", size: "12px", weight: "300",
       color: () => `hsla(200,80%,${45+Math.random()*20}%,0.85)`,
@@ -265,8 +306,6 @@
         setTimeout(pulse, i*75 + Math.random()*500);
       }
     },
-
-    /* 9 — 중력: 낱자가 떨어지다 통통 튐 */
     {
       font: "'Gaegu', cursive", size: "12px", weight: "300",
       color: () => `hsla(340,60%,${40+Math.random()*25}%,0.75)`,
@@ -284,8 +323,6 @@
         setTimeout(() => requestAnimationFrame(tick), i*190);
       }
     },
-
-    /* 10 — 거울: 낱자가 좌우 뒤집히며 투명도 흔들림 */
     {
       font: "'Noto Serif KR', serif", size: "12px", weight: "200",
       color: () => `rgba(80,80,105,0.62)`,
@@ -301,8 +338,6 @@
         requestAnimationFrame(tick);
       }
     },
-
-    /* 11 — 깨짐: 낱자들이 사방으로 흩어졌다 다시 조립 */
     {
       font: "'Black Han Sans', sans-serif", size: "12px", weight: "400",
       color: () => `rgba(20,20,20,${0.6+Math.random()*0.4})`,
@@ -324,8 +359,6 @@
         requestAnimationFrame(tick);
       }
     },
-
-    /* 12 — 밑줄파동: 손글씨체 + 밑줄 굵기가 같이 흔들림 */
     {
       font: "'Gaegu', cursive", size: "12px", weight: "700",
       color: () => `hsla(120,50%,${28+Math.random()*22}%,0.9)`,
@@ -343,8 +376,6 @@
         requestAnimationFrame(tick);
       }
     },
-
-    /* 13 — 소용돌이: 낱자들이 원형 궤도를 그리며 나선 */
     {
       font: "'IBM Plex Mono', monospace", size: "12px", weight: "600",
       color: () => `hsla(${270+Math.random()*40},70%,${38+Math.random()*28}%,0.88)`,
@@ -389,14 +420,14 @@
   }
 
   /* ─────────────────────────────────────────────
-     DOM 노드 생성: 텍스트 → .mem > .ch 구조
+     DOM 노드 생성: 텍스트 → .mem > .ch 구조 (+ 도형 박스)
+     파라미터에 rowIndex 추가 (고유 도형 생성용)
   ───────────────────────────────────────────── */
-  function buildNode(text, typeId, x, y, windowW, windowH) {
+  function buildNode(text, typeId, x, y, windowW, windowH, rowIndex) {
     const T = TYPES[typeId];
     const wrap = document.createElement('div');
     wrap.className = 'mem';
     
-    // 반응형 대응을 위해 px 대신 화면 크기 대비 비율(%)로 위치를 지정합니다.
     wrap.style.left = ((x / windowW) * 100) + "%";
     wrap.style.top  = ((y / windowH) * 100) + "%";
     wrap.style.fontFamily = T.font;
@@ -406,6 +437,7 @@
     const chars = [...text];
     const chEls = [];
 
+    // 1. 글자 요소 생성
     chars.forEach((ch, ci) => {
       if (ch === ' ') {
         const sp = document.createElement('span');
@@ -421,6 +453,19 @@
       if (T.extraStyle) el.style.cssText += T.extraStyle;
       wrap.appendChild(el);
       chEls.push({ el, ci });
+    });
+
+    // 2. 고유 도형 상자 생성
+    const shape = document.createElement('div');
+    shape.className = 'shape-box';
+    shape.style.backgroundColor = T.color(); // 글자 색상에 맞춤
+    shape.style.clipPath = getUniqueShapePath(rowIndex);
+    wrap.appendChild(shape);
+
+    // 3. 클릭 이벤트 추가 (토글)
+    wrap.addEventListener('click', (e) => {
+      e.stopPropagation();
+      wrap.classList.toggle('is-shape');
     });
 
     return { wrap, chEls, total: chEls.length, T };
@@ -459,7 +504,15 @@
       const elapsed = ts - start;
       nodes.forEach((wrap, i) => {
         const s = seeds[i];
-        wrap.style.transform = `translate(${s.dx*Math.sin(elapsed*s.spd+s.phase)}px,${s.dy*Math.cos(elapsed*s.spd*0.7+s.phase+1)}px)`;
+        const tx = s.dx*Math.sin(elapsed*s.spd+s.phase);
+        const ty = s.dy*Math.cos(elapsed*s.spd*0.7+s.phase+1);
+        
+        // 클릭해서 도형이 되었거나 마우스 오버 중일 때는 스케일 적용 유지
+        if (wrap.matches(':hover') || wrap.classList.contains('is-shape')) {
+          wrap.style.transform = `translate(${tx}px,${ty}px) scale(1.05)`;
+        } else {
+          wrap.style.transform = `translate(${tx}px,${ty}px)`;
+        }
       });
       requestAnimationFrame(tick);
     };
@@ -481,7 +534,7 @@
       const rows = parseCSV(text);
       const wraps = [];
 
-      rows.forEach(row => {
+      rows.forEach((row, index) => { // index 추가
         const noteText = (row[KEYS.note] || "").trim();
         const typeName = (row[KEYS.type] || "").trim();
         if (!noteText) return;
@@ -497,12 +550,12 @@
           fallbackCounter++;
         }
 
-        // 폰트 크기가 12px로 통일되었으므로 estW 계산값도 이에 맞게 고정합니다.
         const estW = Math.min([...noteText].length * 12 * 0.82, 240);
         const estH = 44;
         const { x, y } = findPos(W, H, estW, estH);
 
-        const { wrap, chEls, total, T } = buildNode(noteText, typeId, x, y, W, H);
+        // index를 마지막 파라미터로 넘겨 80개 고유 도형 매핑 적용
+        const { wrap, chEls, total, T } = buildNode(noteText, typeId, x, y, W, H, index);
         canvas.appendChild(wrap);
         wraps.push(wrap);
 
