@@ -7,219 +7,215 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400&display=swap" rel="stylesheet" />
 
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #000;
+      width: 100%; height: 100%;
+      overflow: hidden; background: #000;
     }
-
     .layer {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
+      position: fixed; inset: 0;
+      width: 100%; height: 100%;
     }
-
     .layer img {
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
       object-fit: cover;
     }
-
-    #bg-layer {
-      z-index: 1;
-    }
-
+    #bg-layer { z-index: 1; }
     #reveal-layer {
       z-index: 2;
-      -webkit-mask-image: radial-gradient(
-        circle 0px at 50% 50%,
-        rgba(0,0,0,1) 0%,
-        rgba(0,0,0,0.3) 60%,
-        rgba(0,0,0,0) 100%
-      );
-      mask-image: radial-gradient(
-        circle 0px at 50% 50%,
-        rgba(0,0,0,1) 0%,
-        rgba(0,0,0,0.3) 60%,
-        rgba(0,0,0,0) 100%
-      );
+      -webkit-mask-image: radial-gradient(circle 0px at 50% 50%, rgba(0,0,0,1) 0%, rgba(0,0,0,0.3) 60%, rgba(0,0,0,0) 100%);
+      mask-image: radial-gradient(circle 0px at 50% 50%, rgba(0,0,0,1) 0%, rgba(0,0,0,0.3) 60%, rgba(0,0,0,0) 100%);
     }
-
-    /* ── 텍스트 캔버스 ── */
     #text-canvas {
-      position: fixed;
-      inset: 0;
-      z-index: 3;
-      pointer-events: none;
+      position: fixed; inset: 0;
+      z-index: 3; pointer-events: none;
     }
   </style>
 </head>
 <body>
 
-  <!-- ① 배경 -->
   <div id="bg-layer" class="layer">
     <img src="./assets/sample2.jpg" alt="background" />
   </div>
 
-  <!-- ② reveal -->
   <div id="reveal-layer" class="layer">
     <img src="./assets/sample1.jpg" alt="reveal" />
   </div>
 
-  <!-- ③ 텍스트 -->
   <canvas id="text-canvas"></canvas>
 
   <script>
-    /* ═══════════════════════════════════
-       PART 1: 기존 Spotlight Reveal
-       ═══════════════════════════════════ */
+    /* ═══════════ PART 1: Spotlight ═══════════ */
     const reveal = document.getElementById("reveal-layer");
 
     let targetX = window.innerWidth / 2;
     let targetY = window.innerHeight / 2;
     let currentX = targetX;
     let currentY = targetY;
-
-    let targetR = 0;
-    let currentR = 0;
-    const RADIUS = 180;
-    const EASE = 0.07;
-    const R_EASE = 0.06;
+    let targetR = 0, currentR = 0;
+    const RADIUS = 180, EASE = 0.07, R_EASE = 0.06;
 
     document.addEventListener("mousemove", (e) => {
-      targetX = e.clientX;
-      targetY = e.clientY;
-      targetR = RADIUS;
-      mouseX = e.clientX;
-      mouseY = e.clientY;
+      targetX = e.clientX; targetY = e.clientY;
+      targetR = RADIUS; mouseX = e.clientX; mouseY = e.clientY;
     });
+    document.addEventListener("mouseleave", () => { targetR = 0; });
+    document.addEventListener("mouseenter", () => { targetR = RADIUS; });
 
-    document.addEventListener("mouseleave", () => {
-      targetR = 0;
-    });
-
-    document.addEventListener("mouseenter", () => {
-      targetR = RADIUS;
-    });
-
-    /* ═══════════════════════════════════
-       PART 2: 텍스트 모션 (꾹 누르기)
-       ═══════════════════════════════════ */
+    /* ═══════════ PART 2: 텍스트 모션 ═══════════ */
     const tc = document.getElementById("text-canvas");
     const ctx = tc.getContext("2d");
 
     let W, H;
-    function resize() {
-      W = tc.width = window.innerWidth;
-      H = tc.height = window.innerHeight;
-    }
+    function resize() { W = tc.width = window.innerWidth; H = tc.height = window.innerHeight; }
     resize();
     window.addEventListener("resize", resize);
 
     const TEXT = "사과의 시각적 표상은 없지만, 벡터가 포함된 완벽한 3D 모델을 가지고 있어요.";
     const CYAN = "#00f0ff";
-    const MAROON = "rgba(120, 10, 20, 0.85)";
+    const MAROON_BG = "rgba(120, 10, 20, %%A%%)";
 
-    let mouseX = W / 2;
-    let mouseY = H / 2;
+    let mouseX = W / 2, mouseY = H / 2;
     let isHolding = false;
+    const lines = [];      // 문장 라인들
     let spawnTimer = 0;
-    let spawnIndex = 0;
-    const chars = [];
 
-    /* ── 사과 형상 포인트 생성 ── */
-    function getApplePoint(angle) {
-      // 사과 형상의 극좌표 (cardioid 변형)
-      const r = 110;
-      let x, y;
+    /* ── 사과 형상 점 (실제 사과 비율) ── */
+    function applePoint(t) {
+      // t: 0~1, 사과 외곽을 따라 도는 각도
+      const a = t * Math.PI * 2;
 
-      // 사과 모양: 위쪽 움푹, 아래 둥근
-      const t = angle;
-      x = r * Math.sin(t);
-      y = -r * (Math.cos(t) + 0.3 * Math.cos(2 * t)) * 0.85;
-      y += 10; // 살짝 아래로
+      // 실제 사과 형태: 위가 살짝 움푹, 아래 둥근
+      let r = 1.0;
+      // 위쪽 움푹
+      r += 0.12 * Math.cos(a);
+      // 아래쪽 더 볼록
+      r += 0.08 * Math.cos(2 * a);
 
-      return { x, y };
+      const baseR = 75; // 사과 기본 반지름 (px) — 작은 범위
+      let x = baseR * r * Math.sin(a);
+      let y = -baseR * r * Math.cos(a) * 1.05;
+
+      // 사과 아래쪽 살짝 넓게
+      if (y > 0) x *= 1.1;
+
+      // 꼭지 부분 (위쪽) 움푹
+      if (y < -baseR * 0.6) {
+        const pinch = 1.0 - Math.pow(Math.abs(x) / (baseR * 0.5), 2) * 0.15;
+        y *= pinch;
+      }
+
+      return { x, y: y + 10 }; // 살짝 아래로
     }
 
-    /* ── 글자 클래스 ── */
-    class Char {
-      constructor(char, mx, my) {
-        this.char = char;
+    /* ── 랜덤 도형 점 ── */
+    function randomShapePoint(shapeType, t) {
+      const R = 90;
+      const a = t * Math.PI * 2;
+
+      switch (shapeType) {
+        case 0: // 원
+          return { x: R * Math.cos(a), y: R * Math.sin(a) };
+        case 1: // 삼각형
+          const sides = 3;
+          const seg = Math.floor(t * sides);
+          const frac = (t * sides) - seg;
+          const a1 = (seg / sides) * Math.PI * 2 - Math.PI / 2;
+          const a2 = ((seg + 1) / sides) * Math.PI * 2 - Math.PI / 2;
+          return {
+            x: R * (Math.cos(a1) * (1 - frac) + Math.cos(a2) * frac),
+            y: R * (Math.sin(a1) * (1 - frac) + Math.sin(a2) * frac)
+          };
+        case 2: // 사각형
+          const s4 = 4;
+          const seg4 = Math.floor(t * s4);
+          const f4 = (t * s4) - seg4;
+          const a41 = (seg4 / s4) * Math.PI * 2 - Math.PI / 4;
+          const a42 = ((seg4 + 1) / s4) * Math.PI * 2 - Math.PI / 4;
+          return {
+            x: R * 0.8 * (Math.cos(a41) * (1 - f4) + Math.cos(a42) * f4),
+            y: R * 0.8 * (Math.sin(a41) * (1 - f4) + Math.sin(a42) * f4)
+          };
+        case 3: // 별
+          const spikes = 5;
+          const spike_a = a;
+          const spike_r = (Math.floor(t * spikes * 2) % 2 === 0) ? R : R * 0.45;
+          return { x: spike_r * Math.cos(spike_a), y: spike_r * Math.sin(spike_a) };
+        default: // 다이아몬드
+          const d = t * 4;
+          const di = Math.floor(d);
+          const df = d - di;
+          const pts = [[0, -R], [R * 0.6, 0], [0, R * 0.8], [-R * 0.6, 0]];
+          const p1 = pts[di % 4], p2 = pts[(di + 1) % 4];
+          return { x: p1[0] * (1 - df) + p2[0] * df, y: p1[1] * (1 - df) + p2[1] * df };
+      }
+    }
+
+    /* ── 문장 라인 클래스 ── */
+    class TextLine {
+      constructor(mx, my, index) {
+        this.text = TEXT;
         this.life = 1.0;
         this.alive = true;
-        this.fontSize = 14 + Math.random() * 6;
+        this.fontSize = 11 + Math.random() * 3;
 
-        // 사과 형상 위의 목표 위치
-        const angle = Math.random() * Math.PI * 2;
-        const apple = getApplePoint(angle);
-        const scale = Math.min(W, H) / 500;
+        // 사과 형상 위의 위치
+        this.t = (index % 20) / 20 + Math.random() * 0.05;
+        const ap = applePoint(this.t);
 
-        this.goalX = mx + apple.x * scale;
-        this.goalY = my + apple.y * scale;
+        // 목표: 마우스 기준 사과 형상
+        this.anchorX = mx;
+        this.anchorY = my;
+        this.goalX = ap.x;
+        this.goalY = ap.y;
 
-        // 마우스 근처에서 시작
-        this.x = mx + (Math.random() - 0.5) * 40;
-        this.y = my + (Math.random() - 0.5) * 40;
-        this.z = (Math.random() - 0.5) * 150;
+        // 현재 위치 (마우스 근처에서 시작)
+        this.offX = (Math.random() - 0.5) * 20;
+        this.offY = (Math.random() - 0.5) * 20;
 
-        // 목표로 향하는 속도
-        this.vx = 0;
-        this.vy = 0;
-        this.vz = (Math.random() - 0.5) * 1.5;
+        // z축 회전
+        this.z = (Math.random() - 0.5) * 60;
+        this.rotZ = Math.random() * Math.PI * 2;
+        this.rotSpeed = (Math.random() - 0.5) * 1.8;
 
-        // 미세 떨림
-        this.wobblePhase = Math.random() * Math.PI * 2;
-        this.wobbleSpeed = 1.5 + Math.random() * 2;
-        this.wobbleAmp = 2 + Math.random() * 4;
+        // 도형 변환용
+        this.shapeType = Math.floor(Math.random() * 5);
+        this.morphProgress = 0; // 0 = 사과, 1 = 도형
 
-        this.arrived = false;
-        this.arriveTime = 0;
+        this.spawnTime = performance.now() / 1000;
       }
 
       update(time) {
         if (isHolding) {
-          // 목표(사과 형상 위)를 향해 부드럽게 이동
-          const dx = this.goalX - this.x;
-          const dy = this.goalY - this.y;
-          this.vx += dx * 0.02;
-          this.vy += dy * 0.02;
-          this.vx *= 0.92;
-          this.vy *= 0.92;
+          // 사과 형상으로 이동
+          this.offX += (this.goalX - this.offX) * 0.04;
+          this.offY += (this.goalY - this.offY) * 0.04;
 
-          this.x += this.vx;
-          this.y += this.vy;
+          // z축 빙빙
+          this.rotZ += this.rotSpeed * 0.016;
 
-          // z축 미세 움직임
-          this.z += this.vz;
-          this.vz *= 0.98;
-          if (Math.abs(this.z) > 80) this.vz *= -0.6;
-          this.vz += (Math.random() - 0.5) * 0.3;
+          // z 미세 움직임
+          this.z += Math.sin(time * 2 + this.t * 10) * 0.3;
+          this.z *= 0.99;
 
-          // 도착 판정
-          if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
-            if (!this.arrived) {
-              this.arrived = true;
-              this.arriveTime = time;
-            }
-          }
+          this.life = Math.min(1.0, this.life + 0.02);
+          this.morphProgress = Math.max(0, this.morphProgress - 0.02);
 
-          this.life = Math.min(1.0, this.life + 0.03);
         } else {
-          // 놓으면 흩어지며 사라짐
-          this.life -= 0.015;
-          this.vy += 0.12;
-          this.vx += (Math.random() - 0.5) * 0.5;
-          this.x += this.vx;
-          this.y += this.vy;
+          // 놓으면 → 도형으로 변환
+          this.morphProgress = Math.min(1, this.morphProgress + 0.015);
+
+          const sp = randomShapePoint(this.shapeType, this.t);
+          const morphGoalX = sp.x;
+          const morphGoalY = sp.y;
+
+          this.offX += (morphGoalX - this.offX) * 0.03;
+          this.offY += (morphGoalY - this.offY) * 0.03;
+
+          this.rotZ += this.rotSpeed * 0.008;
+
+          // 서서히 사라짐
+          this.life -= 0.004;
           if (this.life <= 0) this.alive = false;
         }
       }
@@ -227,74 +223,69 @@
       draw(time) {
         if (!this.alive || this.life <= 0) return;
 
-        // z축 perspective
-        const persp = 500;
+        // perspective
+        const persp = 400;
         const projScale = persp / (persp + this.z);
-        const sx = this.x + (this.x - W / 2) * (projScale - 1) * 0.3;
-        const sy = this.y + (this.y - H / 2) * (projScale - 1) * 0.3;
 
-        // 도착 후 미세 떨림
-        let wx = 0, wy = 0;
-        if (this.arrived) {
-          wx = Math.sin(time * this.wobbleSpeed + this.wobblePhase) * this.wobbleAmp;
-          wy = Math.cos(time * this.wobbleSpeed * 0.8 + this.wobblePhase) * this.wobbleAmp * 0.7;
-        }
+        const sx = this.anchorX + this.offX;
+        const sy = this.anchorY + this.offY;
 
-        const finalX = sx + wx;
-        const finalY = sy + wy;
         const size = this.fontSize * projScale;
         const alpha = this.life * Math.max(0.3, projScale);
 
         ctx.save();
+        ctx.translate(sx, sy);
+
+        // z축 회전
+        ctx.rotate(this.rotZ * projScale * 0.3);
+
+        ctx.font = `300 ${size}px 'Noto Serif KR', serif`;
+
+        // 텍스트 측정
+        const textW = ctx.measureText(this.text).width;
+        const maxW = 200; // 최대 폭 제한
+        const displayText = textW > maxW
+          ? this.text.slice(0, Math.floor(this.text.length * (maxW / textW)))
+          : this.text;
+        const finalW = Math.min(textW, maxW);
+
+        const padX = 4, padY = 3;
 
         // 박스
-        ctx.font = `300 ${size}px 'Noto Serif KR', serif`;
-        const charW = ctx.measureText(this.char).width;
-        const padX = 3;
-        const padY = 2;
-
-        ctx.fillStyle = MAROON.replace("0.85", (alpha * 0.8).toFixed(2));
+        ctx.fillStyle = MAROON_BG.replace("%%A%%", (alpha * 0.75).toFixed(2));
         ctx.fillRect(
-          finalX - padX,
-          finalY - size * 0.75 - padY,
-          charW + padX * 2,
+          -finalW / 2 - padX,
+          -size / 2 - padY,
+          finalW + padX * 2,
           size + padY * 2
         );
 
         // 글자
         ctx.fillStyle = CYAN;
         ctx.globalAlpha = alpha;
-        ctx.font = `300 ${size}px 'Noto Serif KR', serif`;
+        ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(this.char, finalX, finalY - size * 0.22);
+        ctx.fillText(displayText, 0, 0);
 
         ctx.restore();
       }
     }
 
-    /* ── 마우스 이벤트 ── */
-    document.addEventListener("mousedown", () => {
-      isHolding = true;
-      spawnTimer = 0;
-    });
+    /* ── 마우스/터치 이벤트 ── */
+    document.addEventListener("mousedown", () => { isHolding = true; spawnTimer = 0; });
     document.addEventListener("mouseup", () => { isHolding = false; });
     document.addEventListener("touchstart", (e) => {
-      e.preventDefault();
-      isHolding = true;
-      spawnTimer = 0;
-      mouseX = e.touches[0].clientX;
-      mouseY = e.touches[0].clientY;
+      e.preventDefault(); isHolding = true; spawnTimer = 0;
+      mouseX = e.touches[0].clientX; mouseY = e.touches[0].clientY;
     });
     document.addEventListener("touchmove", (e) => {
-      mouseX = e.touches[0].clientX;
-      mouseY = e.touches[0].clientY;
+      mouseX = e.touches[0].clientX; mouseY = e.touches[0].clientY;
     });
     document.addEventListener("touchend", () => { isHolding = false; });
 
-    /* ═══════════════════════════════════
-       메인 애니메이션 루프
-       ═══════════════════════════════════ */
+    /* ═══════════ 메인 루프 ═══════════ */
     let time = 0;
+    let lineIndex = 0;
 
     function animate() {
       time += 0.016;
@@ -303,42 +294,34 @@
       currentX += (targetX - currentX) * EASE;
       currentY += (targetY - currentY) * EASE;
       currentR += (targetR - currentR) * R_EASE;
-
-      const mask = `radial-gradient(
-        circle ${currentR}px at ${currentX}px ${currentY}px,
-        rgba(0,0,0,1) 0%,
-        rgba(0,0,0,0.6) 50%,
-        rgba(0,0,0,0) 100%
-      )`;
+      const mask = `radial-gradient(circle ${currentR}px at ${currentX}px ${currentY}px, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0) 100%)`;
       reveal.style.webkitMaskImage = mask;
       reveal.style.maskImage = mask;
 
       // ── 텍스트 ──
       ctx.clearRect(0, 0, W, H);
 
-      // 클릭 중이면 글자 스폰
       if (isHolding) {
         spawnTimer += 0.016;
-        while (spawnTimer > 0.05) {
-          chars.push(new Char(TEXT[spawnIndex % TEXT.length], mouseX, mouseY));
-          spawnIndex++;
-          spawnTimer -= 0.05;
+        // 0.12초마다 문장 하나 추가
+        while (spawnTimer > 0.12) {
+          lines.push(new TextLine(mouseX, mouseY, lineIndex));
+          lineIndex++;
+          spawnTimer -= 0.12;
         }
       }
 
-      // z 정렬 후 그리기
-      chars.sort((a, b) => b.z - a.z);
+      // z 정렬
+      lines.sort((a, b) => b.z - a.z);
 
-      for (let i = chars.length - 1; i >= 0; i--) {
-        chars[i].update(time);
-        chars[i].draw(time);
-        if (!chars[i].alive) chars.splice(i, 1);
+      for (let i = lines.length - 1; i >= 0; i--) {
+        lines[i].update(time);
+        lines[i].draw(time);
+        if (!lines[i].alive) lines.splice(i, 1);
       }
 
-      // 너무 많으면 오래된 것 제거
-      while (chars.length > 300) {
-        chars.shift();
-      }
+      // 제한
+      while (lines.length > 80) lines.shift();
 
       requestAnimationFrame(animate);
     }
