@@ -155,7 +155,6 @@ function parseCSV(text) {
     return obj;
   });
 }
-
 function splitLine(line) {
   const r=[]; let cur="", inQ=false;
   for(let i=0;i<line.length;i++){
@@ -173,14 +172,12 @@ function buildCharsForText(text, typeId, groupX, groupY) {
   const style = T[typeId] || T[0];
   const chars = [...text];
   const total = chars.length;
-  
-  // 황금각(Golden Angle)을 이용해 중앙을 기점으로 나선형 덩어리로 뭉치게 설정
-  const goldenAngle = 2.39996323; 
-  const spacing = 13; // 글자 간 퍼지는 반경 간격 조절
+  // 11px Noto Serif KR + scaleX(0.98) + letter-spacing -0.03em 기준 평균 글자 폭
+  const charW = 9.8;
+  const startX = groupX - (total * charW) / 2;
 
   chars.forEach((char, i) => {
     if (char === ' ') return;
-    
     const el = document.createElement('span');
     el.className = 'char-node';
     el.textContent = char;
@@ -188,13 +185,8 @@ function buildCharsForText(text, typeId, groupX, groupY) {
     if (style.color) el.style.color = style.color;
     if (typeof style.opacity === 'number') el.style.opacity = style.opacity;
 
-    // 나선형(원형 군집) 배치 로직
-    const radius = Math.sqrt(i) * spacing;
-    const angle = i * goldenAngle;
-    
-    const baseX = groupX + Math.cos(angle) * radius;
-    const baseY = groupY + Math.sin(angle) * radius;
-    
+    const baseX = startX + i * charW;
+    const baseY = groupY;
     el.style.left = baseX + "px";
     el.style.top  = baseY + "px";
 
@@ -244,8 +236,6 @@ fetch(CSV_URL)
       const id = TYPE_NAME_TO_ID.hasOwnProperty(typeName)
         ? TYPE_NAME_TO_ID[typeName]
         : (fallback.has(typeName)?fallback.get(typeName):(fallback.set(typeName,fc%80),fc++,fallback.get(typeName)));
-      
-      // 화면 내 무작위 좌표에 각 덩어리의 중심(groupX, groupY)을 배치
       buildCharsForText(note.trim(), id,
         80 + Math.random()*(W-160),
         60 + Math.random()*(H-120));
