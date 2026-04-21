@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Memory Image Map</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
     /* 로컬 폰트 — assets 폴더에 'New Century Schoolbook Roman.otf' 파일 필요 */
     @font-face {
@@ -62,14 +65,6 @@
     .name-title .line {
       display: block;
     }
-
-    .hint {
-      position: fixed; bottom: 24px; left: 50%;
-      transform: translateX(-50%); z-index: 5;
-      font: 300 11px 'Pretendard', sans-serif;
-      color: rgba(80,80,80,0.25);
-      letter-spacing: 0.04em; pointer-events: none;
-    }
   </style>
 </head>
 <body>
@@ -83,8 +78,6 @@
     <span class="line main">Hyoeun Kim</span>
     <span class="line sub">Scenes without Scenes</span>
   </div>
-
-  <div class="hint">hover to reveal · hold for text · release to drop</div>
 
   <script>
     const paintCvs = document.getElementById("paint-canvas");
@@ -294,72 +287,117 @@
     }
 
     /* ═══════════════════════════════════════
-       TEXT MOTION — "계산하듯 조직되는" 모션
-       각 글자는 초기에 랜덤 위치에서 시작하여
-       최종 위치로 스프링처럼 수렴한다.
-       글자가 자리를 찾은 뒤 단어별 괄호 브래킷과
-       측정선이 그려지며 구조가 조직된다.
+       TEXT MOTION — 낱자(자소) 단위 조립
+
+       각 한글 글자를 초/중/종성으로 분해하여
+       각 자소가 주변에서 날아들어와 글자로 조립.
+       "방향과 거리, 관계와 구조를 계산하듯 조직되는" 모션.
        ═══════════════════════════════════════ */
-    const SENTENCE = "사과의 시각적 표상은 없지만, 벡터가 포함된 완벽한 3D 모델을 가지고 있어요.";
+    const SENTENCE = "사과의 시각적 표상은 없지만, 벡터가 포함된 완벽한 3D 모델을 가지고 있어요. 어떤 기억은 장면으로 남기보다, 방향과 거리, 관계와 구조를 계산하듯 조직되기도 합니다.";
     const CHARS = [...SENTENCE];
+
+    // 한글 분해 테이블
+    const CHO = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+    const JUNG = ["ㅏ","ㅐ","ㅑ","ㅒ","ㅓ","ㅔ","ㅕ","ㅖ","ㅗ","ㅘ","ㅙ","ㅚ","ㅛ","ㅜ","ㅝ","ㅞ","ㅟ","ㅠ","ㅡ","ㅢ","ㅣ"];
+    const JONG = ["","ㄱ","ㄲ","ㄳ","ㄴ","ㄵ","ㄶ","ㄷ","ㄹ","ㄺ","ㄻ","ㄼ","ㄽ","ㄾ","ㄿ","ㅀ","ㅁ","ㅂ","ㅄ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+
+    // 한글 분해 — 낱자 배열 반환
+    function decomposeHangul(ch) {
+      const code = ch.charCodeAt(0);
+      if (code < 0xAC00 || code > 0xD7A3) return null;
+      const offset = code - 0xAC00;
+      const cho = Math.floor(offset / (21 * 28));
+      const jung = Math.floor((offset % (21 * 28)) / 28);
+      const jong = offset % 28;
+      const parts = [CHO[cho], JUNG[jung]];
+      if (jong > 0) parts.push(JONG[jong]);
+      return parts;
+    }
 
     let isHolding = false;
     let holdX = 0, holdY = 0;
 
-    // Phases: idle → organizing → structuring → hold → fadeout
+    // Phases: idle → assembling → hold → fadeout
     let textPhase = "idle";
     let textTimer = 0;
     let textAlpha = 1;
-    const HOLD_DUR = 80;
-    const ORGANIZE_DUR = 55;    // 글자가 제자리를 찾는 시간
-    const STRUCTURE_DUR = 30;   // 구조선이 그어지는 시간
+    const HOLD_DUR = 90;
+    const ASSEMBLE_PER_CHAR = 1.1;  // 글자 간 등장 지연 프레임
+    const JAMO_TRAVEL = 22;          // 자소가 날아오는 시간
 
-    // 각 글자별 상태 — 초기 위치, 목표 위치, 현재 위치, 도착 시각
-    const glyphs = CHARS.map((ch, i) => ({
-      ch,
-      // 초기 랜덤 오프셋 (격자 밖 어딘가에서 시작)
-      startOX: (Math.random() - 0.5) * 140,
-      startOY: (Math.random() - 0.5) * 80,
-      // 현재 렌더링 오프셋 (목표는 0,0)
-      ox: 0, oy: 0,
-      // 회전 각도
-      startRot: (Math.random() - 0.5) * 0.6,
-      rot: 0,
-      // 각 글자의 수렴 시작 시점 (연속적으로 순차 도착)
-      delay: i * 1.2 + Math.random() * 2,
-      // 개별 알파
-      alpha: 0,
-      // 도착 시 작은 "클릭" 강조 (프레임 카운트)
-      settleFlash: 0,
-      settled: false,
-    }));
+    // 글자별 상태 — 각 글자는 여러 낱자를 가짐
+    // jamo: { ch, sx, sy, rot0, delay, progress, settled }
+    let glyphs = [];
 
-    // 단어 경계 계산 (공백 기준)
-    function computeWordRanges() {
-      const ranges = [];
-      let start = 0;
-      for (let i = 0; i <= CHARS.length; i++) {
-        if (i === CHARS.length || CHARS[i] === " ") {
-          if (i > start) ranges.push([start, i - 1]);
-          start = i + 1;
+    function buildGlyphs() {
+      glyphs = CHARS.map((ch, i) => {
+        const parts = decomposeHangul(ch);
+        const charDelay = i * ASSEMBLE_PER_CHAR;
+        if (parts) {
+          // 한글 — 낱자별로 서로 다른 방향에서 날아옴
+          const jamos = parts.map((p, j) => {
+            const ang = Math.random() * Math.PI * 2;
+            const dist = 60 + Math.random() * 100;
+            return {
+              ch: p,
+              sx: Math.cos(ang) * dist,
+              sy: Math.sin(ang) * dist,
+              rot0: (Math.random() - 0.5) * 1.2,
+              delay: charDelay + j * 1.5 + Math.random() * 1.5,
+              progress: 0,
+              settled: false,
+              settleFlash: 0,
+              alpha: 0,
+            };
+          });
+          return { ch, jamos, isHangul: true, charDelay };
+        } else {
+          // 공백, 영문, 숫자, 구두점 — 그대로 한 덩어리
+          const ang = Math.random() * Math.PI * 2;
+          const dist = 60 + Math.random() * 100;
+          return {
+            ch,
+            isHangul: false,
+            charDelay,
+            single: {
+              sx: Math.cos(ang) * dist,
+              sy: Math.sin(ang) * dist,
+              rot0: (Math.random() - 0.5) * 1.0,
+              delay: charDelay + Math.random() * 2,
+              progress: 0,
+              settled: false,
+              settleFlash: 0,
+              alpha: 0,
+            }
+          };
         }
-      }
-      return ranges;
+      });
     }
-    const WORD_RANGES = computeWordRanges();
+    buildGlyphs();
 
     function resetText() {
-      textPhase = "organizing";
+      textPhase = "assembling";
       textTimer = 0;
       textAlpha = 1;
-      glyphs.forEach((g, i) => {
-        g.ox = g.startOX;
-        g.oy = g.startOY;
-        g.rot = g.startRot;
-        g.alpha = 0;
-        g.settleFlash = 0;
-        g.settled = false;
-      });
+      buildGlyphs();
+    }
+
+    function updateJamo(j) {
+      const localT = textTimer - j.delay;
+      if (localT < 0) {
+        j.alpha = 0;
+        return false;
+      }
+      const p = Math.min(1, localT / JAMO_TRAVEL);
+      // easeOutCubic
+      j.progress = 1 - Math.pow(1 - p, 3);
+      j.alpha = Math.min(1, p * 1.8);
+      if (p >= 1 && !j.settled) {
+        j.settled = true;
+        j.settleFlash = 7;
+      }
+      if (j.settleFlash > 0) j.settleFlash--;
+      return p >= 1;
     }
 
     function updateText() {
@@ -370,41 +408,19 @@
       if (!isHolding && textPhase !== "fadeout") textPhase = "fadeout";
       textTimer++;
 
-      if (textPhase === "organizing") {
-        // 각 글자가 제자리로 수렴 — easeOutCubic 기반 스프링
-        let allSettled = true;
-        for (let i = 0; i < glyphs.length; i++) {
-          const g = glyphs[i];
-          const localT = textTimer - g.delay;
-          if (localT < 0) { g.alpha = 0; allSettled = false; continue; }
-
-          const progress = Math.min(1, localT / 18);
-          // easeOutCubic
-          const eased = 1 - Math.pow(1 - progress, 3);
-          g.ox = g.startOX * (1 - eased);
-          g.oy = g.startOY * (1 - eased);
-          g.rot = g.startRot * (1 - eased);
-          g.alpha = Math.min(1, progress * 1.5);
-
-          if (progress < 1) allSettled = false;
-          else if (!g.settled) {
-            g.settled = true;
-            g.settleFlash = 8;
-          }
-          if (g.settleFlash > 0) g.settleFlash--;
-        }
-
-        if (allSettled && textTimer > ORGANIZE_DUR) {
-          textPhase = "structuring";
-          textTimer = 0;
-        }
-      }
-      else if (textPhase === "structuring") {
-        // 글자는 정렬 완료, 이제 구조선/괄호가 그려지는 단계
+      if (textPhase === "assembling") {
+        let allDone = true;
         for (const g of glyphs) {
-          if (g.settleFlash > 0) g.settleFlash--;
+          if (g.isHangul) {
+            for (const j of g.jamos) {
+              if (!updateJamo(j)) allDone = false;
+            }
+          } else {
+            if (!updateJamo(g.single)) allDone = false;
+          }
         }
-        if (textTimer > STRUCTURE_DUR) {
+        // 모든 자소가 제자리에 도착하면 hold로 전환 (추가 대기 30 프레임)
+        if (allDone && textTimer > glyphs[glyphs.length-1].charDelay + JAMO_TRAVEL + 30) {
           textPhase = "hold";
           textTimer = 0;
         }
@@ -424,165 +440,182 @@
 
     function drawText() {
       if (textPhase === "idle") return;
-      const fontSize = 14;
-      ui.font = `300 ${fontSize}px 'Pretendard', sans-serif`;
-      ui.textBaseline = "middle";
 
-      // 각 글자 너비 측정
-      const cw = [];
-      let totalW = 0;
-      for (const ch of CHARS) {
-        const w = ui.measureText(ch).width;
-        cw.push(w); totalW += w;
-      }
-
-      const startX = holdX - totalW / 2;
-      const baseY = holdY;
-
-      // 각 글자의 "목표" (anchor) x 좌표 계산
-      const anchorX = [];
-      {
-        let cx = startX;
-        for (let i = 0; i < CHARS.length; i++) {
-          anchorX.push(cx);
-          cx += cw[i];
-        }
-      }
-
-      // ── 측정선(ruler) 및 구조선 ─────────────────
-      // organizing 단계에서는 희미하게, structuring에서 선명해짐
-      let structAlpha = 0;
-      if (textPhase === "organizing") {
-        structAlpha = Math.min(1, textTimer / ORGANIZE_DUR) * 0.25;
-      } else if (textPhase === "structuring") {
-        structAlpha = 0.25 + Math.min(1, textTimer / STRUCTURE_DUR) * 0.35;
-      } else if (textPhase === "hold" || textPhase === "fadeout") {
-        structAlpha = 0.6;
-      }
-      structAlpha *= textAlpha;
-
-      if (structAlpha > 0.01) {
-        // 상단 기준선 (organizing 초기부터 보임)
-        ui.save();
-        ui.globalAlpha = structAlpha * 0.5;
-        ui.strokeStyle = "#111";
-        ui.lineWidth = 0.5;
-        ui.setLineDash([2, 3]);
-        ui.beginPath();
-        ui.moveTo(startX - 8, baseY - fontSize * 0.9);
-        ui.lineTo(startX + totalW + 8, baseY - fontSize * 0.9);
-        ui.stroke();
-        // 하단 기준선
-        ui.beginPath();
-        ui.moveTo(startX - 8, baseY + fontSize * 0.9);
-        ui.lineTo(startX + totalW + 8, baseY + fontSize * 0.9);
-        ui.stroke();
-        ui.setLineDash([]);
-        ui.restore();
-
-        // 좌우 끝 짧은 수직 마커
-        ui.save();
-        ui.globalAlpha = structAlpha * 0.7;
-        ui.strokeStyle = "#111";
-        ui.lineWidth = 0.6;
-        ui.beginPath();
-        ui.moveTo(startX - 6, baseY - fontSize * 0.95);
-        ui.lineTo(startX - 6, baseY + fontSize * 0.95);
-        ui.moveTo(startX + totalW + 6, baseY - fontSize * 0.95);
-        ui.lineTo(startX + totalW + 6, baseY + fontSize * 0.95);
-        ui.stroke();
-        ui.restore();
-      }
-
-      // ── 단어 그룹 브래킷 (structuring 단계에 순차적으로 그려짐) ──
-      if (textPhase === "structuring" || textPhase === "hold" || textPhase === "fadeout") {
-        const t = textPhase === "structuring" ? Math.min(1, textTimer / STRUCTURE_DUR) : 1;
-        for (let w = 0; w < WORD_RANGES.length; w++) {
-          // 단어별 순차 등장
-          const wordDelay = w / WORD_RANGES.length;
-          if (t < wordDelay) continue;
-          const wordT = Math.min(1, (t - wordDelay) / (1 / WORD_RANGES.length));
-
-          const [a, b] = WORD_RANGES[w];
-          const x0 = anchorX[a];
-          const x1 = anchorX[b] + cw[b];
-          const by = baseY + fontSize * 1.15;
-
-          ui.save();
-          ui.globalAlpha = wordT * textAlpha * 0.55;
-          ui.strokeStyle = "#111";
-          ui.lineWidth = 0.7;
-          ui.beginPath();
-          // ⌞ ⌟ 스타일 하단 브래킷
-          const tickH = 3;
-          ui.moveTo(x0, by - tickH);
-          ui.lineTo(x0, by);
-          ui.lineTo(x1, by);
-          ui.lineTo(x1, by - tickH);
-          ui.stroke();
-          ui.restore();
-
-          // 단어 위에 작은 인덱스 번호 (w+1)
-          if (wordT > 0.5) {
-            ui.save();
-            ui.globalAlpha = ((wordT - 0.5) / 0.5) * textAlpha * 0.45;
-            ui.fillStyle = "#111";
-            ui.font = `300 8px 'Pretendard', sans-serif`;
-            ui.textAlign = "center";
-            ui.fillText(String(w + 1).padStart(2, "0"), (x0 + x1) / 2, by + 9);
-            ui.restore();
-          }
-        }
-      }
-
-      // ── 글자 본체 렌더링 ────────────────────────
-      ui.font = `300 ${fontSize}px 'Pretendard', sans-serif`;
+      const fontSize = 15;
+      // 한 줄에 너무 길면 줄바꿈
+      ui.font = `400 ${fontSize}px 'Noto Serif KR', serif`;
       ui.textBaseline = "middle";
       ui.textAlign = "left";
 
+      // 각 글자 너비 측정 + 줄바꿈 계산
+      const maxWidth = Math.min(W * 0.7, 620);
+      const lineHeight = fontSize * 1.9;
+
+      // lines[i] = { chars: [{idx, w}], totalW }
+      const lines = [];
+      let cur = { chars: [], totalW: 0 };
       for (let i = 0; i < CHARS.length; i++) {
-        const g = glyphs[i];
-        if (g.alpha <= 0.01) continue;
-
-        const x = anchorX[i] + g.ox;
-        const y = baseY + g.oy;
-
-        // 이동 중 — 목표 위치에 "고스트" 점선 테두리 표시
-        if (textPhase === "organizing" && !g.settled) {
-          const moveDist = Math.sqrt(g.ox * g.ox + g.oy * g.oy);
-          if (moveDist > 2) {
-            ui.save();
-            ui.globalAlpha = textAlpha * 0.2 * g.alpha;
-            ui.strokeStyle = "#111";
-            ui.lineWidth = 0.4;
-            ui.setLineDash([1.5, 1.5]);
-            ui.strokeRect(anchorX[i], baseY - fontSize * 0.55, cw[i], fontSize * 1.1);
-            ui.setLineDash([]);
-            // 궤적선 — 현재 위치에서 목표 위치로
-            ui.globalAlpha = textAlpha * 0.15 * g.alpha;
-            ui.beginPath();
-            ui.moveTo(x + cw[i] / 2, y);
-            ui.lineTo(anchorX[i] + cw[i] / 2, baseY);
-            ui.stroke();
-            ui.restore();
+        const w = ui.measureText(CHARS[i]).width;
+        if (cur.totalW + w > maxWidth && CHARS[i] !== " ") {
+          // 공백에서 줄바꿈 시도 — 이전 공백까지 되돌아감
+          let breakIdx = cur.chars.length - 1;
+          while (breakIdx >= 0 && CHARS[cur.chars[breakIdx].idx] !== " ") breakIdx--;
+          if (breakIdx > 0) {
+            const remainder = cur.chars.slice(breakIdx + 1);
+            cur.chars = cur.chars.slice(0, breakIdx);
+            cur.totalW = cur.chars.reduce((s, c) => s + c.w, 0);
+            lines.push(cur);
+            cur = { chars: remainder, totalW: remainder.reduce((s, c) => s + c.w, 0) };
+          } else {
+            lines.push(cur);
+            cur = { chars: [], totalW: 0 };
           }
         }
+        cur.chars.push({ idx: i, w });
+        cur.totalW += w;
+      }
+      if (cur.chars.length) lines.push(cur);
 
-        // 도착 플래시 — 짧은 흰 하이라이트 박스
-        if (g.settleFlash > 0) {
-          const fa = (g.settleFlash / 8) * textAlpha * 0.35;
-          ui.fillStyle = `rgba(30,30,30,${fa.toFixed(3)})`;
-          ui.fillRect(anchorX[i] - 1, baseY - fontSize * 0.55, cw[i] + 2, fontSize * 1.1);
+      // 각 글자의 anchor 좌표 계산
+      const anchor = new Array(CHARS.length);
+      const totalH = lines.length * lineHeight;
+      const topY = holdY - totalH / 2 + lineHeight / 2;
+
+      for (let l = 0; l < lines.length; l++) {
+        const line = lines[l];
+        const lineStartX = holdX - line.totalW / 2;
+        let x = lineStartX;
+        const y = topY + l * lineHeight;
+        for (const c of line.chars) {
+          anchor[c.idx] = { x, y, w: c.w };
+          x += c.w;
         }
+      }
 
-        ui.save();
-        ui.globalAlpha = textAlpha * g.alpha;
-        ui.translate(x + cw[i] / 2, y);
-        ui.rotate(g.rot);
-        ui.translate(-cw[i] / 2, 0);
-        ui.fillStyle = "#111";
-        ui.fillText(CHARS[i], 0, 0);
-        ui.restore();
+      // ── 낱자별 렌더링 ──
+      // 한글 글자 렌더링 시, 조합된 완성형은 anchor에 그리되
+      // assembling 중에는 각 낱자가 날아들어오는 모션으로 그림.
+      // 트릭: 각 낱자는 anchor 위치에서 시작 오프셋으로부터 보간되어 그려짐.
+      // 이때 한글 완성형 자체는 progress가 충분할 때만 보이게 함.
+
+      for (let i = 0; i < CHARS.length; i++) {
+        const g = glyphs[i];
+        const a = anchor[i];
+        if (!a) continue;
+        const ax = a.x + a.w / 2;
+        const ay = a.y;
+
+        if (g.isHangul) {
+          // 각 낱자의 평균 진행도로 "완성 알파" 계산
+          let avgProg = 0;
+          let settledCount = 0;
+          for (const j of g.jamos) {
+            avgProg += j.progress;
+            if (j.settled) settledCount++;
+          }
+          avgProg /= g.jamos.length;
+
+          // 완성형 한글을 그리되, 낱자들이 모두 도착한 뒤에 본격적으로 선명해짐
+          const fullAlpha = Math.max(0, (settledCount / g.jamos.length - 0.6) / 0.4);
+
+          // 자소가 날아오는 동안에는 각 자소를 개별 그려 효과를 만듦
+          for (const j of g.jamos) {
+            if (j.alpha <= 0.01) continue;
+            if (j.settled && fullAlpha > 0.5) continue; // 완성형이 가리면 자소 숨김
+
+            const curX = ax + j.sx * (1 - j.progress);
+            const curY = ay + j.sy * (1 - j.progress);
+            const curRot = j.rot0 * (1 - j.progress);
+            const scale = 0.5 + j.progress * 0.5;
+
+            // 궤적선 (도착 전에만 잠깐)
+            if (j.progress < 0.9 && j.progress > 0.05) {
+              ui.save();
+              ui.globalAlpha = textAlpha * 0.15 * j.alpha;
+              ui.strokeStyle = "#111";
+              ui.lineWidth = 0.4;
+              ui.setLineDash([1, 2]);
+              ui.beginPath();
+              ui.moveTo(curX, curY);
+              ui.lineTo(ax, ay);
+              ui.stroke();
+              ui.setLineDash([]);
+              ui.restore();
+            }
+
+            ui.save();
+            ui.globalAlpha = textAlpha * j.alpha * (1 - fullAlpha * 0.9);
+            ui.translate(curX, curY);
+            ui.rotate(curRot);
+            ui.scale(scale, scale);
+            ui.fillStyle = "#111";
+            ui.font = `400 ${fontSize}px 'Noto Serif KR', serif`;
+            ui.textAlign = "center";
+            ui.textBaseline = "middle";
+            ui.fillText(j.ch, 0, 0);
+            ui.restore();
+          }
+
+          // 완성형 한글
+          if (fullAlpha > 0.01) {
+            ui.save();
+            ui.globalAlpha = textAlpha * fullAlpha;
+            ui.fillStyle = "#111";
+            ui.font = `400 ${fontSize}px 'Noto Serif KR', serif`;
+            ui.textAlign = "center";
+            ui.textBaseline = "middle";
+            ui.fillText(g.ch, ax, ay);
+            ui.restore();
+          }
+
+          // 도착 플래시 — 가장 최근 도착한 낱자의 플래시를 글자 단위로 표시
+          const maxFlash = Math.max(...g.jamos.map(j => j.settleFlash));
+          if (maxFlash > 0 && fullAlpha > 0.3) {
+            const fa = (maxFlash / 7) * textAlpha * 0.25;
+            ui.fillStyle = `rgba(30,30,30,${fa.toFixed(3)})`;
+            ui.fillRect(a.x - 1, a.y - fontSize * 0.6, a.w + 2, fontSize * 1.2);
+          }
+        } else {
+          // 한글이 아닌 글자 (공백/영문/숫자/구두점) — 한 덩어리로 이동
+          const j = g.single;
+          if (j.alpha <= 0.01) continue;
+          const curX = ax + j.sx * (1 - j.progress);
+          const curY = ay + j.sy * (1 - j.progress);
+          const curRot = j.rot0 * (1 - j.progress);
+          const scale = 0.7 + j.progress * 0.3;
+
+          if (j.progress < 0.9 && j.progress > 0.05 && CHARS[i] !== " ") {
+            ui.save();
+            ui.globalAlpha = textAlpha * 0.15 * j.alpha;
+            ui.strokeStyle = "#111";
+            ui.lineWidth = 0.4;
+            ui.setLineDash([1, 2]);
+            ui.beginPath();
+            ui.moveTo(curX, curY);
+            ui.lineTo(ax, ay);
+            ui.stroke();
+            ui.setLineDash([]);
+            ui.restore();
+          }
+
+          ui.save();
+          ui.globalAlpha = textAlpha * j.alpha;
+          ui.translate(curX, curY);
+          ui.rotate(curRot);
+          ui.scale(scale, scale);
+          ui.fillStyle = "#111";
+          ui.font = `400 ${fontSize}px 'Noto Serif KR', serif`;
+          ui.textAlign = "center";
+          ui.textBaseline = "middle";
+          ui.fillText(g.ch, 0, 0);
+          ui.restore();
+
+          if (j.settleFlash > 0) {
+            const fa = (j.settleFlash / 7) * textAlpha * 0.25;
+            ui.fillStyle = `rgba(30,30,30,${fa.toFixed(3)})`;
+            ui.fillRect(a.x - 1, a.y - fontSize * 0.6, a.w + 2, fontSize * 1.2);
+          }
+        }
       }
     }
 
