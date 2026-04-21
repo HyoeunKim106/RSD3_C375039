@@ -168,9 +168,6 @@
     const apples = [];
 
     function createApple(x, y) {
-      const hue = 350 + (Math.random() - 0.5) * 20;
-      const sat = 65 + Math.random() * 15;
-      const light = 45 + Math.random() * 10;
       apples.push({
         x, y,
         vx: (Math.random() - 0.5) * 2.2,
@@ -178,10 +175,6 @@
         size: 22 + Math.random() * 18,
         rot: (Math.random() - 0.5) * 0.4,
         rotSpeed: (Math.random() - 0.5) * 0.015,
-        color: `hsl(${hue}, ${sat}%, ${light}%)`,
-        highlight: `hsla(${hue + 10}, ${sat - 20}%, ${light + 30}%, 0.55)`,
-        stemColor: `hsl(25, 45%, 25%)`,
-        leafColor: `hsl(95, 40%, 40%)`,
         birthTime: 0,
         nSeedX: Math.random() * 1000,
         nSeedY: Math.random() * 1000,
@@ -230,15 +223,9 @@
       ctx.rotate(a.rot);
       ctx.scale(scale, scale);
 
-      ctx.save();
-      ctx.globalAlpha = 0.18;
       ctx.fillStyle = "#000";
-      ctx.beginPath();
-      ctx.ellipse(2, s * 0.95, s * 0.85, s * 0.25, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
 
-      ctx.fillStyle = a.color;
+      // 사과 본체 — 두 개의 겹친 원으로 하트형 실루엣
       ctx.beginPath();
       ctx.ellipse(-s * 0.22, 0, s * 0.78, s * 0.85, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -246,22 +233,13 @@
       ctx.ellipse(s * 0.22, 0, s * 0.78, s * 0.85, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = a.color;
+      // 상단 움푹한 부분
       ctx.beginPath();
       ctx.ellipse(0, -s * 0.7, s * 0.45, s * 0.2, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = a.highlight;
-      ctx.beginPath();
-      ctx.ellipse(-s * 0.35, -s * 0.25, s * 0.2, s * 0.32, -0.3, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = "rgba(255,255,255,0.5)";
-      ctx.beginPath();
-      ctx.ellipse(-s * 0.4, -s * 0.4, s * 0.08, s * 0.12, -0.3, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.strokeStyle = a.stemColor;
+      // 꼭지 (줄기)
+      ctx.strokeStyle = "#000";
       ctx.lineWidth = s * 0.08;
       ctx.lineCap = "round";
       ctx.beginPath();
@@ -269,16 +247,11 @@
       ctx.quadraticCurveTo(s * 0.08, -s * 1.0, s * 0.18, -s * 1.05);
       ctx.stroke();
 
-      ctx.fillStyle = a.leafColor;
+      // 잎
+      ctx.fillStyle = "#000";
       ctx.beginPath();
       ctx.ellipse(s * 0.3, -s * 0.92, s * 0.22, s * 0.11, -0.6, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = "rgba(0,0,0,0.15)";
-      ctx.lineWidth = 0.8;
-      ctx.beginPath();
-      ctx.moveTo(s * 0.14, -s * 0.86);
-      ctx.lineTo(s * 0.48, -s * 0.98);
-      ctx.stroke();
 
       ctx.restore();
     }
@@ -585,18 +558,6 @@
           ui.restore();
         }
 
-        // ── 하이라이트 박스 (글자 뒤, 시안색) ──
-        if (state.charAlpha > 0.1) {
-          ui.save();
-          ui.globalAlpha = releaseFade * state.charAlpha * 0.85;
-          ui.fillStyle = HI_COLOR;
-          // 글자에 딱 맞게
-          const bx = a.x - 0.5 + jx;
-          const by = a.y - fontSize * 0.55 + jy;
-          ui.fillRect(bx, by, a.w + 1, fontSize * 1.1);
-          ui.restore();
-        }
-
         // ── 글자 본체 ──
         if (state.charAlpha > 0.02) {
           const scatterDist = state.scatter * 12;
@@ -615,27 +576,6 @@
           ui.restore();
         }
 
-        // ── 좌표 라벨 (일부 글자만, appear/stay 초기에 잠깐) ──
-        if (g.showLabel && (state.state === "appear" || state.state === "stay")) {
-          // stay 시작 부분에만 짧게 표시
-          const t = ((holdFrame + g.phase) % g.cycle);
-          const appearStart = g.scanDur;
-          const labelStart = appearStart;
-          const labelEnd = appearStart + 10;
-          if (t > labelStart && t < labelEnd) {
-            const lt = (t - labelStart) / (labelEnd - labelStart);
-            const la = (1 - lt) * releaseFade * 0.55;
-            ui.save();
-            ui.globalAlpha = la;
-            ui.fillStyle = TEXT_COLOR;
-            ui.font = `400 6.5px 'Pretendard', monospace`;
-            ui.textAlign = "center";
-            ui.textBaseline = "bottom";
-            ui.fillText("(" + g.coordX + "," + g.coordY + ")", ax, ay - fontSize * 0.7);
-            ui.restore();
-          }
-        }
-
         // ── 흩어지는 파편 효과 (disappear 중) ──
         if (state.state === "disappear") {
           ui.save();
@@ -650,17 +590,6 @@
           ui.restore();
         }
       }
-
-      // ── 하단에 현재 "홀드 프레임" 카운터 (계산되는 느낌 강조) ──
-      ui.save();
-      ui.globalAlpha = releaseFade * 0.4;
-      ui.fillStyle = TEXT_COLOR;
-      ui.font = `400 7px 'Pretendard', monospace`;
-      ui.textAlign = "left";
-      ui.textBaseline = "top";
-      const counter = String(holdFrame).padStart(5, "0");
-      ui.fillText("t=" + counter + "  n=" + CHARS.length, left, bot + 5);
-      ui.restore();
     }
 
     /* ═══════════════════════════════════════
