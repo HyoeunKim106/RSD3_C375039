@@ -16,8 +16,12 @@
       position: fixed; inset: 0; z-index: 2;
       width: 100%; height: 100%; pointer-events: none;
     }
-    #ui-canvas {
+    #shape-canvas {
       position: fixed; inset: 0; z-index: 3;
+      width: 100%; height: 100%; pointer-events: none;
+    }
+    #ui-canvas {
+      position: fixed; inset: 0; z-index: 4;
       pointer-events: auto; cursor: crosshair;
     }
     .hint {
@@ -33,12 +37,15 @@
 
   <img class="bg-img" src="./assets/sample2.jpg" alt="bg" />
   <canvas id="paint-canvas"></canvas>
+  <canvas id="shape-canvas"></canvas>
   <canvas id="ui-canvas"></canvas>
-  <div class="hint">hover to reveal · hold for text</div>
+  <div class="hint">hover to reveal · hold for text · release to drop</div>
 
   <script>
     const paintCvs = document.getElementById("paint-canvas");
     const paintCtx = paintCvs.getContext("2d");
+    const shapeCvs = document.getElementById("shape-canvas");
+    const shapeCtx = shapeCvs.getContext("2d");
     const uiCvs = document.getElementById("ui-canvas");
     const ui = uiCvs.getContext("2d");
 
@@ -51,6 +58,7 @@
     function resize() {
       W = window.innerWidth; H = window.innerHeight;
       paintCvs.width = W; paintCvs.height = H;
+      shapeCvs.width = W; shapeCvs.height = H;
       uiCvs.width = W; uiCvs.height = H;
     }
     resize();
@@ -101,11 +109,162 @@
     }
 
     /* ═══════════════════════════════════════
-       TEXT MOTION — loops while holding
+       FLOATING APPLES
+       마우스를 뗄 때 생성되어 화면을 자유롭게
+       떠다니며 가장자리에서 부드럽게 튕김
+       ═══════════════════════════════════════ */
+    const apples = [];
 
-       One sentence, typed out char by char,
-       holds briefly, fades out, then restarts.
-       All while mouse is held down.
+    function createApple(x, y) {
+      // 살짝 다른 빨강 톤으로 변주
+      const hue = 350 + (Math.random() - 0.5) * 20;
+      const sat = 65 + Math.random() * 15;
+      const light = 45 + Math.random() * 10;
+      apples.push({
+        x, y,
+        vx: (Math.random() - 0.5) * 2.2,
+        vy: (Math.random() - 0.5) * 2.2 - 0.5,
+        size: 22 + Math.random() * 18,
+        rot: (Math.random() - 0.5) * 0.4,
+        rotSpeed: (Math.random() - 0.5) * 0.015,
+        color: `hsl(${hue}, ${sat}%, ${light}%)`,
+        highlight: `hsla(${hue + 10}, ${sat - 20}%, ${light + 30}%, 0.55)`,
+        stemColor: `hsl(25, 45%, 25%)`,
+        leafColor: `hsl(95, 40%, 40%)`,
+        birthTime: 0,
+        // 부드러운 떠다님을 위한 노이즈 시드
+        nSeedX: Math.random() * 1000,
+        nSeedY: Math.random() * 1000,
+      });
+    }
+
+    function updateApples() {
+      for (const a of apples) {
+        a.birthTime++;
+
+        // 부드러운 떠다니는 흔들림 (사인파 기반 노이즈)
+        a.nSeedX += 0.01;
+        a.nSeedY += 0.008;
+        const driftX = Math.sin(a.nSeedX) * 0.04 + Math.cos(a.nSeedX * 0.7) * 0.02;
+        const driftY = Math.cos(a.nSeedY) * 0.04 + Math.sin(a.nSeedY * 1.3) * 0.02;
+
+        a.vx += driftX;
+        a.vy += driftY;
+
+        // 약간의 마찰 — 너무 빨라지지 않게
+        a.vx *= 0.995;
+        a.vy *= 0.995;
+
+        // 속도 제한
+        const sp = Math.sqrt(a.vx * a.vx + a.vy * a.vy);
+        const MAX = 1.8;
+        if (sp > MAX) {
+          a.vx = (a.vx / sp) * MAX;
+          a.vy = (a.vy / sp) * MAX;
+        }
+
+        a.x += a.vx;
+        a.y += a.vy;
+        a.rot += a.rotSpeed;
+
+        // 가장자리에서 튕김 (부드럽게)
+        const pad = a.size;
+        if (a.x < pad) { a.x = pad; a.vx = Math.abs(a.vx) * 0.8; }
+        if (a.x > W - pad) { a.x = W - pad; a.vx = -Math.abs(a.vx) * 0.8; }
+        if (a.y < pad) { a.y = pad; a.vy = Math.abs(a.vy) * 0.8; }
+        if (a.y > H - pad) { a.y = H - pad; a.vy = -Math.abs(a.vy) * 0.8; }
+      }
+    }
+
+    function drawApple(ctx, a) {
+      const s = a.size;
+
+      // 등장 애니메이션 — 처음 30 프레임 동안 팝업
+      let scale = 1;
+      if (a.birthTime < 30) {
+        const t = a.birthTime / 30;
+        // easeOutBack 느낌
+        scale = 1 + (Math.sin(t * Math.PI) * 0.15) * (1 - t * 0.5);
+        if (a.birthTime < 10) {
+          scale *= a.birthTime / 10;
+        }
+      }
+
+      ctx.save();
+      ctx.translate(a.x, a.y);
+      ctx.rotate(a.rot);
+      ctx.scale(scale, scale);
+
+      // 그림자
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = "#000";
+      ctx.beginPath();
+      ctx.ellipse(2, s * 0.95, s * 0.85, s * 0.25, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // 사과 본체 — 두 개의 겹친 원으로 사과 특유의 하트형 실루엣
+      ctx.fillStyle = a.color;
+      ctx.beginPath();
+      ctx.ellipse(-s * 0.22, 0, s * 0.78, s * 0.85, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(s * 0.22, 0, s * 0.78, s * 0.85, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 상단 움푹 (꼭지 자리)
+      ctx.fillStyle = a.color;
+      ctx.beginPath();
+      ctx.ellipse(0, -s * 0.7, s * 0.45, s * 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 하이라이트
+      ctx.fillStyle = a.highlight;
+      ctx.beginPath();
+      ctx.ellipse(-s * 0.35, -s * 0.25, s * 0.2, s * 0.32, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 작은 반짝임
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.beginPath();
+      ctx.ellipse(-s * 0.4, -s * 0.4, s * 0.08, s * 0.12, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 꼭지 (줄기)
+      ctx.strokeStyle = a.stemColor;
+      ctx.lineWidth = s * 0.08;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(0, -s * 0.78);
+      ctx.quadraticCurveTo(s * 0.08, -s * 1.0, s * 0.18, -s * 1.05);
+      ctx.stroke();
+
+      // 잎
+      ctx.fillStyle = a.leafColor;
+      ctx.beginPath();
+      ctx.ellipse(s * 0.3, -s * 0.92, s * 0.22, s * 0.11, -0.6, 0, Math.PI * 2);
+      ctx.fill();
+      // 잎맥
+      ctx.strokeStyle = "rgba(0,0,0,0.15)";
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(s * 0.14, -s * 0.86);
+      ctx.lineTo(s * 0.48, -s * 0.98);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function renderShapes() {
+      shapeCtx.clearRect(0, 0, W, H);
+      for (const a of apples) {
+        drawApple(shapeCtx, a);
+      }
+    }
+
+    /* ═══════════════════════════════════════
+       TEXT MOTION — loops while holding
        ═══════════════════════════════════════ */
 
     const SENTENCE = "사과의 시각적 표상은 없지만 벡터가 포함된 완벽한 3D 모델을 가지고 있어요";
@@ -114,16 +273,13 @@
     let isHolding = false;
     let holdX = 0, holdY = 0;
 
-    // Animation state machine
-    // phases: idle → typing → hold → fadeout → (restart)
     let textPhase = "idle";
     let textTimer = 0;
-    let revealed = 0;       // float, how many chars shown
+    let revealed = 0;
     let textAlpha = 1;
     const TYPE_SPEED = 0.55;
-    const HOLD_DUR = 70;    // frames to hold after typing
+    const HOLD_DUR = 70;
 
-    // Per-char glitch
     const glitch = CHARS.map(() => ({ ox: 0, oy: 0, on: false, t: 0 }));
 
     function resetText() {
@@ -140,7 +296,6 @@
         return;
       }
 
-      // If released during any phase, fade out
       if (!isHolding && textPhase !== "fadeout") {
         textPhase = "fadeout";
       }
@@ -149,7 +304,6 @@
 
       if (textPhase === "typing") {
         revealed += TYPE_SPEED;
-        // random micro-stutter
         if (Math.random() < 0.04) revealed -= 0.2;
         if (revealed >= CHARS.length) {
           revealed = CHARS.length;
@@ -167,7 +321,6 @@
         textAlpha -= 0.025;
         if (textAlpha <= 0) {
           textAlpha = 0;
-          // If still holding, restart loop
           if (isHolding) {
             resetText();
           } else {
@@ -176,7 +329,6 @@
         }
       }
 
-      // Glitch updates
       for (let i = 0; i < CHARS.length; i++) {
         const g = glitch[i];
         if (g.on) {
@@ -201,7 +353,6 @@
 
       const nShow = Math.floor(revealed);
 
-      // Measure char widths
       const cw = [];
       let totalW = 0;
       for (const ch of CHARS) {
@@ -219,7 +370,6 @@
         const g = glitch[i];
 
         if (i < nShow) {
-          // Recent-char highlight box
           const recency = nShow - i;
           if (recency <= 3 && textPhase === "typing") {
             const boxA = (1 - recency / 3) * 0.18 * textAlpha;
@@ -234,7 +384,6 @@
           ui.restore();
         }
 
-        // Blinking cursor at typing head
         if (i === nShow && textPhase === "typing") {
           if (Math.sin(textTimer * 0.3) > 0) {
             ui.save();
@@ -248,7 +397,6 @@
         cx += w;
       }
 
-      // Underline after typed
       if (textPhase === "hold" || textPhase === "fadeout") {
         const prog = textPhase === "hold" ? Math.min(1, textTimer / 12) : 1;
         ui.save();
@@ -270,7 +418,6 @@
       mouseX = e.clientX; mouseY = e.clientY;
       if (prevMX > -900) addTrail(prevMX, prevMY, mouseX, mouseY);
       prevMX = mouseX; prevMY = mouseY;
-      // Update hold position if holding
       if (isHolding) { holdX = mouseX; holdY = mouseY; }
     });
     uiCvs.addEventListener("mouseleave", () => { prevMX = -999; });
@@ -279,7 +426,11 @@
       isHolding = true;
       holdX = e.clientX; holdY = e.clientY;
     });
-    uiCvs.addEventListener("mouseup", () => { isHolding = false; });
+    uiCvs.addEventListener("mouseup", e => {
+      isHolding = false;
+      // 마우스를 뗄 때 사과 생성
+      createApple(e.clientX, e.clientY);
+    });
 
     uiCvs.addEventListener("touchstart", e => {
       e.preventDefault(); isHolding = true;
@@ -293,13 +444,19 @@
       mouseX = tx; mouseY = ty; prevMX = tx; prevMY = ty;
       holdX = tx; holdY = ty;
     });
-    uiCvs.addEventListener("touchend", () => { isHolding = false; prevMX = -999; });
+    uiCvs.addEventListener("touchend", e => {
+      isHolding = false; prevMX = -999;
+      // 터치가 끝난 위치에 사과 생성
+      createApple(mouseX, mouseY);
+    });
 
     /* ═══════════════════════════════════════
        LOOP
        ═══════════════════════════════════════ */
     function animate() {
       renderPaint();
+      updateApples();
+      renderShapes();
       ui.clearRect(0, 0, W, H);
       updateText();
       drawText();
