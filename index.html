@@ -71,7 +71,7 @@
 </head>
 <body>
 
-  <img class="bg-img" src="./assets/sample2.png" alt="bg" />
+  <img class="bg-img" src="./assets/sample2.jpg" alt="bg" />
   <canvas id="paint-canvas"></canvas>
   <canvas id="shape-canvas"></canvas>
   <canvas id="ui-canvas"></canvas>
@@ -91,7 +91,7 @@
 
     let W, H;
     const paintImg = new Image();
-    paintImg.src = "./assets/sample1.png";
+    paintImg.src = "./assets/sample1.jpg";
     let imgReady = false;
     paintImg.onload = () => { imgReady = true; };
 
@@ -108,17 +108,23 @@
        BRUSH PAINT REVEAL
        ═══════════════════════════════════════ */
     const trail = [];
-    const LIFETIME = 50, BRUSH_R = 120;
+    const LIFETIME = 120, BRUSH_R = 130;
     let mouseX = 0, mouseY = 0, prevMX = -999, prevMY = -999;
 
     function addTrail(x0, y0, x1, y1, radiusBoost = 0) {
       const dx = x1 - x0, dy = y1 - y0;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const steps = Math.max(1, Math.floor(dist / 6));
-      const r = BRUSH_R + Math.min(dist, 50) * 0.6 + radiusBoost;
+      // 더 촘촘하게 점을 뿌려서 부드러운 연결
+      const steps = Math.max(1, Math.floor(dist / 4));
+      const r = BRUSH_R + Math.min(dist, 40) * 0.4 + radiusBoost;
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
-        trail.push({ x: x0 + dx * t, y: y0 + dy * t, age: 0, r: r + (Math.random() - 0.5) * 12 });
+        trail.push({
+          x: x0 + dx * t,
+          y: y0 + dy * t,
+          age: 0,
+          r: r + (Math.random() - 0.5) * 10
+        });
       }
     }
 
@@ -144,8 +150,21 @@
         const p = trail[i]; p.age++;
         if (p.age > LIFETIME) { trail.splice(i, 1); continue; }
         const life = p.age / LIFETIME;
-        let a = life < 0.04 ? life / 0.04 : 1 - Math.pow((life - 0.04) / 0.96, 0.8);
-        a *= 0.95;
+        // 부드러운 envelope
+        //   - 초반 15% 는 천천히 fade-in
+        //   - 중반 은 full
+        //   - 후반 은 아주 천천히 fade-out (ease-out)
+        let a;
+        if (life < 0.15) {
+          // ease-in cubic
+          const t = life / 0.15;
+          a = t * t * (3 - 2 * t);
+        } else {
+          // long ease-out
+          const t = (life - 0.15) / 0.85;
+          a = 1 - Math.pow(t, 1.4);
+        }
+        a *= 0.9;
         if (a < 0.005) continue;
         const g = paintCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
         g.addColorStop(0,   `rgba(255,255,255,${a.toFixed(3)})`);
