@@ -475,49 +475,6 @@
       const blockTop = topY - fontSize * 0.7;
       const blockBot = topY + (lines.length - 1) * lineHeight + fontSize * 0.7;
 
-      // ── 주변 스캔선 (계속 움직이는 가로 라인) ──
-      const scanY = blockTop + ((scanLinePos) % (blockBot - blockTop + 40)) - 20;
-      if (scanY > blockTop - 15 && scanY < blockBot + 15) {
-        ui.save();
-        ui.globalAlpha = releaseFade * 0.35;
-        ui.strokeStyle = TEXT_COLOR;
-        ui.lineWidth = 0.5;
-        ui.setLineDash([2, 3]);
-        ui.beginPath();
-        ui.moveTo(blockLeft - 14, scanY);
-        ui.lineTo(blockRight + 14, scanY);
-        ui.stroke();
-        ui.setLineDash([]);
-        // 스캔선 끝 점 마커
-        ui.fillStyle = TEXT_COLOR;
-        ui.beginPath();
-        ui.arc(blockLeft - 14, scanY, 1.5, 0, Math.PI * 2);
-        ui.fill();
-        ui.beginPath();
-        ui.arc(blockRight + 14, scanY, 1.5, 0, Math.PI * 2);
-        ui.fill();
-        ui.restore();
-      }
-
-      // ── 코너 크롭 마커 (계속 보임) ──
-      ui.save();
-      ui.globalAlpha = releaseFade * 0.5;
-      ui.strokeStyle = TEXT_COLOR;
-      ui.lineWidth = 0.6;
-      const pad = 10;
-      const top = blockTop - pad / 2;
-      const bot = blockBot + pad / 2;
-      const left = blockLeft - pad;
-      const right = blockRight + pad;
-      const cL = 5;
-      ui.beginPath();
-      ui.moveTo(left, top + cL); ui.lineTo(left, top); ui.lineTo(left + cL, top);
-      ui.moveTo(right - cL, top); ui.lineTo(right, top); ui.lineTo(right, top + cL);
-      ui.moveTo(left, bot - cL); ui.lineTo(left, bot); ui.lineTo(left + cL, bot);
-      ui.moveTo(right - cL, bot); ui.lineTo(right, bot); ui.lineTo(right, bot - cL);
-      ui.stroke();
-      ui.restore();
-
       // ── 각 글자별 사이클 렌더링 ──
       for (let i = 0; i < CHARS.length; i++) {
         const g = glyphs[i];
@@ -555,6 +512,17 @@
           ui.beginPath();
           ui.arc(ax, ay, 2 + state.scanT * 2, 0, Math.PI * 2);
           ui.stroke();
+          ui.restore();
+        }
+
+        // ── 하이라이트 박스 (글자 뒤, 시안색) ──
+        if (state.charAlpha > 0.1) {
+          ui.save();
+          ui.globalAlpha = releaseFade * state.charAlpha * 0.85;
+          ui.fillStyle = HI_COLOR;
+          const bx = a.x - 0.5 + jx;
+          const by = a.y - fontSize * 0.55 + jy;
+          ui.fillRect(bx, by, a.w + 1, fontSize * 1.1);
           ui.restore();
         }
 
