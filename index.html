@@ -8,27 +8,24 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #f0ede8; }
-
     .bg-img {
       position: fixed; inset: 0; z-index: 1;
       width: 100%; height: 100%; object-fit: cover;
     }
     #paint-canvas {
       position: fixed; inset: 0; z-index: 2;
-      width: 100%; height: 100%;
-      pointer-events: none;
+      width: 100%; height: 100%; pointer-events: none;
     }
     #ui-canvas {
       position: fixed; inset: 0; z-index: 3;
-      pointer-events: auto;
+      pointer-events: auto; cursor: crosshair;
     }
     .hint {
       position: fixed; bottom: 24px; left: 50%;
       transform: translateX(-50%); z-index: 5;
       font: 300 11px 'Pretendard', sans-serif;
       color: rgba(80,80,80,0.25);
-      letter-spacing: 0.04em;
-      pointer-events: none;
+      letter-spacing: 0.04em; pointer-events: none;
     }
   </style>
 </head>
@@ -37,7 +34,7 @@
   <img class="bg-img" src="./assets/sample2.jpg" alt="bg" />
   <canvas id="paint-canvas"></canvas>
   <canvas id="ui-canvas"></canvas>
-  <div class="hint">hover to reveal · click for text</div>
+  <div class="hint">hover to reveal · hold for text</div>
 
   <script>
     const paintCvs = document.getElementById("paint-canvas");
@@ -60,11 +57,11 @@
     window.addEventListener("resize", resize);
 
     /* ═══════════════════════════════════════
-       BRUSH PAINT REVEAL (same as before)
+       BRUSH PAINT REVEAL
        ═══════════════════════════════════════ */
     const trail = [];
     const LIFETIME = 50, BRUSH_R = 80;
-    let mouseX = 0, mouseY = 0, prevMX = -999, prevMY = -999, mouseInside = false;
+    let mouseX = 0, mouseY = 0, prevMX = -999, prevMY = -999;
 
     function addTrail(x0, y0, x1, y1) {
       const dx = x1 - x0, dy = y1 - y0;
@@ -90,8 +87,8 @@
         if (a < 0.005) continue;
         const g = paintCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
         g.addColorStop(0,   `rgba(255,255,255,${a.toFixed(3)})`);
-        g.addColorStop(0.3, `rgba(255,255,255,${(a*0.7).toFixed(3)})`);
-        g.addColorStop(0.6, `rgba(255,255,255,${(a*0.3).toFixed(3)})`);
+        g.addColorStop(0.3, `rgba(255,255,255,${(a * 0.7).toFixed(3)})`);
+        g.addColorStop(0.6, `rgba(255,255,255,${(a * 0.3).toFixed(3)})`);
         g.addColorStop(1,   `rgba(255,255,255,0)`);
         paintCtx.fillStyle = g;
         paintCtx.beginPath();
@@ -104,216 +101,208 @@
     }
 
     /* ═══════════════════════════════════════
-       TEXT MOTION ON CLICK
-       
-       Click spawns a text block at cursor.
-       Characters appear one by one (typewriter)
-       with a blinking cursor box, subtle glitch
-       flickers, then the whole thing fades out.
+       TEXT MOTION — loops while holding
+
+       One sentence, typed out char by char,
+       holds briefly, fades out, then restarts.
+       All while mouse is held down.
        ═══════════════════════════════════════ */
 
-    const SENTENCES = [
-      "사과의 시각적 표상은 없지만",
-      "벡터가 포함된 완벽한 모델을 가지고 있어요",
-      "기억은 표면 아래에 숨어 있다",
-      "손끝이 닿는 곳에서 형태가 드러난다",
-      "보이지 않는 것을 만지는 일",
-      "감각은 데이터보다 정확하다",
-    ];
+    const SENTENCE = "사과의 시각적 표상은 없지만 벡터가 포함된 완벽한 3D 모델을 가지고 있어요";
+    const CHARS = [...SENTENCE];
 
-    let sentenceIdx = 0;
+    let isHolding = false;
+    let holdX = 0, holdY = 0;
 
-    class TextBlock {
-      constructor(x, y) {
-        this.x = x;
-        this.y = y;
-        this.text = SENTENCES[sentenceIdx % SENTENCES.length];
-        sentenceIdx++;
-        this.chars = [...this.text];
-        this.revealed = 0;        // how many chars visible (float for smooth)
-        this.phase = "typing";    // typing → hold → fadeout → dead
-        this.age = 0;
-        this.holdStart = 0;
-        this.alpha = 1;
-        this.alive = true;
+    // Animation state machine
+    // phases: idle → typing → hold → fadeout → (restart)
+    let textPhase = "idle";
+    let textTimer = 0;
+    let revealed = 0;       // float, how many chars shown
+    let textAlpha = 1;
+    const TYPE_SPEED = 0.55;
+    const HOLD_DUR = 70;    // frames to hold after typing
 
-        // Per-char glitch state
-        this.charGlitch = this.chars.map(() => ({
-          offset: 0, glitching: false, timer: 0
-        }));
+    // Per-char glitch
+    const glitch = CHARS.map(() => ({ ox: 0, oy: 0, on: false, t: 0 }));
 
-        // Typing speed: chars per frame
-        this.typeSpeed = 0.6 + Math.random() * 0.3;
+    function resetText() {
+      textPhase = "typing";
+      textTimer = 0;
+      revealed = 0;
+      textAlpha = 1;
+      glitch.forEach(g => { g.ox = 0; g.oy = 0; g.on = false; g.t = 0; });
+    }
+
+    function updateText() {
+      if (textPhase === "idle") {
+        if (isHolding) resetText();
+        return;
       }
 
-      update() {
-        this.age++;
+      // If released during any phase, fade out
+      if (!isHolding && textPhase !== "fadeout") {
+        textPhase = "fadeout";
+      }
 
-        if (this.phase === "typing") {
-          this.revealed += this.typeSpeed;
+      textTimer++;
 
-          // Random micro-pauses
-          if (Math.random() < 0.03) this.revealed -= 0.3;
-
-          if (this.revealed >= this.chars.length) {
-            this.revealed = this.chars.length;
-            this.phase = "hold";
-            this.holdStart = this.age;
-          }
+      if (textPhase === "typing") {
+        revealed += TYPE_SPEED;
+        // random micro-stutter
+        if (Math.random() < 0.04) revealed -= 0.2;
+        if (revealed >= CHARS.length) {
+          revealed = CHARS.length;
+          textPhase = "hold";
+          textTimer = 0;
         }
-        else if (this.phase === "hold") {
-          if (this.age - this.holdStart > 90) {
-            this.phase = "fadeout";
-          }
+      }
+      else if (textPhase === "hold") {
+        if (textTimer > HOLD_DUR) {
+          textPhase = "fadeout";
+          textTimer = 0;
         }
-        else if (this.phase === "fadeout") {
-          this.alpha -= 0.015;
-          if (this.alpha <= 0) { this.alpha = 0; this.alive = false; }
-        }
-
-        // Update per-char glitch
-        for (let i = 0; i < this.chars.length; i++) {
-          const g = this.charGlitch[i];
-          if (g.glitching) {
-            g.timer--;
-            g.offset = (Math.random() - 0.5) * 3;
-            if (g.timer <= 0) { g.glitching = false; g.offset = 0; }
-          } else if (Math.random() < 0.008 && this.phase !== "fadeout") {
-            g.glitching = true;
-            g.timer = 2 + Math.floor(Math.random() * 4);
+      }
+      else if (textPhase === "fadeout") {
+        textAlpha -= 0.025;
+        if (textAlpha <= 0) {
+          textAlpha = 0;
+          // If still holding, restart loop
+          if (isHolding) {
+            resetText();
+          } else {
+            textPhase = "idle";
           }
         }
       }
 
-      draw(ctx) {
-        if (!this.alive) return;
-        const fontSize = 14;
-        const lineH = fontSize * 1.6;
-        ctx.font = `300 ${fontSize}px 'Pretendard', sans-serif`;
-        ctx.letterSpacing = "-0.3px";
-        ctx.textBaseline = "middle";
-
-        const nShow = Math.floor(this.revealed);
-
-        // Measure total width to center
-        let totalW = 0;
-        const charWidths = [];
-        for (const ch of this.chars) {
-          const w = ctx.measureText(ch).width;
-          charWidths.push(w);
-          totalW += w;
-        }
-        const startX = this.x - totalW / 2;
-        const baseY = this.y;
-
-        let cursorX = startX;
-
-        for (let i = 0; i < this.chars.length; i++) {
-          const cw = charWidths[i];
-          const g = this.charGlitch[i];
-
-          if (i < nShow) {
-            // Draw character
-            const charAlpha = this.alpha;
-            const ox = g.offset;
-            const oy = g.glitching ? (Math.random() - 0.5) * 2 : 0;
-
-            // Background box — subtle flash on recent chars
-            const recency = nShow - i;
-            if (recency < 4 && this.phase === "typing") {
-              const boxA = (1 - recency / 4) * 0.15 * this.alpha;
-              ctx.fillStyle = `rgba(0,0,0,${boxA.toFixed(3)})`;
-              ctx.fillRect(cursorX - 1, baseY - fontSize * 0.55, cw + 2, fontSize * 1.1);
-            }
-
-            ctx.save();
-            ctx.globalAlpha = charAlpha;
-            ctx.fillStyle = "#111";
-            ctx.fillText(this.chars[i], cursorX + ox, baseY + oy);
-            ctx.restore();
-          }
-
-          // Blinking cursor after last revealed char
-          if (i === nShow && this.phase === "typing") {
-            const blink = Math.sin(this.age * 0.25) > 0;
-            if (blink) {
-              ctx.save();
-              ctx.globalAlpha = 0.8 * this.alpha;
-              ctx.fillStyle = "#111";
-              ctx.fillRect(cursorX, baseY - fontSize * 0.5, 1.5, fontSize);
-              ctx.restore();
-            }
-          }
-
-          cursorX += cw;
-        }
-
-        // After typing done, subtle underline that fades
-        if (this.phase === "hold" || this.phase === "fadeout") {
-          const progress = this.phase === "hold"
-            ? Math.min(1, (this.age - this.holdStart) / 15)
-            : 1;
-          const lineW = totalW * progress;
-          ctx.save();
-          ctx.globalAlpha = this.alpha * 0.2;
-          ctx.strokeStyle = "#111";
-          ctx.lineWidth = 0.5;
-          ctx.beginPath();
-          ctx.moveTo(startX, baseY + fontSize * 0.6);
-          ctx.lineTo(startX + lineW, baseY + fontSize * 0.6);
-          ctx.stroke();
-          ctx.restore();
+      // Glitch updates
+      for (let i = 0; i < CHARS.length; i++) {
+        const g = glitch[i];
+        if (g.on) {
+          g.t--;
+          g.ox = (Math.random() - 0.5) * 2.5;
+          g.oy = (Math.random() - 0.5) * 1.5;
+          if (g.t <= 0) { g.on = false; g.ox = 0; g.oy = 0; }
+        } else if (Math.random() < 0.01 && textPhase !== "fadeout") {
+          g.on = true;
+          g.t = 2 + Math.floor(Math.random() * 3);
         }
       }
     }
 
-    const textBlocks = [];
+    function drawText() {
+      if (textPhase === "idle") return;
+
+      const fontSize = 14;
+      ui.font = `300 ${fontSize}px 'Pretendard', sans-serif`;
+      ui.textBaseline = "middle";
+      ui.letterSpacing = "-0.3px";
+
+      const nShow = Math.floor(revealed);
+
+      // Measure char widths
+      const cw = [];
+      let totalW = 0;
+      for (const ch of CHARS) {
+        const w = ui.measureText(ch).width;
+        cw.push(w);
+        totalW += w;
+      }
+
+      const startX = holdX - totalW / 2;
+      const baseY = holdY;
+      let cx = startX;
+
+      for (let i = 0; i < CHARS.length; i++) {
+        const w = cw[i];
+        const g = glitch[i];
+
+        if (i < nShow) {
+          // Recent-char highlight box
+          const recency = nShow - i;
+          if (recency <= 3 && textPhase === "typing") {
+            const boxA = (1 - recency / 3) * 0.18 * textAlpha;
+            ui.fillStyle = `rgba(30,30,30,${boxA.toFixed(3)})`;
+            ui.fillRect(cx - 1, baseY - fontSize * 0.55, w + 2, fontSize * 1.1);
+          }
+
+          ui.save();
+          ui.globalAlpha = textAlpha;
+          ui.fillStyle = "#111";
+          ui.fillText(CHARS[i], cx + g.ox, baseY + g.oy);
+          ui.restore();
+        }
+
+        // Blinking cursor at typing head
+        if (i === nShow && textPhase === "typing") {
+          if (Math.sin(textTimer * 0.3) > 0) {
+            ui.save();
+            ui.globalAlpha = 0.75 * textAlpha;
+            ui.fillStyle = "#111";
+            ui.fillRect(cx, baseY - fontSize * 0.45, 1.2, fontSize * 0.9);
+            ui.restore();
+          }
+        }
+
+        cx += w;
+      }
+
+      // Underline after typed
+      if (textPhase === "hold" || textPhase === "fadeout") {
+        const prog = textPhase === "hold" ? Math.min(1, textTimer / 12) : 1;
+        ui.save();
+        ui.globalAlpha = textAlpha * 0.15;
+        ui.strokeStyle = "#111";
+        ui.lineWidth = 0.5;
+        ui.beginPath();
+        ui.moveTo(startX, baseY + fontSize * 0.6);
+        ui.lineTo(startX + totalW * prog, baseY + fontSize * 0.6);
+        ui.stroke();
+        ui.restore();
+      }
+    }
 
     /* ═══════════════════════════════════════
        EVENTS
        ═══════════════════════════════════════ */
-
     uiCvs.addEventListener("mousemove", e => {
-      mouseX = e.clientX; mouseY = e.clientY; mouseInside = true;
+      mouseX = e.clientX; mouseY = e.clientY;
       if (prevMX > -900) addTrail(prevMX, prevMY, mouseX, mouseY);
       prevMX = mouseX; prevMY = mouseY;
+      // Update hold position if holding
+      if (isHolding) { holdX = mouseX; holdY = mouseY; }
     });
-    uiCvs.addEventListener("mouseleave", () => { mouseInside = false; prevMX = -999; });
-    uiCvs.addEventListener("mouseenter", () => { mouseInside = true; });
+    uiCvs.addEventListener("mouseleave", () => { prevMX = -999; });
 
-    uiCvs.addEventListener("click", e => {
-      textBlocks.push(new TextBlock(e.clientX, e.clientY));
+    uiCvs.addEventListener("mousedown", e => {
+      isHolding = true;
+      holdX = e.clientX; holdY = e.clientY;
     });
+    uiCvs.addEventListener("mouseup", () => { isHolding = false; });
 
     uiCvs.addEventListener("touchstart", e => {
-      e.preventDefault(); mouseInside = true;
+      e.preventDefault(); isHolding = true;
       mouseX = e.touches[0].clientX; mouseY = e.touches[0].clientY;
+      holdX = mouseX; holdY = mouseY;
       prevMX = mouseX; prevMY = mouseY;
-      textBlocks.push(new TextBlock(mouseX, mouseY));
     });
     uiCvs.addEventListener("touchmove", e => {
       const tx = e.touches[0].clientX, ty = e.touches[0].clientY;
       if (prevMX > -900) addTrail(prevMX, prevMY, tx, ty);
       mouseX = tx; mouseY = ty; prevMX = tx; prevMY = ty;
+      holdX = tx; holdY = ty;
     });
-    uiCvs.addEventListener("touchend", () => { mouseInside = false; prevMX = -999; });
+    uiCvs.addEventListener("touchend", () => { isHolding = false; prevMX = -999; });
 
     /* ═══════════════════════════════════════
        LOOP
        ═══════════════════════════════════════ */
-
     function animate() {
       renderPaint();
-
       ui.clearRect(0, 0, W, H);
-
-      // Update and draw text blocks
-      for (let i = textBlocks.length - 1; i >= 0; i--) {
-        textBlocks[i].update();
-        textBlocks[i].draw(ui);
-        if (!textBlocks[i].alive) textBlocks.splice(i, 1);
-      }
-
+      updateText();
+      drawText();
       requestAnimationFrame(animate);
     }
     animate();
