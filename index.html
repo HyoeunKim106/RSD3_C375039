@@ -6,6 +6,15 @@
   <title>Memory Image Map</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <style>
+    /* 로컬 폰트 — assets 폴더에 'New Century Schoolbook Roman.otf' 파일 필요 */
+    @font-face {
+      font-family: 'NewCenturySchoolbook';
+      src: url('./assets/New Century Schoolbook Roman.otf') format('opentype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #f0ede8; }
     .bg-img {
@@ -24,6 +33,36 @@
       position: fixed; inset: 0; z-index: 4;
       pointer-events: auto; cursor: crosshair;
     }
+
+    /* Name title — New Century Schoolbook Roman, 흰 박스 + 검정 텍스트 */
+    .name-title {
+      position: fixed;
+      top: 24px;
+      left: 28px;
+      z-index: 10;
+      pointer-events: none;
+      font-family: 'NewCenturySchoolbook', 'Century Schoolbook', 'Times New Roman', Times, serif;
+      font-weight: 400;
+      font-size: 32px;
+      color: #000;
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    .name-title span {
+      display: inline-block;
+      background: #fff;
+      color: #000;
+      padding: 0 4px;
+      line-height: 1;
+    }
+    .name-title .main { }
+    .name-title .sub {
+      margin-top: 3px;
+    }
+    .name-title .line {
+      display: block;
+    }
+
     .hint {
       position: fixed; bottom: 24px; left: 50%;
       transform: translateX(-50%); z-index: 5;
@@ -39,6 +78,12 @@
   <canvas id="paint-canvas"></canvas>
   <canvas id="shape-canvas"></canvas>
   <canvas id="ui-canvas"></canvas>
+
+  <div class="name-title">
+    <span class="line main">Hyoeun Kim</span>
+    <span class="line sub">Scenes without Scenes</span>
+  </div>
+
   <div class="hint">hover to reveal · hold for text · release to drop</div>
 
   <script>
@@ -71,14 +116,28 @@
     const LIFETIME = 50, BRUSH_R = 80;
     let mouseX = 0, mouseY = 0, prevMX = -999, prevMY = -999;
 
-    function addTrail(x0, y0, x1, y1) {
+    function addTrail(x0, y0, x1, y1, radiusBoost = 0) {
       const dx = x1 - x0, dy = y1 - y0;
       const dist = Math.sqrt(dx * dx + dy * dy);
       const steps = Math.max(1, Math.floor(dist / 6));
-      const r = BRUSH_R + Math.min(dist, 50) * 0.6;
+      const r = BRUSH_R + Math.min(dist, 50) * 0.6 + radiusBoost;
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
         trail.push({ x: x0 + dx * t, y: y0 + dy * t, age: 0, r: r + (Math.random() - 0.5) * 12 });
+      }
+    }
+
+    // 제자리 홀딩에서도 일렁임이 지속되도록 — 포인터 근처에
+    // 랜덤 오프셋으로 브러시 점을 계속 추가
+    function addStationaryShimmer(x, y) {
+      const count = 2;
+      for (let i = 0; i < count; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const dist = Math.random() * 22;
+        const px = x + Math.cos(ang) * dist;
+        const py = y + Math.sin(ang) * dist;
+        const r = BRUSH_R + (Math.random() - 0.5) * 24;
+        trail.push({ x: px, y: py, age: 0, r });
       }
     }
 
@@ -110,13 +169,10 @@
 
     /* ═══════════════════════════════════════
        FLOATING APPLES
-       마우스를 뗄 때 생성되어 화면을 자유롭게
-       떠다니며 가장자리에서 부드럽게 튕김
        ═══════════════════════════════════════ */
     const apples = [];
 
     function createApple(x, y) {
-      // 살짝 다른 빨강 톤으로 변주
       const hue = 350 + (Math.random() - 0.5) * 20;
       const sat = 65 + Math.random() * 15;
       const light = 45 + Math.random() * 10;
@@ -132,7 +188,6 @@
         stemColor: `hsl(25, 45%, 25%)`,
         leafColor: `hsl(95, 40%, 40%)`,
         birthTime: 0,
-        // 부드러운 떠다님을 위한 노이즈 시드
         nSeedX: Math.random() * 1000,
         nSeedY: Math.random() * 1000,
       });
@@ -141,33 +196,23 @@
     function updateApples() {
       for (const a of apples) {
         a.birthTime++;
-
-        // 부드러운 떠다니는 흔들림 (사인파 기반 노이즈)
         a.nSeedX += 0.01;
         a.nSeedY += 0.008;
         const driftX = Math.sin(a.nSeedX) * 0.04 + Math.cos(a.nSeedX * 0.7) * 0.02;
         const driftY = Math.cos(a.nSeedY) * 0.04 + Math.sin(a.nSeedY * 1.3) * 0.02;
-
         a.vx += driftX;
         a.vy += driftY;
-
-        // 약간의 마찰 — 너무 빨라지지 않게
         a.vx *= 0.995;
         a.vy *= 0.995;
-
-        // 속도 제한
         const sp = Math.sqrt(a.vx * a.vx + a.vy * a.vy);
         const MAX = 1.8;
         if (sp > MAX) {
           a.vx = (a.vx / sp) * MAX;
           a.vy = (a.vy / sp) * MAX;
         }
-
         a.x += a.vx;
         a.y += a.vy;
         a.rot += a.rotSpeed;
-
-        // 가장자리에서 튕김 (부드럽게)
         const pad = a.size;
         if (a.x < pad) { a.x = pad; a.vx = Math.abs(a.vx) * 0.8; }
         if (a.x > W - pad) { a.x = W - pad; a.vx = -Math.abs(a.vx) * 0.8; }
@@ -178,16 +223,11 @@
 
     function drawApple(ctx, a) {
       const s = a.size;
-
-      // 등장 애니메이션 — 처음 30 프레임 동안 팝업
       let scale = 1;
       if (a.birthTime < 30) {
         const t = a.birthTime / 30;
-        // easeOutBack 느낌
         scale = 1 + (Math.sin(t * Math.PI) * 0.15) * (1 - t * 0.5);
-        if (a.birthTime < 10) {
-          scale *= a.birthTime / 10;
-        }
+        if (a.birthTime < 10) scale *= a.birthTime / 10;
       }
 
       ctx.save();
@@ -195,7 +235,6 @@
       ctx.rotate(a.rot);
       ctx.scale(scale, scale);
 
-      // 그림자
       ctx.save();
       ctx.globalAlpha = 0.18;
       ctx.fillStyle = "#000";
@@ -204,7 +243,6 @@
       ctx.fill();
       ctx.restore();
 
-      // 사과 본체 — 두 개의 겹친 원으로 사과 특유의 하트형 실루엣
       ctx.fillStyle = a.color;
       ctx.beginPath();
       ctx.ellipse(-s * 0.22, 0, s * 0.78, s * 0.85, 0, 0, Math.PI * 2);
@@ -213,25 +251,21 @@
       ctx.ellipse(s * 0.22, 0, s * 0.78, s * 0.85, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // 상단 움푹 (꼭지 자리)
       ctx.fillStyle = a.color;
       ctx.beginPath();
       ctx.ellipse(0, -s * 0.7, s * 0.45, s * 0.2, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // 하이라이트
       ctx.fillStyle = a.highlight;
       ctx.beginPath();
       ctx.ellipse(-s * 0.35, -s * 0.25, s * 0.2, s * 0.32, -0.3, 0, Math.PI * 2);
       ctx.fill();
 
-      // 작은 반짝임
       ctx.fillStyle = "rgba(255,255,255,0.5)";
       ctx.beginPath();
       ctx.ellipse(-s * 0.4, -s * 0.4, s * 0.08, s * 0.12, -0.3, 0, Math.PI * 2);
       ctx.fill();
 
-      // 꼭지 (줄기)
       ctx.strokeStyle = a.stemColor;
       ctx.lineWidth = s * 0.08;
       ctx.lineCap = "round";
@@ -240,12 +274,10 @@
       ctx.quadraticCurveTo(s * 0.08, -s * 1.0, s * 0.18, -s * 1.05);
       ctx.stroke();
 
-      // 잎
       ctx.fillStyle = a.leafColor;
       ctx.beginPath();
       ctx.ellipse(s * 0.3, -s * 0.92, s * 0.22, s * 0.11, -0.6, 0, Math.PI * 2);
       ctx.fill();
-      // 잎맥
       ctx.strokeStyle = "rgba(0,0,0,0.15)";
       ctx.lineWidth = 0.8;
       ctx.beginPath();
@@ -258,15 +290,12 @@
 
     function renderShapes() {
       shapeCtx.clearRect(0, 0, W, H);
-      for (const a of apples) {
-        drawApple(shapeCtx, a);
-      }
+      for (const a of apples) drawApple(shapeCtx, a);
     }
 
     /* ═══════════════════════════════════════
-       TEXT MOTION — loops while holding
+       TEXT MOTION
        ═══════════════════════════════════════ */
-
     const SENTENCE = "사과의 시각적 표상은 없지만 벡터가 포함된 완벽한 3D 모델을 가지고 있어요";
     const CHARS = [...SENTENCE];
 
@@ -295,11 +324,7 @@
         if (isHolding) resetText();
         return;
       }
-
-      if (!isHolding && textPhase !== "fadeout") {
-        textPhase = "fadeout";
-      }
-
+      if (!isHolding && textPhase !== "fadeout") textPhase = "fadeout";
       textTimer++;
 
       if (textPhase === "typing") {
@@ -310,22 +335,14 @@
           textPhase = "hold";
           textTimer = 0;
         }
-      }
-      else if (textPhase === "hold") {
-        if (textTimer > HOLD_DUR) {
-          textPhase = "fadeout";
-          textTimer = 0;
-        }
-      }
-      else if (textPhase === "fadeout") {
+      } else if (textPhase === "hold") {
+        if (textTimer > HOLD_DUR) { textPhase = "fadeout"; textTimer = 0; }
+      } else if (textPhase === "fadeout") {
         textAlpha -= 0.025;
         if (textAlpha <= 0) {
           textAlpha = 0;
-          if (isHolding) {
-            resetText();
-          } else {
-            textPhase = "idle";
-          }
+          if (isHolding) resetText();
+          else textPhase = "idle";
         }
       }
 
@@ -345,20 +362,17 @@
 
     function drawText() {
       if (textPhase === "idle") return;
-
       const fontSize = 14;
       ui.font = `300 ${fontSize}px 'Pretendard', sans-serif`;
       ui.textBaseline = "middle";
       ui.letterSpacing = "-0.3px";
 
       const nShow = Math.floor(revealed);
-
       const cw = [];
       let totalW = 0;
       for (const ch of CHARS) {
         const w = ui.measureText(ch).width;
-        cw.push(w);
-        totalW += w;
+        cw.push(w); totalW += w;
       }
 
       const startX = holdX - totalW / 2;
@@ -376,7 +390,6 @@
             ui.fillStyle = `rgba(30,30,30,${boxA.toFixed(3)})`;
             ui.fillRect(cx - 1, baseY - fontSize * 0.55, w + 2, fontSize * 1.1);
           }
-
           ui.save();
           ui.globalAlpha = textAlpha;
           ui.fillStyle = "#111";
@@ -393,7 +406,6 @@
             ui.restore();
           }
         }
-
         cx += w;
       }
 
@@ -416,7 +428,10 @@
        ═══════════════════════════════════════ */
     uiCvs.addEventListener("mousemove", e => {
       mouseX = e.clientX; mouseY = e.clientY;
-      if (prevMX > -900) addTrail(prevMX, prevMY, mouseX, mouseY);
+      if (prevMX > -900) {
+        // 홀딩 중에는 브러시 반경을 키워 더 강한 일렁임
+        addTrail(prevMX, prevMY, mouseX, mouseY, isHolding ? 15 : 0);
+      }
       prevMX = mouseX; prevMY = mouseY;
       if (isHolding) { holdX = mouseX; holdY = mouseY; }
     });
@@ -425,10 +440,10 @@
     uiCvs.addEventListener("mousedown", e => {
       isHolding = true;
       holdX = e.clientX; holdY = e.clientY;
+      mouseX = e.clientX; mouseY = e.clientY;
     });
     uiCvs.addEventListener("mouseup", e => {
       isHolding = false;
-      // 마우스를 뗄 때 사과 생성
       createApple(e.clientX, e.clientY);
     });
 
@@ -440,13 +455,12 @@
     });
     uiCvs.addEventListener("touchmove", e => {
       const tx = e.touches[0].clientX, ty = e.touches[0].clientY;
-      if (prevMX > -900) addTrail(prevMX, prevMY, tx, ty);
+      if (prevMX > -900) addTrail(prevMX, prevMY, tx, ty, isHolding ? 15 : 0);
       mouseX = tx; mouseY = ty; prevMX = tx; prevMY = ty;
       holdX = tx; holdY = ty;
     });
-    uiCvs.addEventListener("touchend", e => {
+    uiCvs.addEventListener("touchend", () => {
       isHolding = false; prevMX = -999;
-      // 터치가 끝난 위치에 사과 생성
       createApple(mouseX, mouseY);
     });
 
@@ -454,6 +468,9 @@
        LOOP
        ═══════════════════════════════════════ */
     function animate() {
+      // 홀딩 중에는 제자리에서도 일렁임 지속
+      if (isHolding) addStationaryShimmer(holdX, holdY);
+
       renderPaint();
       updateApples();
       renderShapes();
