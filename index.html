@@ -13,25 +13,20 @@
       position: fixed; inset: 0; z-index: 1;
       width: 100%; height: 100%; object-fit: cover;
     }
-
-    /* Canvas that "paints" sample1 over sample2 */
     #paint-canvas {
       position: fixed; inset: 0; z-index: 2;
       width: 100%; height: 100%;
       pointer-events: none;
     }
-
-    /* Top interaction + 3D text layer */
     #ui-canvas {
       position: fixed; inset: 0; z-index: 3;
       pointer-events: auto;
     }
-
     .hint {
       position: fixed; bottom: 24px; left: 50%;
       transform: translateX(-50%); z-index: 5;
       font: 300 11px 'Pretendard', sans-serif;
-      color: rgba(80,80,80,0.3);
+      color: rgba(80,80,80,0.25);
       letter-spacing: 0.04em;
       pointer-events: none;
     }
@@ -39,253 +34,285 @@
 </head>
 <body>
 
-  <!-- Base layer: sample2 (plain texture, no apple) -->
   <img class="bg-img" src="./assets/sample2.jpg" alt="bg" />
-
-  <!-- Paint canvas: sample1 gets brushed onto here -->
   <canvas id="paint-canvas"></canvas>
-
-  <!-- UI canvas: 3D apple text -->
   <canvas id="ui-canvas"></canvas>
-
-  <div class="hint">hover to reveal · hold for 3D</div>
+  <div class="hint">hover to reveal · click for text</div>
 
   <script>
-    /* ═══════════════════════════════════════════════
-       SETUP
-       ═══════════════════════════════════════════════ */
     const paintCvs = document.getElementById("paint-canvas");
     const paintCtx = paintCvs.getContext("2d");
-    const uiCvs   = document.getElementById("ui-canvas");
-    const uiCtx   = uiCvs.getContext("2d");
+    const uiCvs = document.getElementById("ui-canvas");
+    const ui = uiCvs.getContext("2d");
 
     let W, H;
-
-    // Load sample1 as the "paint" image
     const paintImg = new Image();
     paintImg.src = "./assets/sample1.jpg";
     let imgReady = false;
     paintImg.onload = () => { imgReady = true; };
 
     function resize() {
-      W = window.innerWidth;
-      H = window.innerHeight;
+      W = window.innerWidth; H = window.innerHeight;
       paintCvs.width = W; paintCvs.height = H;
       uiCvs.width = W; uiCvs.height = H;
     }
     resize();
     window.addEventListener("resize", resize);
 
-    /* ═══════════════════════════════════════════════
-       BRUSH-PAINT REVEAL
-       
-       Each frame:
-       1. Clear paint canvas
-       2. Draw soft brush blobs (white) for each
-          active trail point → this is the "mask shape"
-       3. globalCompositeOperation = "source-in"
-       4. Draw sample1 full-screen → only shows through
-          the brush blobs
-       
-       Result: sample1 literally appears where you brush,
-       like painting it onto the surface.
-       Trail points fade over time → old strokes disappear.
-       ═══════════════════════════════════════════════ */
-
+    /* ═══════════════════════════════════════
+       BRUSH PAINT REVEAL (same as before)
+       ═══════════════════════════════════════ */
     const trail = [];
-    const LIFETIME = 50;  // frames
-    const BRUSH_R = 80;
-
-    let mouseX = 0, mouseY = 0;
-    let prevMX = -999, prevMY = -999;
-    let mouseInside = false;
+    const LIFETIME = 50, BRUSH_R = 80;
+    let mouseX = 0, mouseY = 0, prevMX = -999, prevMY = -999, mouseInside = false;
 
     function addTrail(x0, y0, x1, y1) {
       const dx = x1 - x0, dy = y1 - y0;
       const dist = Math.sqrt(dx * dx + dy * dy);
       const steps = Math.max(1, Math.floor(dist / 6));
-      const speed = Math.min(dist, 50);
-      const r = BRUSH_R + speed * 0.6;
-
+      const r = BRUSH_R + Math.min(dist, 50) * 0.6;
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
-        trail.push({
-          x: x0 + dx * t,
-          y: y0 + dy * t,
-          age: 0,
-          r: r + (Math.random() - 0.5) * 12
-        });
+        trail.push({ x: x0 + dx * t, y: y0 + dy * t, age: 0, r: r + (Math.random() - 0.5) * 12 });
       }
     }
 
     function renderPaint() {
       paintCtx.clearRect(0, 0, W, H);
       if (!imgReady || trail.length === 0) return;
-
-      // Pass 1: draw brush blobs (white circles with soft alpha)
       paintCtx.save();
-      paintCtx.globalCompositeOperation = "source-over";
-
       for (let i = trail.length - 1; i >= 0; i--) {
-        const p = trail[i];
-        p.age++;
+        const p = trail[i]; p.age++;
         if (p.age > LIFETIME) { trail.splice(i, 1); continue; }
-
         const life = p.age / LIFETIME;
-        let alpha;
-        if (life < 0.04) alpha = life / 0.04;
-        else alpha = 1.0 - Math.pow((life - 0.04) / 0.96, 0.8);
-        alpha *= 0.95;
-        if (alpha < 0.005) continue;
-
-        const grad = paintCtx.createRadialGradient(
-          p.x, p.y, 0,
-          p.x, p.y, p.r
-        );
-        grad.addColorStop(0,   `rgba(255,255,255,${alpha.toFixed(3)})`);
-        grad.addColorStop(0.3, `rgba(255,255,255,${(alpha * 0.7).toFixed(3)})`);
-        grad.addColorStop(0.6, `rgba(255,255,255,${(alpha * 0.3).toFixed(3)})`);
-        grad.addColorStop(1,   `rgba(255,255,255,0)`);
-
-        paintCtx.fillStyle = grad;
+        let a = life < 0.04 ? life / 0.04 : 1 - Math.pow((life - 0.04) / 0.96, 0.8);
+        a *= 0.95;
+        if (a < 0.005) continue;
+        const g = paintCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+        g.addColorStop(0,   `rgba(255,255,255,${a.toFixed(3)})`);
+        g.addColorStop(0.3, `rgba(255,255,255,${(a*0.7).toFixed(3)})`);
+        g.addColorStop(0.6, `rgba(255,255,255,${(a*0.3).toFixed(3)})`);
+        g.addColorStop(1,   `rgba(255,255,255,0)`);
+        paintCtx.fillStyle = g;
         paintCtx.beginPath();
         paintCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
         paintCtx.fill();
       }
-
-      // Pass 2: draw sample1 only where brush blobs exist
       paintCtx.globalCompositeOperation = "source-in";
       paintCtx.drawImage(paintImg, 0, 0, W, H);
       paintCtx.restore();
     }
 
+    /* ═══════════════════════════════════════
+       TEXT MOTION ON CLICK
+       
+       Click spawns a text block at cursor.
+       Characters appear one by one (typewriter)
+       with a blinking cursor box, subtle glitch
+       flickers, then the whole thing fades out.
+       ═══════════════════════════════════════ */
 
-    /* ═══════════════════════════════════════════════
-       3D APPLE TEXT — tilted elliptical orbits
-       ═══════════════════════════════════════════════ */
+    const SENTENCES = [
+      "사과의 시각적 표상은 없지만",
+      "벡터가 포함된 완벽한 모델을 가지고 있어요",
+      "기억은 표면 아래에 숨어 있다",
+      "손끝이 닿는 곳에서 형태가 드러난다",
+      "보이지 않는 것을 만지는 일",
+      "감각은 데이터보다 정확하다",
+    ];
 
-    const TEXT = "사과의시각적표상은없지만벡터가포함된완벽한3D모델을가지고있어요";
-    let isHolding = false, holdAlpha = 0, rotY = 0;
+    let sentenceIdx = 0;
 
-    function appleProfile(t) {
-      const y = (t - 0.45) * 200;
-      let r;
-      if (t < 0.08)       { r = (t / 0.08) * 0.35; }
-      else if (t < 0.40)  { const s = (t - 0.08) / 0.32; r = 0.35 + 0.65 * Math.pow(Math.sin(s * Math.PI / 2), 0.7); }
-      else if (t < 0.75)  { const s = (t - 0.40) / 0.35; r = 1.0 - 0.08 * s; }
-      else                 { const s = (t - 0.75) / 0.25; r = 0.92 * (1.0 - Math.pow(s, 1.5)); if (s > 0.85) r *= 1.0 - (s - 0.85) / 0.15 * 0.3; }
-      return { r: r * 72, y };
-    }
+    class TextBlock {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.text = SENTENCES[sentenceIdx % SENTENCES.length];
+        sentenceIdx++;
+        this.chars = [...this.text];
+        this.revealed = 0;        // how many chars visible (float for smooth)
+        this.phase = "typing";    // typing → hold → fadeout → dead
+        this.age = 0;
+        this.holdStart = 0;
+        this.alpha = 1;
+        this.alive = true;
 
-    const applePoints = [];
-    let ci = 0;
-    const N_ORB = 12, PTS_ORB = 36;
+        // Per-char glitch state
+        this.charGlitch = this.chars.map(() => ({
+          offset: 0, glitching: false, timer: 0
+        }));
 
-    for (let o = 0; o < N_ORB; o++) {
-      const tilt = (o / N_ORB) * Math.PI;
-      for (let i = 0; i < PTS_ORB; i++) {
-        const theta = (i / PTS_ORB) * Math.PI * 2;
-        let sx = Math.cos(theta), sy = Math.sin(theta);
-        const ct = Math.cos(tilt), st = Math.sin(tilt);
-        const rx = sx * ct, rz = sx * st;
-        const t = (sy + 1) / 2;
-        const prof = appleProfile(t);
-        const hLen = Math.sqrt(rx * rx + rz * rz);
-        let hx = 0, hz = 0;
-        if (hLen > 0.001) { hx = (rx / hLen) * prof.r; hz = (rz / hLen) * prof.r; }
-        applePoints.push({ ax: hx, ay: prof.y, az: hz, char: TEXT[ci % TEXT.length] });
-        ci++;
+        // Typing speed: chars per frame
+        this.typeSpeed = 0.6 + Math.random() * 0.3;
+      }
+
+      update() {
+        this.age++;
+
+        if (this.phase === "typing") {
+          this.revealed += this.typeSpeed;
+
+          // Random micro-pauses
+          if (Math.random() < 0.03) this.revealed -= 0.3;
+
+          if (this.revealed >= this.chars.length) {
+            this.revealed = this.chars.length;
+            this.phase = "hold";
+            this.holdStart = this.age;
+          }
+        }
+        else if (this.phase === "hold") {
+          if (this.age - this.holdStart > 90) {
+            this.phase = "fadeout";
+          }
+        }
+        else if (this.phase === "fadeout") {
+          this.alpha -= 0.015;
+          if (this.alpha <= 0) { this.alpha = 0; this.alive = false; }
+        }
+
+        // Update per-char glitch
+        for (let i = 0; i < this.chars.length; i++) {
+          const g = this.charGlitch[i];
+          if (g.glitching) {
+            g.timer--;
+            g.offset = (Math.random() - 0.5) * 3;
+            if (g.timer <= 0) { g.glitching = false; g.offset = 0; }
+          } else if (Math.random() < 0.008 && this.phase !== "fadeout") {
+            g.glitching = true;
+            g.timer = 2 + Math.floor(Math.random() * 4);
+          }
+        }
+      }
+
+      draw(ctx) {
+        if (!this.alive) return;
+        const fontSize = 14;
+        const lineH = fontSize * 1.6;
+        ctx.font = `300 ${fontSize}px 'Pretendard', sans-serif`;
+        ctx.letterSpacing = "-0.3px";
+        ctx.textBaseline = "middle";
+
+        const nShow = Math.floor(this.revealed);
+
+        // Measure total width to center
+        let totalW = 0;
+        const charWidths = [];
+        for (const ch of this.chars) {
+          const w = ctx.measureText(ch).width;
+          charWidths.push(w);
+          totalW += w;
+        }
+        const startX = this.x - totalW / 2;
+        const baseY = this.y;
+
+        let cursorX = startX;
+
+        for (let i = 0; i < this.chars.length; i++) {
+          const cw = charWidths[i];
+          const g = this.charGlitch[i];
+
+          if (i < nShow) {
+            // Draw character
+            const charAlpha = this.alpha;
+            const ox = g.offset;
+            const oy = g.glitching ? (Math.random() - 0.5) * 2 : 0;
+
+            // Background box — subtle flash on recent chars
+            const recency = nShow - i;
+            if (recency < 4 && this.phase === "typing") {
+              const boxA = (1 - recency / 4) * 0.15 * this.alpha;
+              ctx.fillStyle = `rgba(0,0,0,${boxA.toFixed(3)})`;
+              ctx.fillRect(cursorX - 1, baseY - fontSize * 0.55, cw + 2, fontSize * 1.1);
+            }
+
+            ctx.save();
+            ctx.globalAlpha = charAlpha;
+            ctx.fillStyle = "#111";
+            ctx.fillText(this.chars[i], cursorX + ox, baseY + oy);
+            ctx.restore();
+          }
+
+          // Blinking cursor after last revealed char
+          if (i === nShow && this.phase === "typing") {
+            const blink = Math.sin(this.age * 0.25) > 0;
+            if (blink) {
+              ctx.save();
+              ctx.globalAlpha = 0.8 * this.alpha;
+              ctx.fillStyle = "#111";
+              ctx.fillRect(cursorX, baseY - fontSize * 0.5, 1.5, fontSize);
+              ctx.restore();
+            }
+          }
+
+          cursorX += cw;
+        }
+
+        // After typing done, subtle underline that fades
+        if (this.phase === "hold" || this.phase === "fadeout") {
+          const progress = this.phase === "hold"
+            ? Math.min(1, (this.age - this.holdStart) / 15)
+            : 1;
+          const lineW = totalW * progress;
+          ctx.save();
+          ctx.globalAlpha = this.alpha * 0.2;
+          ctx.strokeStyle = "#111";
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.moveTo(startX, baseY + fontSize * 0.6);
+          ctx.lineTo(startX + lineW, baseY + fontSize * 0.6);
+          ctx.stroke();
+          ctx.restore();
+        }
       }
     }
-    for (let i = 0; i < 5; i++) {
-      const t = i / 4;
-      applePoints.push({ ax: Math.sin(t * 0.3) * 2, ay: -95 - t * 20, az: 0, char: "│", stem: true });
-    }
-    for (let i = 0; i < 8; i++) {
-      const t = i / 7, along = t * 22, across = Math.sin(t * Math.PI) * 7, a = -0.5;
-      applePoints.push({
-        ax: along * Math.cos(a) - across * Math.sin(a) + 3,
-        ay: -104 + along * Math.sin(a) - across * Math.cos(a),
-        az: across * 0.2, char: "잎", leaf: true
-      });
-    }
 
-    function project(x, y, z, cx, cy, ry) {
-      const c = Math.cos(ry), s = Math.sin(ry);
-      const rx = x * c - z * s, rz = x * s + z * c;
-      const p = 500 / (500 + rz);
-      return { x: cx + rx * p, y: cy + y * p, s: p, z: rz };
-    }
+    const textBlocks = [];
 
-    function drawApple() {
-      const cx = mouseX, cy = mouseY;
-      const list = [];
-      for (const pt of applePoints) {
-        const pj = project(pt.ax, pt.ay, pt.az, cx, cy, rotY);
-        list.push({ x: pj.x, y: pj.y, s: pj.s, z: pj.z, f: pj.z < 60 ? 1 : 0.04, char: pt.char });
-      }
-      list.sort((a, b) => b.z - a.z);
-
-      for (const d of list) {
-        const a = holdAlpha * d.f;
-        if (a < 0.01) continue;
-        const sz = Math.max(4, 8.5 * d.s);
-        uiCtx.save();
-        uiCtx.translate(d.x, d.y);
-        uiCtx.font = `300 ${sz}px 'Pretendard', sans-serif`;
-        uiCtx.globalAlpha = a;
-        uiCtx.fillStyle = "#222";
-        uiCtx.textAlign = "center";
-        uiCtx.textBaseline = "middle";
-        uiCtx.letterSpacing = "-0.5px";
-        uiCtx.fillText(d.char, 0, 0);
-        uiCtx.restore();
-      }
-    }
-
-
-    /* ═══════════════════════════════════════════════
+    /* ═══════════════════════════════════════
        EVENTS
-       ═══════════════════════════════════════════════ */
+       ═══════════════════════════════════════ */
 
     uiCvs.addEventListener("mousemove", e => {
-      mouseX = e.clientX; mouseY = e.clientY;
-      mouseInside = true;
+      mouseX = e.clientX; mouseY = e.clientY; mouseInside = true;
       if (prevMX > -900) addTrail(prevMX, prevMY, mouseX, mouseY);
       prevMX = mouseX; prevMY = mouseY;
     });
     uiCvs.addEventListener("mouseleave", () => { mouseInside = false; prevMX = -999; });
     uiCvs.addEventListener("mouseenter", () => { mouseInside = true; });
-    uiCvs.addEventListener("mousedown", () => { isHolding = true; });
-    uiCvs.addEventListener("mouseup",   () => { isHolding = false; });
+
+    uiCvs.addEventListener("click", e => {
+      textBlocks.push(new TextBlock(e.clientX, e.clientY));
+    });
 
     uiCvs.addEventListener("touchstart", e => {
-      e.preventDefault(); isHolding = true; mouseInside = true;
+      e.preventDefault(); mouseInside = true;
       mouseX = e.touches[0].clientX; mouseY = e.touches[0].clientY;
       prevMX = mouseX; prevMY = mouseY;
+      textBlocks.push(new TextBlock(mouseX, mouseY));
     });
     uiCvs.addEventListener("touchmove", e => {
       const tx = e.touches[0].clientX, ty = e.touches[0].clientY;
       if (prevMX > -900) addTrail(prevMX, prevMY, tx, ty);
       mouseX = tx; mouseY = ty; prevMX = tx; prevMY = ty;
     });
-    uiCvs.addEventListener("touchend", () => { isHolding = false; mouseInside = false; prevMX = -999; });
+    uiCvs.addEventListener("touchend", () => { mouseInside = false; prevMX = -999; });
 
-
-    /* ═══════════════════════════════════════════════
+    /* ═══════════════════════════════════════
        LOOP
-       ═══════════════════════════════════════════════ */
+       ═══════════════════════════════════════ */
 
     function animate() {
-      // Brush paint
       renderPaint();
 
-      // 3D apple
-      uiCtx.clearRect(0, 0, W, H);
-      if (isHolding) holdAlpha = Math.min(1, holdAlpha + 0.035);
-      else holdAlpha = Math.max(0, holdAlpha - 0.025);
-      rotY += 0.01;
-      if (holdAlpha > 0.01) drawApple();
+      ui.clearRect(0, 0, W, H);
+
+      // Update and draw text blocks
+      for (let i = textBlocks.length - 1; i >= 0; i--) {
+        textBlocks[i].update();
+        textBlocks[i].draw(ui);
+        if (!textBlocks[i].alive) textBlocks.splice(i, 1);
+      }
 
       requestAnimationFrame(animate);
     }
