@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Memory Image Map - Wide Ink Brush</title>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200;300&display=swap" rel="stylesheet" />
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -25,7 +25,6 @@
     #reveal-layer {
       z-index: 2;
       filter: url('#ink-spread');
-      /* 그라데이션 범위를 95%까지 확장하여 필터가 그려질 캔버스 영역 확보 */
       -webkit-mask-image: radial-gradient(circle 0px at 50% 50%, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0) 95%);
       mask-image: radial-gradient(circle 0px at 50% 50%, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0) 95%);
     }
@@ -40,6 +39,104 @@
       position: absolute;
       width: 0; height: 0;
       pointer-events: none;
+    }
+
+    /* ── Popup Overlay ── */
+    #popup-overlay {
+      position: fixed; inset: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    #popup-overlay.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #popup-backdrop {
+      position: absolute; inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+
+    #popup-box {
+      position: relative;
+      width: 480px;
+      height: 520px;
+      max-width: 90vw;
+      max-height: 85vh;
+      background: rgba(255, 255, 255, 0.94);
+      border-radius: 24px;
+      box-shadow:
+        0 30px 80px rgba(0,0,0,0.35),
+        0 0 0 1px rgba(255,255,255,0.15) inset;
+      overflow: hidden;
+      transform: scale(0.85) translateY(20px);
+      transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    #popup-overlay.visible #popup-box {
+      transform: scale(1) translateY(0);
+    }
+
+    #popup-header {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 2;
+      background: rgba(255,255,255,0.75);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+    #popup-header .title {
+      font-family: 'Noto Serif KR', serif;
+      font-weight: 300;
+      font-size: 13px;
+      color: #222;
+      letter-spacing: 0.02em;
+    }
+    #popup-close {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(0,0,0,0.06);
+      color: #333;
+      font-size: 15px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    #popup-close:hover {
+      background: rgba(0,0,0,0.12);
+    }
+
+    #popup-canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    .click-hint {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4;
+      font-family: 'Noto Serif KR', serif;
+      font-size: 12px;
+      color: rgba(255,255,255,0.45);
+      letter-spacing: 0.08em;
+      pointer-events: none;
+      transition: opacity 0.6s;
     }
   </style>
 </head>
@@ -62,83 +159,143 @@
   </div>
   <canvas id="text-canvas"></canvas>
 
+  <div class="click-hint" id="click-hint">click &amp; hold</div>
+
+  <!-- Popup -->
+  <div id="popup-overlay">
+    <div id="popup-backdrop"></div>
+    <div id="popup-box">
+      <div id="popup-header">
+        <span class="title">3D 벡터 모델</span>
+        <button id="popup-close">✕</button>
+      </div>
+      <canvas id="popup-canvas"></canvas>
+    </div>
+  </div>
+
   <script>
+    /* ── reveal / ink-brush ── */
     const reveal = document.getElementById("reveal-layer");
     const displacement = document.getElementById("displacement");
     
     let targetX = window.innerWidth/2, targetY = window.innerHeight/2;
     let currentX = targetX, currentY = targetY;
     let targetR = 0, currentR = 0;
-    
     let prevMouseX = targetX, prevMouseY = targetY;
     let currentScale = 40; 
-
-    // 반경(RADIUS)을 180에서 350으로 2배 가까이 대폭 확대
     const RADIUS = 350, EASE = 0.07, R_EASE = 0.06;
 
     const tc = document.getElementById("text-canvas");
-    const ctx = tc.getContext("2d");
+    const ctxMain = tc.getContext("2d");
     let W, H;
     function resize() { W = tc.width = window.innerWidth; H = tc.height = window.innerHeight; }
     resize();
     window.addEventListener("resize", resize);
 
+    /* ── popup canvas ── */
+    const popupOverlay = document.getElementById("popup-overlay");
+    const popupBox = document.getElementById("popup-box");
+    const popupCanvas = document.getElementById("popup-canvas");
+    const popupCtx = popupCanvas.getContext("2d");
+    let PW, PH;
+
+    function resizePopup() {
+      const rect = popupBox.getBoundingClientRect();
+      PW = popupCanvas.width = rect.width * devicePixelRatio;
+      PH = popupCanvas.height = rect.height * devicePixelRatio;
+      popupCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    }
+    const popupResizeObserver = new ResizeObserver(resizePopup);
+    popupResizeObserver.observe(popupBox);
+
     const TEXT = "사과의시각적표상은없지만벡터가포함된완벽한3D모델을가지고있어요";
-    const CYAN = "#00f0ff";
-    const LEAF_GREEN = "#4ecf4e";
 
     let mouseX = W/2, mouseY = H/2;
     let isHolding = false;
     let holdAlpha = 0;
     let rotY = 0;
+    let popupOpen = false;
+    let popupAlpha = 0;
 
-    function appleRadius(v) {
-      const t = v / Math.PI;
-      let r = Math.sin(v);
-      if (t < 0.15) r *= 0.3 + 0.7 * (t / 0.15);
-      r *= 1.0 + 0.2 * Math.sin(v * 0.9 - 0.1);
-      if (t > 0.85) r *= 1.0 - (t - 0.85) / 0.15 * 0.3;
-      return r * 90;
+    /* ─────────────────────────────────────────────
+       Realistic apple: diagonal spiral text bands
+       ───────────────────────────────────────────── */
+
+    // Apple cross-section radius at parameter t (0=top, 1=bottom)
+    function appleR(t) {
+      // base shape
+      let r = Math.sin(t * Math.PI);
+      
+      // wider shoulder (apple is fatter above center)
+      r *= 1.0 + 0.3 * Math.pow(Math.sin(t * Math.PI * 0.75), 2);
+      
+      // stem cavity indent at top
+      if (t < 0.10) r *= 0.15 + 0.85 * (t / 0.10);
+      
+      // bottom indent (calyx)
+      if (t > 0.93) r *= 1.0 - 0.4 * ((t - 0.93) / 0.07);
+      
+      // subtle asymmetric bulge above center
+      r *= 1.0 + 0.08 * Math.exp(-Math.pow((t - 0.35) * 6, 2));
+      
+      return r * 82;
     }
 
-    function appleY(v) { return -Math.cos(v) * 100; }
+    function appleYPos(t) {
+      return (t - 0.5) * 195;
+    }
 
     const applePoints = [];
-    const ROWS = 16, COLS = 22;
+    const NUM_SPIRALS = 10;
+    const PTS_PER_SPIRAL = 48;
+    const SPIRAL_TURNS = 1.0;
     let charIdx = 0;
 
-    for (let row = 0; row < ROWS; row++) {
-      const v = (row + 0.5) / ROWS * Math.PI;
-      const r = appleRadius(v);
-      const y = appleY(v);
-      for (let col = 0; col < COLS; col++) {
-        const u = (col / COLS) * Math.PI * 2;
+    for (let s = 0; s < NUM_SPIRALS; s++) {
+      const uOffset = (s / NUM_SPIRALS) * Math.PI * 2;
+      
+      for (let i = 0; i < PTS_PER_SPIRAL; i++) {
+        const t = i / (PTS_PER_SPIRAL - 1); // 0..1
+        const r = appleR(t);
+        const y = appleYPos(t);
+        
+        // diagonal spiral: u advances as t goes top→bottom
+        const u = uOffset + t * SPIRAL_TURNS * Math.PI * 2;
+        
         applePoints.push({
-          ax: r * Math.cos(u), ay: y, az: r * Math.sin(u),
-          char: TEXT[charIdx % TEXT.length], row, col
+          ax: r * Math.cos(u),
+          ay: y,
+          az: r * Math.sin(u),
+          char: TEXT[charIdx % TEXT.length],
+          isStem: false, isLeaf: false
         });
         charIdx++;
       }
     }
 
-    for (let i = 0; i < 6; i++) {
-      const t = i / 5;
+    // Stem
+    for (let i = 0; i < 7; i++) {
+      const t = i / 6;
       applePoints.push({
-        ax: Math.sin(t * 0.3) * 3, ay: -105 - t * 30, az: Math.cos(t * 0.2) * 2,
-        char: "│", isStem: true, row: -1, col: i
+        ax: Math.sin(t * 0.5) * 3,
+        ay: -102 - t * 26,
+        az: Math.cos(t * 0.3) * 2,
+        char: "│", isStem: true, isLeaf: false
       });
     }
 
-    for (let i = 0; i < 18; i++) {
-      const t = i / 17;
-      const len = 40, wid = 14;
-      const along = t * len, across = Math.sin(t * Math.PI) * wid;
-      const ang = -0.6;
+    // Leaf
+    for (let i = 0; i < 14; i++) {
+      const t = i / 13;
+      const len = 32, wid = 11;
+      const along = t * len;
+      const across = Math.sin(t * Math.PI) * wid;
+      const ang = -0.55;
       applePoints.push({
         ax: along * Math.cos(ang) - across * Math.sin(ang) + 5,
-        ay: -128 + along * Math.sin(ang) - across * Math.cos(ang),
+        ay: -115 + along * Math.sin(ang) - across * Math.cos(ang),
         az: across * 0.3,
-        char: "잎", isLeaf: true, row: -2, col: i
+        char: "잎", isLeaf: true, isStem: false
       });
     }
 
@@ -149,22 +306,18 @@
       return { x: cx + rx2 * p, y: cy + y * p, s: p, z: rz2 };
     }
 
+    /* ── Floating shapes ── */
     let floatingShape = null;
-
     class FloatingShape {
       constructor(x, y) {
         this.x = x; this.y = y;
         this.vx = (Math.random() - 0.5) * 0.8;
         this.vy = -0.3 - Math.random() * 0.5;
         this.size = 25 + Math.random() * 35;
-        this.rot = 0;
-        this.rotSpeed = (Math.random() - 0.5) * 0.008;
-        this.life = 1.0;
-        this.alive = true;
-        this.alpha = 0;
+        this.rot = 0; this.rotSpeed = (Math.random() - 0.5) * 0.008;
+        this.life = 1.0; this.alive = true; this.alpha = 0;
         this.type = Math.floor(Math.random() * 5);
       }
-
       update() {
         this.x += this.vx; this.y += this.vy; this.rot += this.rotSpeed;
         this.vx += (Math.random() - 0.5) * 0.01;
@@ -174,85 +327,56 @@
         if (this.life < 0.3) this.alpha = this.life / 0.3 * 0.5;
         if (this.life <= 0) this.alive = false;
       }
-
       draw() {
         if (!this.alive) return;
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.rot);
-
-        const a = this.alpha, s = this.size;
-        ctx.strokeStyle = `rgba(0, 240, 255, ${a.toFixed(2)})`;
-        ctx.lineWidth = 1;
-        ctx.fillStyle = `rgba(0, 240, 255, ${(a * 0.1).toFixed(2)})`;
-
-        switch(this.type) {
-          case 0:
-            ctx.beginPath(); ctx.arc(0, 0, s/2, 0, Math.PI*2);
-            ctx.fill(); ctx.stroke(); break;
-          case 1:
-            ctx.beginPath();
-            for (let i = 0; i < 3; i++) {
-              const ang = i/3*Math.PI*2 - Math.PI/2;
-              i===0 ? ctx.moveTo(Math.cos(ang)*s/2, Math.sin(ang)*s/2)
-                    : ctx.lineTo(Math.cos(ang)*s/2, Math.sin(ang)*s/2);
-            }
-            ctx.closePath(); ctx.fill(); ctx.stroke(); break;
-          case 2:
-            ctx.fillRect(-s/2,-s/2,s,s); ctx.strokeRect(-s/2,-s/2,s,s); break;
-          case 3:
-            ctx.beginPath();
-            ctx.moveTo(0,-s/2); ctx.lineTo(s/3,0);
-            ctx.lineTo(0,s/2); ctx.lineTo(-s/3,0);
-            ctx.closePath(); ctx.fill(); ctx.stroke(); break;
-          case 4:
-            ctx.beginPath(); ctx.arc(0,0,s/2,0,Math.PI*2); ctx.stroke();
-            ctx.beginPath(); ctx.arc(0,0,s/3,0,Math.PI*2); ctx.stroke(); break;
+        ctxMain.save();
+        ctxMain.translate(this.x, this.y); ctxMain.rotate(this.rot);
+        const a = this.alpha, sz = this.size;
+        ctxMain.strokeStyle = `rgba(0,240,255,${a.toFixed(2)})`;
+        ctxMain.lineWidth = 1;
+        ctxMain.fillStyle = `rgba(0,240,255,${(a*0.1).toFixed(2)})`;
+        switch(this.type){
+          case 0: ctxMain.beginPath();ctxMain.arc(0,0,sz/2,0,Math.PI*2);ctxMain.fill();ctxMain.stroke();break;
+          case 1: ctxMain.beginPath();for(let i=0;i<3;i++){const ag=i/3*Math.PI*2-Math.PI/2;i===0?ctxMain.moveTo(Math.cos(ag)*sz/2,Math.sin(ag)*sz/2):ctxMain.lineTo(Math.cos(ag)*sz/2,Math.sin(ag)*sz/2);}ctxMain.closePath();ctxMain.fill();ctxMain.stroke();break;
+          case 2: ctxMain.fillRect(-sz/2,-sz/2,sz,sz);ctxMain.strokeRect(-sz/2,-sz/2,sz,sz);break;
+          case 3: ctxMain.beginPath();ctxMain.moveTo(0,-sz/2);ctxMain.lineTo(sz/3,0);ctxMain.lineTo(0,sz/2);ctxMain.lineTo(-sz/3,0);ctxMain.closePath();ctxMain.fill();ctxMain.stroke();break;
+          case 4: ctxMain.beginPath();ctxMain.arc(0,0,sz/2,0,Math.PI*2);ctxMain.stroke();ctxMain.beginPath();ctxMain.arc(0,0,sz/3,0,Math.PI*2);ctxMain.stroke();break;
         }
-        ctx.restore();
+        ctxMain.restore();
       }
     }
 
-    function drawApple() {
-      const cx = mouseX, cy = mouseY;
+    /* ── Draw apple ── */
+    function drawApple(tCtx, cx, cy, alpha) {
       const drawList = [];
-
       for (const pt of applePoints) {
         const proj = project(pt.ax, pt.ay, pt.az, cx, cy, rotY);
         drawList.push({
           x: proj.x, y: proj.y, s: proj.s, z: proj.z,
-          facing: proj.z < 50 ? 1.0 : 0.12,
-          char: pt.char, isLeaf: pt.isLeaf||false, isStem: pt.isStem||false
+          facing: proj.z < 50 ? 1.0 : 0.06,
+          char: pt.char, isLeaf: pt.isLeaf, isStem: pt.isStem
         });
       }
-
       drawList.sort((a, b) => b.z - a.z);
 
       for (const d of drawList) {
-        const alpha = holdAlpha * d.facing;
-        if (alpha < 0.02) continue;
-        const size = Math.max(6, 13 * d.s);
+        const a = alpha * d.facing;
+        if (a < 0.02) continue;
+        const size = Math.max(5, 10 * d.s);
 
-        ctx.save();
-        ctx.translate(d.x, d.y);
-        ctx.font = `300 ${size}px 'Noto Serif KR', serif`;
-        const cw = ctx.measureText(d.char).width;
-        const padX = 2, padY = 1;
-
-        ctx.fillStyle = d.isLeaf ? `rgba(20,80,20,${(alpha*0.7).toFixed(2)})`
-          : d.isStem ? `rgba(80,40,10,${(alpha*0.7).toFixed(2)})`
-          : `rgba(120,10,20,${(alpha*0.7).toFixed(2)})`;
-        ctx.fillRect(-cw/2-padX, -size/2-padY, cw+padX*2, size+padY*2);
-
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = d.isLeaf ? LEAF_GREEN : d.isStem ? "#8B6914" : CYAN;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(d.char, 0, 0);
-        ctx.restore();
+        tCtx.save();
+        tCtx.translate(d.x, d.y);
+        tCtx.font = `300 ${size}px 'Noto Serif KR', serif`;
+        tCtx.globalAlpha = a;
+        tCtx.fillStyle = "#000";
+        tCtx.textAlign = "center";
+        tCtx.textBaseline = "middle";
+        tCtx.fillText(d.char, 0, 0);
+        tCtx.restore();
       }
     }
 
+    /* ── Main canvas events ── */
     tc.addEventListener("mousemove", (e) => {
       targetX = e.clientX; targetY = e.clientY; targetR = RADIUS;
       mouseX = e.clientX; mouseY = e.clientY;
@@ -260,13 +384,15 @@
     tc.addEventListener("mouseleave", () => { targetR = 0; });
     tc.addEventListener("mouseenter", () => { targetR = RADIUS; });
 
-    tc.addEventListener("mousedown", () => { isHolding = true; });
+    tc.addEventListener("mousedown", () => { if (!popupOpen) isHolding = true; });
     tc.addEventListener("mouseup", () => {
+      if (!isHolding) return;
       isHolding = false;
-      floatingShape = new FloatingShape(mouseX, mouseY);
+      openPopup();
     });
 
     tc.addEventListener("touchstart", (e) => {
+      if (popupOpen) return;
       e.preventDefault(); isHolding = true;
       mouseX = e.touches[0].clientX; mouseY = e.touches[0].clientY;
       targetX = mouseX; targetY = mouseY; targetR = RADIUS;
@@ -276,10 +402,54 @@
       targetX = mouseX; targetY = mouseY;
     });
     tc.addEventListener("touchend", () => {
+      if (!isHolding) return;
       isHolding = false;
-      floatingShape = new FloatingShape(mouseX, mouseY);
+      openPopup();
     });
 
+    /* ── Popup ── */
+    function openPopup() {
+      popupOpen = true;
+      popupAlpha = 0;
+      popupOverlay.classList.add("visible");
+      resizePopup();
+      document.getElementById("click-hint").style.opacity = "0";
+    }
+    function closePopup() {
+      popupOpen = false;
+      popupOverlay.classList.remove("visible");
+      document.getElementById("click-hint").style.opacity = "1";
+    }
+
+    document.getElementById("popup-close").addEventListener("click", closePopup);
+    document.getElementById("popup-backdrop").addEventListener("click", closePopup);
+
+    let popupDragging = false;
+    let popupDragStartX = 0, popupRotStart = 0;
+
+    popupCanvas.addEventListener("mousedown", (e) => {
+      popupDragging = true;
+      popupDragStartX = e.clientX;
+      popupRotStart = rotY;
+    });
+    window.addEventListener("mousemove", (e) => {
+      if (!popupDragging) return;
+      rotY = popupRotStart + (e.clientX - popupDragStartX) * 0.01;
+    });
+    window.addEventListener("mouseup", () => { popupDragging = false; });
+
+    popupCanvas.addEventListener("touchstart", (e) => {
+      popupDragging = true;
+      popupDragStartX = e.touches[0].clientX;
+      popupRotStart = rotY;
+    });
+    popupCanvas.addEventListener("touchmove", (e) => {
+      if (!popupDragging) return;
+      rotY = popupRotStart + (e.touches[0].clientX - popupDragStartX) * 0.01;
+    });
+    popupCanvas.addEventListener("touchend", () => { popupDragging = false; });
+
+    /* ── Animation ── */
     let time = 0;
 
     function animate() {
@@ -288,42 +458,42 @@
       const dx = targetX - prevMouseX;
       const dy = targetY - prevMouseY;
       const velocity = Math.sqrt(dx * dx + dy * dy);
-      
-      prevMouseX = targetX;
-      prevMouseY = targetY;
+      prevMouseX = targetX; prevMouseY = targetY;
 
       currentX += (targetX - currentX) * EASE;
       currentY += (targetY - currentY) * EASE;
       currentR += (targetR - currentR) * R_EASE;
 
-      // 마스크 경계를 95%까지 밀어내어 넓어진 반경이 잘리지 않도록 보호
       reveal.style.webkitMaskImage = reveal.style.maskImage =
         `radial-gradient(circle ${currentR}px at ${currentX}px ${currentY}px, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0) 95%)`;
 
-      // 최고 속도일 때 뻗어나가는 필터 한계값을 기존 70에서 120으로 상향
       const targetScale = 40 + Math.min(velocity * 2.0, 120);
-      currentScale += (targetScale - currentScale) * 0.1; 
+      currentScale += (targetScale - currentScale) * 0.1;
+      if (displacement) displacement.setAttribute('scale', currentScale);
 
-      if (displacement) {
-        displacement.setAttribute('scale', currentScale);
-      }
+      ctxMain.clearRect(0, 0, W, H);
 
-      ctx.clearRect(0, 0, W, H);
+      if (isHolding) holdAlpha = Math.min(1, holdAlpha + 0.03);
+      else holdAlpha = Math.max(0, holdAlpha - 0.015);
 
-      if (isHolding) {
-        holdAlpha = Math.min(1, holdAlpha + 0.03);
-      } else {
-        holdAlpha = Math.max(0, holdAlpha - 0.015);
-      }
+      if (!popupOpen && !popupDragging) rotY += 0.012;
+      else if (popupOpen && !popupDragging) rotY += 0.003;
 
-      rotY += 0.015;
-
-      if (holdAlpha > 0.01) drawApple();
+      if (holdAlpha > 0.01) drawApple(ctxMain, mouseX, mouseY, holdAlpha);
 
       if (floatingShape) {
-        floatingShape.update();
-        floatingShape.draw();
+        floatingShape.update(); floatingShape.draw();
         if (!floatingShape.alive) floatingShape = null;
+      }
+
+      /* popup */
+      if (popupOpen) {
+        popupAlpha = Math.min(1, popupAlpha + 0.04);
+        const rect = popupBox.getBoundingClientRect();
+        const pcx = rect.width / 2;
+        const pcy = rect.height / 2;
+        popupCtx.clearRect(0, 0, rect.width, rect.height);
+        drawApple(popupCtx, pcx, pcy, popupAlpha);
       }
 
       requestAnimationFrame(animate);
