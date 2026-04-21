@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Memory Image Map - Wide Ink Brush</title>
+  <title>Memory Image Map</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200;300&display=swap" rel="stylesheet" />
 
   <style>
@@ -12,6 +12,7 @@
       width: 100%; height: 100%;
       overflow: hidden; background: #000;
     }
+
     .layer {
       position: fixed; inset: 0;
       width: 100%; height: 100%;
@@ -20,109 +21,34 @@
       width: 100%; height: 100%;
       object-fit: cover;
     }
-    #bg-layer { z-index: 1; }
-    
+
+    /* background = desaturated / darker version */
+    #bg-layer {
+      z-index: 1;
+      filter: saturate(0.15) brightness(0.45);
+    }
+
+    /* reveal = full-color, masked + displaced */
     #reveal-layer {
       z-index: 2;
-      filter: url('#ink-spread');
-      -webkit-mask-image: radial-gradient(circle 0px at 50% 50%, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0) 95%);
-      mask-image: radial-gradient(circle 0px at 50% 50%, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0) 95%);
+      -webkit-mask-image: radial-gradient(circle 0px at 50% 50%, black 0%, transparent 100%);
+      mask-image: radial-gradient(circle 0px at 50% 50%, black 0%, transparent 100%);
     }
-    
-    #text-canvas {
+
+    /* ripple displacement canvas sits between */
+    #ripple-canvas {
       position: fixed; inset: 0;
       z-index: 3;
-      pointer-events: auto;
-    }
-
-    .svg-filters {
-      position: absolute;
-      width: 0; height: 0;
       pointer-events: none;
-    }
-
-    /* ── Popup Overlay ── */
-    #popup-overlay {
-      position: fixed; inset: 0;
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
+      mix-blend-mode: normal;
       opacity: 0;
-      transition: opacity 0.4s ease;
     }
-    #popup-overlay.visible {
-      opacity: 1;
+
+    /* interaction + 3d text canvas on top */
+    #text-canvas {
+      position: fixed; inset: 0;
+      z-index: 4;
       pointer-events: auto;
-    }
-
-    #popup-backdrop {
-      position: absolute; inset: 0;
-      background: rgba(0, 0, 0, 0.55);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-    }
-
-    #popup-box {
-      position: relative;
-      width: 480px;
-      height: 520px;
-      max-width: 90vw;
-      max-height: 85vh;
-      background: rgba(255, 255, 255, 0.94);
-      border-radius: 24px;
-      box-shadow:
-        0 30px 80px rgba(0,0,0,0.35),
-        0 0 0 1px rgba(255,255,255,0.15) inset;
-      overflow: hidden;
-      transform: scale(0.85) translateY(20px);
-      transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    #popup-overlay.visible #popup-box {
-      transform: scale(1) translateY(0);
-    }
-
-    #popup-header {
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 20px;
-      z-index: 2;
-      background: rgba(255,255,255,0.75);
-      backdrop-filter: blur(10px);
-      border-bottom: 1px solid rgba(0,0,0,0.06);
-    }
-    #popup-header .title {
-      font-family: 'Noto Serif KR', serif;
-      font-weight: 300;
-      font-size: 13px;
-      color: #222;
-      letter-spacing: 0.02em;
-    }
-    #popup-close {
-      width: 28px; height: 28px;
-      border-radius: 50%;
-      border: none;
-      background: rgba(0,0,0,0.06);
-      color: #333;
-      font-size: 15px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s;
-    }
-    #popup-close:hover {
-      background: rgba(0,0,0,0.12);
-    }
-
-    #popup-canvas {
-      width: 100%;
-      height: 100%;
     }
 
     .click-hint {
@@ -130,26 +56,16 @@
       bottom: 28px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 4;
+      z-index: 5;
       font-family: 'Noto Serif KR', serif;
       font-size: 12px;
-      color: rgba(255,255,255,0.45);
+      color: rgba(255,255,255,0.35);
       letter-spacing: 0.08em;
       pointer-events: none;
-      transition: opacity 0.6s;
     }
   </style>
 </head>
 <body>
-
-  <svg class="svg-filters">
-    <defs>
-      <filter id="ink-spread" x="-50%" y="-50%" width="200%" height="200%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.003 0.006" numOctaves="4" result="noise" />
-        <feDisplacementMap id="displacement" in="SourceGraphic" in2="noise" scale="40" xChannelSelector="R" yChannelSelector="G" />
-      </filter>
-    </defs>
-  </svg>
 
   <div id="bg-layer" class="layer">
     <img src="./assets/sample2.jpg?v=4" alt="background" />
@@ -157,143 +73,225 @@
   <div id="reveal-layer" class="layer">
     <img src="./assets/sample1.jpg?v=4" alt="reveal" />
   </div>
+  <canvas id="ripple-canvas"></canvas>
   <canvas id="text-canvas"></canvas>
 
-  <div class="click-hint" id="click-hint">click &amp; hold</div>
-
-  <!-- Popup -->
-  <div id="popup-overlay">
-    <div id="popup-backdrop"></div>
-    <div id="popup-box">
-      <div id="popup-header">
-        <span class="title">3D 벡터 모델</span>
-        <button id="popup-close">✕</button>
-      </div>
-      <canvas id="popup-canvas"></canvas>
-    </div>
-  </div>
+  <div class="click-hint">click &amp; hold</div>
 
   <script>
-    /* ── reveal / ink-brush ── */
+    /* ═══════════════════════════════════════════
+       1. RIPPLE DISPLACEMENT SYSTEM
+       Renders a displacement map on a hidden canvas,
+       then applies it via CSS filter on the reveal layer.
+       Inspired by immersive-g.com's liquid hover reveal.
+       ═══════════════════════════════════════════ */
+
     const reveal = document.getElementById("reveal-layer");
-    const displacement = document.getElementById("displacement");
-    
-    let targetX = window.innerWidth/2, targetY = window.innerHeight/2;
+    const rippleCvs = document.getElementById("ripple-canvas");
+    const rippleCtx = rippleCvs.getContext("2d");
+
+    let W, H;
+    function resizeAll() {
+      W = window.innerWidth;
+      H = window.innerHeight;
+      rippleCvs.width = Math.floor(W / 4);   // low-res for perf
+      rippleCvs.height = Math.floor(H / 4);
+      tc.width = W;
+      tc.height = H;
+    }
+
+    // Ripple simulation buffers (2D heightmap)
+    const GRID_SCALE = 4;
+    let cols, rows;
+    let bufA, bufB; // ping-pong buffers
+
+    function initRipple() {
+      cols = Math.floor(W / GRID_SCALE);
+      rows = Math.floor(H / GRID_SCALE);
+      bufA = new Float32Array(cols * rows);
+      bufB = new Float32Array(cols * rows);
+    }
+
+    function addRippleDrop(x, y, strength) {
+      const gx = Math.floor(x / GRID_SCALE);
+      const gy = Math.floor(y / GRID_SCALE);
+      const radius = 4;
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const px = gx + dx, py = gy + dy;
+          if (px < 0 || px >= cols || py < 0 || py >= rows) continue;
+          const d = Math.sqrt(dx*dx + dy*dy);
+          if (d < radius) {
+            bufA[py * cols + px] += strength * (1 - d / radius);
+          }
+        }
+      }
+    }
+
+    // Continuous mouse trail ripple
+    function addRippleTrail(x, y) {
+      const gx = Math.floor(x / GRID_SCALE);
+      const gy = Math.floor(y / GRID_SCALE);
+      const radius = 3;
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const px = gx + dx, py = gy + dy;
+          if (px < 0 || px >= cols || py < 0 || py >= rows) continue;
+          const d = Math.sqrt(dx*dx + dy*dy);
+          if (d < radius) {
+            bufA[py * cols + px] += 0.6 * (1 - d / radius);
+          }
+        }
+      }
+    }
+
+    function stepRipple() {
+      const damping = 0.965;
+      for (let y = 1; y < rows - 1; y++) {
+        for (let x = 1; x < cols - 1; x++) {
+          const i = y * cols + x;
+          bufB[i] = (
+            bufA[(y-1)*cols+x] +
+            bufA[(y+1)*cols+x] +
+            bufA[y*cols+(x-1)] +
+            bufA[y*cols+(x+1)]
+          ) / 2 - bufB[i];
+          bufB[i] *= damping;
+        }
+      }
+      // swap
+      const tmp = bufA;
+      bufA = bufB;
+      bufB = tmp;
+    }
+
+    function drawRippleMap() {
+      const w = rippleCvs.width, h = rippleCvs.height;
+      const imgData = rippleCtx.createImageData(w, h);
+      const data = imgData.data;
+
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const bx = Math.min(Math.floor(x * cols / w), cols - 2);
+          const by = Math.min(Math.floor(y * rows / h), rows - 2);
+          const i = by * cols + bx;
+
+          // Compute gradient (normals) for displacement
+          const dx = (bufA[i + 1] - bufA[i]) * 8;
+          const dy = (bufA[i + cols] - bufA[i]) * 8;
+
+          const pi = (y * w + x) * 4;
+          data[pi]     = Math.max(0, Math.min(255, 128 + dx * 128));
+          data[pi + 1] = Math.max(0, Math.min(255, 128 + dy * 128));
+          data[pi + 2] = 128;
+          data[pi + 3] = 255;
+        }
+      }
+      rippleCtx.putImageData(imgData, 0, 0);
+    }
+
+
+    /* ═══════════════════════════════════════════
+       2. REVEAL MASK (radial gradient following cursor)
+       ═══════════════════════════════════════════ */
+
+    let targetX = W || 960, targetY = H || 540;
     let currentX = targetX, currentY = targetY;
     let targetR = 0, currentR = 0;
-    let prevMouseX = targetX, prevMouseY = targetY;
-    let currentScale = 40; 
-    const RADIUS = 350, EASE = 0.07, R_EASE = 0.06;
+    let mouseInside = false;
+    let prevMX = targetX, prevMY = targetY;
+
+    const RADIUS = 380;
+    const EASE = 0.08;
+    const R_EASE = 0.06;
+
+    // SVG filter for displacement — applied via CSS
+    // We'll create an inline SVG filter that references our canvas as displacement map
+    // But CSS filter(url) with feImage from canvas is tricky cross-browser.
+    // Instead, we'll apply displacement directly by distorting the mask + using CSS backdrop trick.
+
+    // Simpler approach: use the ripple data to modulate the reveal mask with slight offset
+    // and render the reveal layer through a feDisplacementMap SVG filter with turbulence + mouse modulation.
+
+    // Let's use a dynamic SVG filter approach:
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svgEl = document.createElementNS(svgNS, "svg");
+    svgEl.setAttribute("width", "0");
+    svgEl.setAttribute("height", "0");
+    svgEl.style.position = "absolute";
+    svgEl.innerHTML = `
+      <defs>
+        <filter id="ripple-filter" x="-10%" y="-10%" width="120%" height="120%">
+          <feTurbulence id="turb" type="fractalNoise" baseFrequency="0.015 0.015" numOctaves="3" seed="2" result="noise"/>
+          <feDisplacementMap id="disp" in="SourceGraphic" in2="noise" scale="0" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
+      </defs>
+    `;
+    document.body.appendChild(svgEl);
+
+    const turbEl = document.getElementById("turb");
+    const dispEl = document.getElementById("disp");
+
+    reveal.style.filter = "url(#ripple-filter)";
+
+
+    /* ═══════════════════════════════════════════
+       3. 3D APPLE TEXT (diagonal spirals)
+       ═══════════════════════════════════════════ */
 
     const tc = document.getElementById("text-canvas");
-    const ctxMain = tc.getContext("2d");
-    let W, H;
-    function resize() { W = tc.width = window.innerWidth; H = tc.height = window.innerHeight; }
-    resize();
-    window.addEventListener("resize", resize);
-
-    /* ── popup canvas ── */
-    const popupOverlay = document.getElementById("popup-overlay");
-    const popupBox = document.getElementById("popup-box");
-    const popupCanvas = document.getElementById("popup-canvas");
-    const popupCtx = popupCanvas.getContext("2d");
-    let PW, PH;
-
-    function resizePopup() {
-      const rect = popupBox.getBoundingClientRect();
-      PW = popupCanvas.width = rect.width * devicePixelRatio;
-      PH = popupCanvas.height = rect.height * devicePixelRatio;
-      popupCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-    }
-    const popupResizeObserver = new ResizeObserver(resizePopup);
-    popupResizeObserver.observe(popupBox);
+    const ctx = tc.getContext("2d");
 
     const TEXT = "사과의시각적표상은없지만벡터가포함된완벽한3D모델을가지고있어요";
 
-    let mouseX = W/2, mouseY = H/2;
+    let mouseX = 960, mouseY = 540;
     let isHolding = false;
     let holdAlpha = 0;
     let rotY = 0;
-    let popupOpen = false;
-    let popupAlpha = 0;
 
-    /* ─────────────────────────────────────────────
-       Realistic apple: diagonal spiral text bands
-       ───────────────────────────────────────────── */
-
-    // Apple cross-section radius at parameter t (0=top, 1=bottom)
     function appleR(t) {
-      // base shape
       let r = Math.sin(t * Math.PI);
-      
-      // wider shoulder (apple is fatter above center)
       r *= 1.0 + 0.3 * Math.pow(Math.sin(t * Math.PI * 0.75), 2);
-      
-      // stem cavity indent at top
       if (t < 0.10) r *= 0.15 + 0.85 * (t / 0.10);
-      
-      // bottom indent (calyx)
       if (t > 0.93) r *= 1.0 - 0.4 * ((t - 0.93) / 0.07);
-      
-      // subtle asymmetric bulge above center
       r *= 1.0 + 0.08 * Math.exp(-Math.pow((t - 0.35) * 6, 2));
-      
       return r * 82;
     }
 
-    function appleYPos(t) {
-      return (t - 0.5) * 195;
-    }
-
     const applePoints = [];
-    const NUM_SPIRALS = 10;
-    const PTS_PER_SPIRAL = 48;
-    const SPIRAL_TURNS = 1.0;
+    const NUM_SPIRALS = 10, PTS_PER_SPIRAL = 48;
     let charIdx = 0;
 
     for (let s = 0; s < NUM_SPIRALS; s++) {
-      const uOffset = (s / NUM_SPIRALS) * Math.PI * 2;
-      
+      const uOff = (s / NUM_SPIRALS) * Math.PI * 2;
       for (let i = 0; i < PTS_PER_SPIRAL; i++) {
-        const t = i / (PTS_PER_SPIRAL - 1); // 0..1
+        const t = i / (PTS_PER_SPIRAL - 1);
         const r = appleR(t);
-        const y = appleYPos(t);
-        
-        // diagonal spiral: u advances as t goes top→bottom
-        const u = uOffset + t * SPIRAL_TURNS * Math.PI * 2;
-        
+        const y = (t - 0.5) * 195;
+        const u = uOff + t * Math.PI * 2;
         applePoints.push({
-          ax: r * Math.cos(u),
-          ay: y,
-          az: r * Math.sin(u),
-          char: TEXT[charIdx % TEXT.length],
-          isStem: false, isLeaf: false
+          ax: r * Math.cos(u), ay: y, az: r * Math.sin(u),
+          char: TEXT[charIdx % TEXT.length], isStem: false, isLeaf: false
         });
         charIdx++;
       }
     }
-
-    // Stem
+    // stem
     for (let i = 0; i < 7; i++) {
       const t = i / 6;
       applePoints.push({
-        ax: Math.sin(t * 0.5) * 3,
-        ay: -102 - t * 26,
-        az: Math.cos(t * 0.3) * 2,
+        ax: Math.sin(t*0.5)*3, ay: -102 - t*26, az: Math.cos(t*0.3)*2,
         char: "│", isStem: true, isLeaf: false
       });
     }
-
-    // Leaf
+    // leaf
     for (let i = 0; i < 14; i++) {
       const t = i / 13;
-      const len = 32, wid = 11;
-      const along = t * len;
-      const across = Math.sin(t * Math.PI) * wid;
+      const along = t * 32, across = Math.sin(t * Math.PI) * 11;
       const ang = -0.55;
       applePoints.push({
-        ax: along * Math.cos(ang) - across * Math.sin(ang) + 5,
-        ay: -115 + along * Math.sin(ang) - across * Math.cos(ang),
+        ax: along*Math.cos(ang) - across*Math.sin(ang) + 5,
+        ay: -115 + along*Math.sin(ang) - across*Math.cos(ang),
         az: across * 0.3,
         char: "잎", isLeaf: true, isStem: false
       });
@@ -301,200 +299,155 @@
 
     function project(x, y, z, cx, cy, ry) {
       const c = Math.cos(ry), s = Math.sin(ry);
-      const rx2 = x * c - z * s, rz2 = x * s + z * c;
-      const p = 500 / (500 + rz2);
-      return { x: cx + rx2 * p, y: cy + y * p, s: p, z: rz2 };
+      const rx = x*c - z*s, rz = x*s + z*c;
+      const p = 500 / (500 + rz);
+      return { x: cx + rx*p, y: cy + y*p, s: p, z: rz };
     }
 
-    /* ── Floating shapes ── */
-    let floatingShape = null;
-    class FloatingShape {
-      constructor(x, y) {
-        this.x = x; this.y = y;
-        this.vx = (Math.random() - 0.5) * 0.8;
-        this.vy = -0.3 - Math.random() * 0.5;
-        this.size = 25 + Math.random() * 35;
-        this.rot = 0; this.rotSpeed = (Math.random() - 0.5) * 0.008;
-        this.life = 1.0; this.alive = true; this.alpha = 0;
-        this.type = Math.floor(Math.random() * 5);
-      }
-      update() {
-        this.x += this.vx; this.y += this.vy; this.rot += this.rotSpeed;
-        this.vx += (Math.random() - 0.5) * 0.01;
-        this.vy += (Math.random() - 0.5) * 0.01;
-        this.alpha = Math.min(0.5, this.alpha + 0.01);
-        this.life -= 0.0015;
-        if (this.life < 0.3) this.alpha = this.life / 0.3 * 0.5;
-        if (this.life <= 0) this.alive = false;
-      }
-      draw() {
-        if (!this.alive) return;
-        ctxMain.save();
-        ctxMain.translate(this.x, this.y); ctxMain.rotate(this.rot);
-        const a = this.alpha, sz = this.size;
-        ctxMain.strokeStyle = `rgba(0,240,255,${a.toFixed(2)})`;
-        ctxMain.lineWidth = 1;
-        ctxMain.fillStyle = `rgba(0,240,255,${(a*0.1).toFixed(2)})`;
-        switch(this.type){
-          case 0: ctxMain.beginPath();ctxMain.arc(0,0,sz/2,0,Math.PI*2);ctxMain.fill();ctxMain.stroke();break;
-          case 1: ctxMain.beginPath();for(let i=0;i<3;i++){const ag=i/3*Math.PI*2-Math.PI/2;i===0?ctxMain.moveTo(Math.cos(ag)*sz/2,Math.sin(ag)*sz/2):ctxMain.lineTo(Math.cos(ag)*sz/2,Math.sin(ag)*sz/2);}ctxMain.closePath();ctxMain.fill();ctxMain.stroke();break;
-          case 2: ctxMain.fillRect(-sz/2,-sz/2,sz,sz);ctxMain.strokeRect(-sz/2,-sz/2,sz,sz);break;
-          case 3: ctxMain.beginPath();ctxMain.moveTo(0,-sz/2);ctxMain.lineTo(sz/3,0);ctxMain.lineTo(0,sz/2);ctxMain.lineTo(-sz/3,0);ctxMain.closePath();ctxMain.fill();ctxMain.stroke();break;
-          case 4: ctxMain.beginPath();ctxMain.arc(0,0,sz/2,0,Math.PI*2);ctxMain.stroke();ctxMain.beginPath();ctxMain.arc(0,0,sz/3,0,Math.PI*2);ctxMain.stroke();break;
-        }
-        ctxMain.restore();
-      }
-    }
-
-    /* ── Draw apple ── */
-    function drawApple(tCtx, cx, cy, alpha) {
-      const drawList = [];
+    function drawApple() {
+      const cx = mouseX, cy = mouseY;
+      const list = [];
       for (const pt of applePoints) {
         const proj = project(pt.ax, pt.ay, pt.az, cx, cy, rotY);
-        drawList.push({
+        list.push({
           x: proj.x, y: proj.y, s: proj.s, z: proj.z,
           facing: proj.z < 50 ? 1.0 : 0.06,
-          char: pt.char, isLeaf: pt.isLeaf, isStem: pt.isStem
+          char: pt.char
         });
       }
-      drawList.sort((a, b) => b.z - a.z);
+      list.sort((a, b) => b.z - a.z);
 
-      for (const d of drawList) {
-        const a = alpha * d.facing;
+      for (const d of list) {
+        const a = holdAlpha * d.facing;
         if (a < 0.02) continue;
         const size = Math.max(5, 10 * d.s);
-
-        tCtx.save();
-        tCtx.translate(d.x, d.y);
-        tCtx.font = `300 ${size}px 'Noto Serif KR', serif`;
-        tCtx.globalAlpha = a;
-        tCtx.fillStyle = "#000";
-        tCtx.textAlign = "center";
-        tCtx.textBaseline = "middle";
-        tCtx.fillText(d.char, 0, 0);
-        tCtx.restore();
+        ctx.save();
+        ctx.translate(d.x, d.y);
+        ctx.font = `300 ${size}px 'Noto Serif KR', serif`;
+        ctx.globalAlpha = a;
+        ctx.fillStyle = "#000";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(d.char, 0, 0);
+        ctx.restore();
       }
     }
 
-    /* ── Main canvas events ── */
-    tc.addEventListener("mousemove", (e) => {
-      targetX = e.clientX; targetY = e.clientY; targetR = RADIUS;
-      mouseX = e.clientX; mouseY = e.clientY;
-    });
-    tc.addEventListener("mouseleave", () => { targetR = 0; });
-    tc.addEventListener("mouseenter", () => { targetR = RADIUS; });
 
-    tc.addEventListener("mousedown", () => { if (!popupOpen) isHolding = true; });
-    tc.addEventListener("mouseup", () => {
-      if (!isHolding) return;
-      isHolding = false;
-      openPopup();
+    /* ═══════════════════════════════════════════
+       4. EVENTS
+       ═══════════════════════════════════════════ */
+
+    tc.addEventListener("mousemove", (e) => {
+      targetX = e.clientX; targetY = e.clientY;
+      mouseX = e.clientX; mouseY = e.clientY;
+      if (!mouseInside) { mouseInside = true; targetR = RADIUS; }
+      // Add ripple trail on movement
+      const vx = e.clientX - prevMX, vy = e.clientY - prevMY;
+      const vel = Math.sqrt(vx*vx + vy*vy);
+      if (vel > 1.5) {
+        addRippleTrail(e.clientX, e.clientY);
+      }
+      prevMX = e.clientX; prevMY = e.clientY;
     });
+
+    tc.addEventListener("mouseleave", () => {
+      mouseInside = false;
+      targetR = 0;
+    });
+    tc.addEventListener("mouseenter", () => {
+      mouseInside = true;
+      targetR = RADIUS;
+    });
+
+    tc.addEventListener("mousedown", () => { isHolding = true; });
+    tc.addEventListener("mouseup", () => { isHolding = false; });
 
     tc.addEventListener("touchstart", (e) => {
-      if (popupOpen) return;
       e.preventDefault(); isHolding = true;
+      mouseInside = true;
       mouseX = e.touches[0].clientX; mouseY = e.touches[0].clientY;
       targetX = mouseX; targetY = mouseY; targetR = RADIUS;
     });
     tc.addEventListener("touchmove", (e) => {
       mouseX = e.touches[0].clientX; mouseY = e.touches[0].clientY;
       targetX = mouseX; targetY = mouseY;
+      addRippleTrail(mouseX, mouseY);
     });
     tc.addEventListener("touchend", () => {
-      if (!isHolding) return;
       isHolding = false;
-      openPopup();
+      mouseInside = false;
+      targetR = 0;
     });
 
-    /* ── Popup ── */
-    function openPopup() {
-      popupOpen = true;
-      popupAlpha = 0;
-      popupOverlay.classList.add("visible");
-      resizePopup();
-      document.getElementById("click-hint").style.opacity = "0";
-    }
-    function closePopup() {
-      popupOpen = false;
-      popupOverlay.classList.remove("visible");
-      document.getElementById("click-hint").style.opacity = "1";
-    }
 
-    document.getElementById("popup-close").addEventListener("click", closePopup);
-    document.getElementById("popup-backdrop").addEventListener("click", closePopup);
+    /* ═══════════════════════════════════════════
+       5. ANIMATION LOOP
+       ═══════════════════════════════════════════ */
 
-    let popupDragging = false;
-    let popupDragStartX = 0, popupRotStart = 0;
-
-    popupCanvas.addEventListener("mousedown", (e) => {
-      popupDragging = true;
-      popupDragStartX = e.clientX;
-      popupRotStart = rotY;
-    });
-    window.addEventListener("mousemove", (e) => {
-      if (!popupDragging) return;
-      rotY = popupRotStart + (e.clientX - popupDragStartX) * 0.01;
-    });
-    window.addEventListener("mouseup", () => { popupDragging = false; });
-
-    popupCanvas.addEventListener("touchstart", (e) => {
-      popupDragging = true;
-      popupDragStartX = e.touches[0].clientX;
-      popupRotStart = rotY;
-    });
-    popupCanvas.addEventListener("touchmove", (e) => {
-      if (!popupDragging) return;
-      rotY = popupRotStart + (e.touches[0].clientX - popupDragStartX) * 0.01;
-    });
-    popupCanvas.addEventListener("touchend", () => { popupDragging = false; });
-
-    /* ── Animation ── */
     let time = 0;
+    let currentDispScale = 0;
+
+    resizeAll();
+    initRipple();
+    window.addEventListener("resize", () => { resizeAll(); initRipple(); });
+
+    // Seed initial values
+    currentX = targetX = W/2;
+    currentY = targetY = H/2;
+    mouseX = W/2; mouseY = H/2;
+    prevMX = W/2; prevMY = H/2;
 
     function animate() {
       time += 0.016;
 
-      const dx = targetX - prevMouseX;
-      const dy = targetY - prevMouseY;
-      const velocity = Math.sqrt(dx * dx + dy * dy);
-      prevMouseX = targetX; prevMouseY = targetY;
-
+      // ── Smooth cursor follow ──
       currentX += (targetX - currentX) * EASE;
       currentY += (targetY - currentY) * EASE;
       currentR += (targetR - currentR) * R_EASE;
 
+      // ── Velocity for displacement intensity ──
+      const vx = targetX - prevMX;
+      const vy = targetY - prevMY;
+      const velocity = Math.sqrt(vx*vx + vy*vy);
+
+      // ── Reveal mask ──
+      // Multi-stop gradient for a softer, more organic reveal edge
       reveal.style.webkitMaskImage = reveal.style.maskImage =
-        `radial-gradient(circle ${currentR}px at ${currentX}px ${currentY}px, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0) 95%)`;
+        `radial-gradient(circle ${currentR}px at ${currentX}px ${currentY}px,
+          rgba(0,0,0,1) 0%,
+          rgba(0,0,0,0.85) 30%,
+          rgba(0,0,0,0.5) 55%,
+          rgba(0,0,0,0.2) 75%,
+          rgba(0,0,0,0) 100%)`;
 
-      const targetScale = 40 + Math.min(velocity * 2.0, 120);
-      currentScale += (targetScale - currentScale) * 0.1;
-      if (displacement) displacement.setAttribute('scale', currentScale);
+      // ── Ripple simulation step ──
+      stepRipple();
+      stepRipple(); // double step for speed
 
-      ctxMain.clearRect(0, 0, W, H);
+      // ── Displacement filter: animate turbulence + scale ──
+      // Turbulence base frequency oscillates slightly for organic feel
+      const bfX = 0.012 + Math.sin(time * 0.7) * 0.003;
+      const bfY = 0.014 + Math.cos(time * 0.5) * 0.004;
+      turbEl.setAttribute("baseFrequency", `${bfX.toFixed(4)} ${bfY.toFixed(4)}`);
+
+      // Displacement scale ramps with cursor presence + velocity
+      const targetDisp = mouseInside ? (18 + Math.min(velocity * 1.8, 45)) : 0;
+      currentDispScale += (targetDisp - currentDispScale) * 0.08;
+      dispEl.setAttribute("scale", currentDispScale.toFixed(1));
+
+      // Animate turbulence seed slowly for continuous movement
+      turbEl.setAttribute("seed", Math.floor(time * 1.5) % 100);
+
+      // ── Text canvas ──
+      ctx.clearRect(0, 0, W, H);
 
       if (isHolding) holdAlpha = Math.min(1, holdAlpha + 0.03);
-      else holdAlpha = Math.max(0, holdAlpha - 0.015);
+      else holdAlpha = Math.max(0, holdAlpha - 0.02);
 
-      if (!popupOpen && !popupDragging) rotY += 0.012;
-      else if (popupOpen && !popupDragging) rotY += 0.003;
+      rotY += 0.012;
 
-      if (holdAlpha > 0.01) drawApple(ctxMain, mouseX, mouseY, holdAlpha);
-
-      if (floatingShape) {
-        floatingShape.update(); floatingShape.draw();
-        if (!floatingShape.alive) floatingShape = null;
-      }
-
-      /* popup */
-      if (popupOpen) {
-        popupAlpha = Math.min(1, popupAlpha + 0.04);
-        const rect = popupBox.getBoundingClientRect();
-        const pcx = rect.width / 2;
-        const pcy = rect.height / 2;
-        popupCtx.clearRect(0, 0, rect.width, rect.height);
-        drawApple(popupCtx, pcx, pcy, popupAlpha);
-      }
+      if (holdAlpha > 0.01) drawApple();
 
       requestAnimationFrame(animate);
     }
