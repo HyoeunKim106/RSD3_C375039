@@ -51,19 +51,21 @@
       line-height: 1;
       letter-spacing: 0;
     }
-    .name-title span {
-      display: inline-block;
+    .name-title .line {
+      display: table;   /* 내용물 너비에 맞게 딱 잘림 */
+    }
+    .name-title .line span {
+      display: inline;
       background: #fff;
       color: #000;
       padding: 0 4px;
       line-height: 1;
+      /* box-decoration-break로 줄바꿈 없는 텍스트에 자연스러운 박스 */
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
     }
-    .name-title .main { }
     .name-title .sub {
       margin-top: 3px;
-    }
-    .name-title .line {
-      display: block;
     }
   </style>
 </head>
@@ -75,8 +77,8 @@
   <canvas id="ui-canvas"></canvas>
 
   <div class="name-title">
-    <span class="line main">Hyoeun Kim</span>
-    <span class="line sub">Scenes without Scenes</span>
+    <div class="line main"><span>Hyoeun Kim</span></div>
+    <div class="line sub"><span>Scenes without Scenes</span></div>
   </div>
 
   <script>
@@ -287,43 +289,160 @@
     }
 
     /* ═══════════════════════════════════════
-       TEXT MOTION — 계산하듯 조직되는 모션
-       
-       각 글자가 좌표 격자 위에 하나씩 계산되어 배치됨.
-       - Phase A: 좌표 스캐너가 격자 위를 훑으며
-                  각 글자 자리에 "+" 십자 마커를 찍음
-       - Phase B: 찍힌 좌표마다 글자가 작게 나타났다
-                  제자리로 확장되며 도착. 각 글자 옆에
-                  좌표 (x,y) 숫자가 짧게 표시됨.
-       - Phase C: 연결선이 글자 사이에 순차적으로 그어짐
+       TEXT MOTION — 계속 변화하는 계산/조직 모션
+
+       고정된 최종 상태 없음. 각 글자는 독립된
+       생애 사이클(등장 → 머무름 → 흩어짐 → 재등장)을
+       서로 다른 위상으로 반복한다. 매번 위치와
+       상태가 달라지며 텍스트는 "조직되었다가 흩어졌다가"
+       를 끊임없이 반복한다.
+
+       디자인:
+       - 파란색(#1a1fff) 글자
+       - 시안(#5ec8ff) 하이라이트 박스 (사진 참조)
+       - 글자가 나타날 때/사라질 때 십자 좌표 마커
+       - 글자 위 좌표 라벨이 깜빡깜빡
+       - 주변 스캔선이 지나감
        ═══════════════════════════════════════ */
     const SENTENCE = "Although we don't have a visual representation of the apple, we do have a complete 3D model with vectors included. In this way, memories are sometimes organized not by images but by coordinate information such as direction, distance, and structure.";
     const CHARS = [...SENTENCE];
 
+    const TEXT_COLOR = "#1a1fff";
+    const HI_COLOR = "#5ec8ff";
+
     let isHolding = false;
     let holdX = 0, holdY = 0;
+    let holdFrame = 0;          // 홀딩 시작 이후 프레임 (fade-in 제어용)
+    let releaseFade = 1;        // 전체 페이드아웃용
 
-    // Phases: idle → scanning → placing → connecting → hold → fadeout
-    let textPhase = "idle";
-    let textTimer = 0;
-    let textAlpha = 1;
-    const HOLD_DUR = 100;
-
-    // 각 글자 상태
+    // 각 글자의 사이클 상태
+    // life ∈ [0, CYCLE) 이 반복된다.
+    //   phase 해석:
+    //     [0, scanDur) → scan (십자 마커 커짐)
+    //     [scanDur, scanDur+appearDur) → appear (글자 팝업)
+    //     [..., stayEnd) → stay (글자 고정)
+    //     [stayEnd, stayEnd+disappearDur) → disappear (흩어짐)
+    //     [..., CYCLE) → gone (쉼)
     let glyphs = [];
-    let layoutLines = [];   // 레이아웃 캐시
-    let layoutCharAnchor = []; // {x, y, w, line}
-    let layoutReady = false;
 
-    // 글자 너비 / 줄바꿈 계산
-    function computeLayout() {
+    function buildGlyphs() {
+      glyphs = CHARS.map((ch, i) => {
+        // 글자 위치 오프셋 — 주변을 살짝 떠다니는 느낌을 위해 개별 지터
+        return {
+          ch,
+          // 사이클 길이 (글자마다 조금씩 다름)
+          cycle: 90 + Math.random() * 60,
+          // 시작 위상 — 전체가 동시에 뜨지 않도록
+          phase: Math.random() * 120 + i * 0.4,
+          // 각 구간 길이
+          scanDur: 6 + Math.random() * 4,
+          appearDur: 4,
+          stayDur: 25 + Math.random() * 35,
+          disappearDur: 6 + Math.random() * 4,
+          // 각 글자 위에 표시될 가상 좌표 라벨
+          coordX: 0,
+          coordY: 0,
+          // 사라지는 방향 (흩어질 때 오프셋)
+          scatterAng: Math.random() * Math.PI * 2,
+          // 미세한 정적 지터
+          jitterSeed: Math.random() * 1000,
+          // 이 글자에 잠깐 붙었다 사라지는 이웃 좌표 라벨 표시 여부
+          showLabel: Math.random() < 0.35,
+        };
+      });
+    }
+    buildGlyphs();
+
+    // 스캔 라인 (텍스트 블록을 주기적으로 훑고 지나가는 가로 바)
+    let scanLinePos = 0;
+
+    function resetTextActive() {
+      // 홀딩 시작 - fade in
+      holdFrame = 0;
+      releaseFade = 1;
+    }
+
+    function updateText() {
+      if (isHolding) {
+        holdFrame++;
+        releaseFade = Math.min(1, holdFrame / 8);
+      } else {
+        releaseFade -= 0.04;
+        if (releaseFade < 0) releaseFade = 0;
+      }
+      scanLinePos += 0.6;
+
+      // 각 글자 지터 시드 진행
+      for (const g of glyphs) g.jitterSeed += 0.03;
+    }
+
+    // 하나의 글자 사이클을 현재 frame에 대해 평가
+    function evalGlyph(g, frame) {
+      const t = ((frame + g.phase) % g.cycle + g.cycle) % g.cycle;
+      const scanEnd = g.scanDur;
+      const appearEnd = scanEnd + g.appearDur;
+      const stayEnd = appearEnd + g.stayDur;
+      const disapEnd = stayEnd + g.disappearDur;
+
+      if (t < scanEnd) {
+        // scan: 십자 마커가 커지고 있음, 글자 아직 없음
+        return {
+          state: "scan",
+          scanT: t / scanEnd,
+          charAlpha: 0,
+          scale: 0,
+          scatter: 0,
+        };
+      } else if (t < appearEnd) {
+        const p = (t - scanEnd) / g.appearDur;
+        const eased = 1 - Math.pow(1 - p, 3);
+        return {
+          state: "appear",
+          scanT: 1 - p,  // 마커는 사라져감
+          charAlpha: p,
+          scale: 0.4 + eased * 0.6,
+          scatter: 0,
+        };
+      } else if (t < stayEnd) {
+        return {
+          state: "stay",
+          scanT: 0,
+          charAlpha: 1,
+          scale: 1,
+          scatter: 0,
+        };
+      } else if (t < disapEnd) {
+        const p = (t - stayEnd) / g.disappearDur;
+        return {
+          state: "disappear",
+          scanT: 0,
+          charAlpha: 1 - p,
+          scale: 1 + p * 0.3,
+          scatter: p,
+        };
+      } else {
+        return {
+          state: "gone",
+          scanT: 0,
+          charAlpha: 0,
+          scale: 0,
+          scatter: 1,
+        };
+      }
+    }
+
+    function drawText() {
+      if (releaseFade <= 0.01) return;
+
       const fontSize = 11;
-      ui.font = `400 ${fontSize}px 'NewCenturySchoolbook', 'Century Schoolbook', 'Times New Roman', serif`;
+      const fontStr = `400 ${fontSize}px 'NewCenturySchoolbook', 'Century Schoolbook', 'Times New Roman', serif`;
+      ui.font = fontStr;
       ui.textBaseline = "middle";
       ui.textAlign = "left";
 
-      const maxWidth = Math.min(W * 0.45, 360);
-      const lineHeight = fontSize * 1.7;
+      // 레이아웃 계산 — 짧은 maxWidth로 여러 줄 유지
+      const maxWidth = Math.min(W * 0.42, 340);
+      const lineHeight = fontSize * 1.8;
 
       // 단어 단위 줄바꿈
       const lines = [];
@@ -336,22 +455,18 @@
         const w = ui.measureText(ch).width;
 
         if (ch === " ") {
-          // 단어 완료
           cur.chars.push({ idx: i, w });
           cur.totalW += w;
           wordStart = i + 1;
           wordW = 0;
         } else {
           wordW += w;
-          // 현재 단어가 다 들어갈 공간이 있는지 확인
-          if (cur.totalW + wordW > maxWidth && cur.chars.length > 0) {
-            // 공백을 제거하고 줄바꿈
+          if (cur.totalW + wordW > maxWidth && cur.chars.length > 0 && wordStart > 0 && CHARS[wordStart-1] === " ") {
             while (cur.chars.length > 0 && CHARS[cur.chars[cur.chars.length-1].idx] === " ") {
               cur.totalW -= cur.chars.pop().w;
             }
             lines.push(cur);
             cur = { chars: [], totalW: 0 };
-            // 현재 단어 다시 추가
             for (let k = wordStart; k <= i; k++) {
               const kw = ui.measureText(CHARS[k]).width;
               cur.chars.push({ idx: k, w: kw });
@@ -366,101 +481,10 @@
       }
       if (cur.chars.length) lines.push(cur);
 
-      layoutLines = lines;
-      return { lines, lineHeight, fontSize };
-    }
-
-    function buildGlyphs() {
-      glyphs = CHARS.map((ch, i) => ({
-        ch,
-        // 각 글자가 처리되는 순서 (왼->오, 위->아래)
-        order: i,
-        // 스캐너 마커 도착 시각
-        scanAt: i * 0.35 + Math.random() * 0.4,
-        // 글자 등장 시각 (스캔 후)
-        placeAt: i * 0.35 + 8 + Math.random() * 1.5,
-        // 연결선 도착 시각
-        connectAt: i * 0.35 + 18,
-        // 진행도
-        scanProgress: 0,
-        placeProgress: 0,
-        connectProgress: 0,
-        // 랜덤 좌표 라벨 (가상의 격자 번호)
-        coordX: 0,
-        coordY: 0,
-        labelShow: 0,
-      }));
-    }
-
-    function resetText() {
-      textPhase = "running";
-      textTimer = 0;
-      textAlpha = 1;
-      buildGlyphs();
-      layoutReady = false;
-    }
-
-    function updateText() {
-      if (textPhase === "idle") {
-        if (isHolding) resetText();
-        return;
-      }
-      if (!isHolding && textPhase !== "fadeout") textPhase = "fadeout";
-      textTimer++;
-
-      if (textPhase === "running") {
-        let allConnected = true;
-        for (const g of glyphs) {
-          // 스캔 진행
-          const scanT = textTimer - g.scanAt;
-          g.scanProgress = Math.min(1, Math.max(0, scanT / 4));
-
-          // 배치 진행
-          const placeT = textTimer - g.placeAt;
-          const placeP = Math.min(1, Math.max(0, placeT / 5));
-          g.placeProgress = 1 - Math.pow(1 - placeP, 3); // easeOutCubic
-          if (g.placeProgress < 1) allConnected = false;
-
-          // 연결선 진행
-          const connT = textTimer - g.connectAt;
-          g.connectProgress = Math.min(1, Math.max(0, connT / 3));
-          if (g.connectProgress < 1) allConnected = false;
-
-          // 라벨 표시 시간 (짧게)
-          const labelT = textTimer - g.placeAt;
-          if (labelT > 0 && labelT < 8) g.labelShow = 1 - labelT / 8;
-          else g.labelShow = 0;
-        }
-        if (allConnected && textTimer > glyphs[glyphs.length-1].connectAt + 5) {
-          textPhase = "hold";
-          textTimer = 0;
-        }
-      }
-      else if (textPhase === "hold") {
-        if (textTimer > HOLD_DUR) { textPhase = "fadeout"; textTimer = 0; }
-      }
-      else if (textPhase === "fadeout") {
-        textAlpha -= 0.04;
-        if (textAlpha <= 0) {
-          textAlpha = 0;
-          if (isHolding) resetText();
-          else textPhase = "idle";
-        }
-      }
-    }
-
-    function drawText() {
-      if (textPhase === "idle") return;
-
-      // 레이아웃 계산 (매번 — holdX/Y 변하니까)
-      const { lines, lineHeight, fontSize } = computeLayout();
-
-      // 각 글자 좌표 계산
       const anchor = new Array(CHARS.length);
       const totalH = lines.length * lineHeight;
       const topY = holdY - totalH / 2 + lineHeight / 2;
 
-      // 전체 블록 경계
       let blockLeft = Infinity, blockRight = -Infinity;
       for (let l = 0; l < lines.length; l++) {
         const line = lines[l];
@@ -475,128 +499,168 @@
         }
       }
 
-      // 각 글자의 가상 좌표 라벨 할당 (한 번만)
-      if (!layoutReady) {
-        for (let i = 0; i < CHARS.length; i++) {
-          const a = anchor[i];
-          if (!a) continue;
-          glyphs[i].coordX = Math.floor((a.x - holdX) * 2 + 500);
-          glyphs[i].coordY = Math.floor((a.y - holdY) * 2 + 500);
-        }
-        layoutReady = true;
-      }
+      const blockTop = topY - fontSize * 0.7;
+      const blockBot = topY + (lines.length - 1) * lineHeight + fontSize * 0.7;
 
-      // ── 격자/프레임 마커 (블록 경계) ──────────────
-      const frameAlpha = textAlpha * 0.35;
-      if (frameAlpha > 0.01) {
+      // ── 주변 스캔선 (계속 움직이는 가로 라인) ──
+      const scanY = blockTop + ((scanLinePos) % (blockBot - blockTop + 40)) - 20;
+      if (scanY > blockTop - 15 && scanY < blockBot + 15) {
         ui.save();
-        ui.globalAlpha = frameAlpha;
-        ui.strokeStyle = "#111";
+        ui.globalAlpha = releaseFade * 0.35;
+        ui.strokeStyle = TEXT_COLOR;
         ui.lineWidth = 0.5;
-
-        const pad = 12;
-        const top = topY - fontSize * 0.7 - pad / 2;
-        const bot = topY + (lines.length - 1) * lineHeight + fontSize * 0.7 + pad / 2;
-        const left = blockLeft - pad;
-        const right = blockRight + pad;
-
-        // 코너 크롭 마커
-        const cL = 6;
+        ui.setLineDash([2, 3]);
         ui.beginPath();
-        // TL
-        ui.moveTo(left, top + cL); ui.lineTo(left, top); ui.lineTo(left + cL, top);
-        // TR
-        ui.moveTo(right - cL, top); ui.lineTo(right, top); ui.lineTo(right, top + cL);
-        // BL
-        ui.moveTo(left, bot - cL); ui.lineTo(left, bot); ui.lineTo(left + cL, bot);
-        // BR
-        ui.moveTo(right - cL, bot); ui.lineTo(right, bot); ui.lineTo(right, bot - cL);
+        ui.moveTo(blockLeft - 14, scanY);
+        ui.lineTo(blockRight + 14, scanY);
         ui.stroke();
+        ui.setLineDash([]);
+        // 스캔선 끝 점 마커
+        ui.fillStyle = TEXT_COLOR;
+        ui.beginPath();
+        ui.arc(blockLeft - 14, scanY, 1.5, 0, Math.PI * 2);
+        ui.fill();
+        ui.beginPath();
+        ui.arc(blockRight + 14, scanY, 1.5, 0, Math.PI * 2);
+        ui.fill();
         ui.restore();
       }
 
-      // ── 각 글자별 렌더링 ──
+      // ── 코너 크롭 마커 (계속 보임) ──
+      ui.save();
+      ui.globalAlpha = releaseFade * 0.5;
+      ui.strokeStyle = TEXT_COLOR;
+      ui.lineWidth = 0.6;
+      const pad = 10;
+      const top = blockTop - pad / 2;
+      const bot = blockBot + pad / 2;
+      const left = blockLeft - pad;
+      const right = blockRight + pad;
+      const cL = 5;
+      ui.beginPath();
+      ui.moveTo(left, top + cL); ui.lineTo(left, top); ui.lineTo(left + cL, top);
+      ui.moveTo(right - cL, top); ui.lineTo(right, top); ui.lineTo(right, top + cL);
+      ui.moveTo(left, bot - cL); ui.lineTo(left, bot); ui.lineTo(left + cL, bot);
+      ui.moveTo(right - cL, bot); ui.lineTo(right, bot); ui.lineTo(right, bot - cL);
+      ui.stroke();
+      ui.restore();
+
+      // ── 각 글자별 사이클 렌더링 ──
       for (let i = 0; i < CHARS.length; i++) {
         const g = glyphs[i];
         const a = anchor[i];
         if (!a) continue;
-        const ax = a.x + a.w / 2;
-        const ay = a.y;
 
-        // Phase A — 스캐너 십자 마커
-        if (g.scanProgress > 0 && g.placeProgress < 0.5) {
-          const crossAlpha = g.scanProgress * (1 - g.placeProgress * 2) * textAlpha;
-          if (crossAlpha > 0.01) {
-            ui.save();
-            ui.globalAlpha = crossAlpha * 0.7;
-            ui.strokeStyle = "#111";
-            ui.lineWidth = 0.6;
-            const cs = 3 + g.scanProgress * 1.5;
-            ui.beginPath();
-            ui.moveTo(ax - cs, ay);
-            ui.lineTo(ax + cs, ay);
-            ui.moveTo(ax, ay - cs);
-            ui.lineTo(ax, ay + cs);
-            ui.stroke();
+        // 미세 정적 지터
+        const jx = Math.sin(g.jitterSeed) * 0.3;
+        const jy = Math.cos(g.jitterSeed * 1.3) * 0.3;
+        const ax = a.x + a.w / 2 + jx;
+        const ay = a.y + jy;
 
-            // 작은 원
-            ui.globalAlpha = crossAlpha * 0.3;
-            ui.beginPath();
-            ui.arc(ax, ay, 2 + g.scanProgress * 1.5, 0, Math.PI * 2);
-            ui.stroke();
-            ui.restore();
-          }
+        const state = evalGlyph(g, holdFrame);
+
+        // 가상 좌표 라벨 계산
+        g.coordX = Math.floor((a.x - holdX) * 3 + 500);
+        g.coordY = Math.floor((a.y - holdY) * 3 + 500);
+
+        // 공백은 렌더 안 함
+        if (CHARS[i] === " ") continue;
+
+        // ── 스캔 마커 (+ 십자) ──
+        if (state.scanT > 0.02) {
+          ui.save();
+          ui.globalAlpha = releaseFade * state.scanT * 0.7;
+          ui.strokeStyle = TEXT_COLOR;
+          ui.lineWidth = 0.5;
+          const cs = 2.5 + state.scanT * 2.5;
+          ui.beginPath();
+          ui.moveTo(ax - cs, ay); ui.lineTo(ax + cs, ay);
+          ui.moveTo(ax, ay - cs); ui.lineTo(ax, ay + cs);
+          ui.stroke();
+          // 주변 작은 원
+          ui.globalAlpha = releaseFade * state.scanT * 0.3;
+          ui.beginPath();
+          ui.arc(ax, ay, 2 + state.scanT * 2, 0, Math.PI * 2);
+          ui.stroke();
+          ui.restore();
         }
 
-        // Phase B — 글자 배치 (작게 → 원래 크기)
-        if (g.placeProgress > 0) {
-          const scale = 0.3 + g.placeProgress * 0.7;
-          const gAlpha = Math.min(1, g.placeProgress * 2) * textAlpha;
+        // ── 하이라이트 박스 (글자 뒤, 시안색) ──
+        if (state.charAlpha > 0.1) {
+          ui.save();
+          ui.globalAlpha = releaseFade * state.charAlpha * 0.85;
+          ui.fillStyle = HI_COLOR;
+          // 글자에 딱 맞게
+          const bx = a.x - 0.5 + jx;
+          const by = a.y - fontSize * 0.55 + jy;
+          ui.fillRect(bx, by, a.w + 1, fontSize * 1.1);
+          ui.restore();
+        }
+
+        // ── 글자 본체 ──
+        if (state.charAlpha > 0.02) {
+          const scatterDist = state.scatter * 12;
+          const sx = ax + Math.cos(g.scatterAng) * scatterDist;
+          const sy = ay + Math.sin(g.scatterAng) * scatterDist;
 
           ui.save();
-          ui.globalAlpha = gAlpha;
-          ui.translate(ax, ay);
-          ui.scale(scale, scale);
-          ui.fillStyle = "#111";
-          ui.font = `400 ${fontSize}px 'NewCenturySchoolbook', 'Century Schoolbook', 'Times New Roman', serif`;
+          ui.globalAlpha = releaseFade * state.charAlpha;
+          ui.translate(sx, sy);
+          ui.scale(state.scale, state.scale);
+          ui.fillStyle = TEXT_COLOR;
+          ui.font = fontStr;
           ui.textAlign = "center";
           ui.textBaseline = "middle";
           ui.fillText(CHARS[i], 0, 0);
           ui.restore();
+        }
 
-          // 좌표 라벨 (등장 직후 짧게)
-          if (g.labelShow > 0 && CHARS[i] !== " ") {
+        // ── 좌표 라벨 (일부 글자만, appear/stay 초기에 잠깐) ──
+        if (g.showLabel && (state.state === "appear" || state.state === "stay")) {
+          // stay 시작 부분에만 짧게 표시
+          const t = ((holdFrame + g.phase) % g.cycle);
+          const appearStart = g.scanDur;
+          const labelStart = appearStart;
+          const labelEnd = appearStart + 10;
+          if (t > labelStart && t < labelEnd) {
+            const lt = (t - labelStart) / (labelEnd - labelStart);
+            const la = (1 - lt) * releaseFade * 0.55;
             ui.save();
-            ui.globalAlpha = g.labelShow * textAlpha * 0.45;
-            ui.fillStyle = "#111";
+            ui.globalAlpha = la;
+            ui.fillStyle = TEXT_COLOR;
             ui.font = `400 6.5px 'Pretendard', monospace`;
             ui.textAlign = "center";
-            ui.textBaseline = "top";
-            const label = g.coordX + "," + g.coordY;
-            ui.fillText(label, ax, ay - fontSize * 0.95);
+            ui.textBaseline = "bottom";
+            ui.fillText("(" + g.coordX + "," + g.coordY + ")", ax, ay - fontSize * 0.7);
             ui.restore();
           }
         }
 
-        // Phase C — 이웃 글자로 연결선
-        // 같은 줄 내 이전 글자 → 현재 글자로
-        if (g.connectProgress > 0 && i > 0) {
-          const prev = anchor[i - 1];
-          if (prev && prev.line === a.line && CHARS[i] !== " " && CHARS[i-1] !== " ") {
-            const px = prev.x + prev.w / 2;
-            const py = prev.y;
-            ui.save();
-            ui.globalAlpha = g.connectProgress * textAlpha * 0.25;
-            ui.strokeStyle = "#111";
-            ui.lineWidth = 0.3;
-            ui.beginPath();
-            ui.moveTo(px, py + fontSize * 0.55);
-            ui.lineTo(ax, ay + fontSize * 0.55);
-            ui.stroke();
-            ui.restore();
-          }
+        // ── 흩어지는 파편 효과 (disappear 중) ──
+        if (state.state === "disappear") {
+          ui.save();
+          ui.globalAlpha = releaseFade * (1 - state.scatter) * 0.5;
+          ui.strokeStyle = TEXT_COLOR;
+          ui.lineWidth = 0.4;
+          const pd = state.scatter * 8;
+          ui.beginPath();
+          ui.moveTo(ax + Math.cos(g.scatterAng) * pd, ay + Math.sin(g.scatterAng) * pd);
+          ui.lineTo(ax + Math.cos(g.scatterAng) * (pd + 4), ay + Math.sin(g.scatterAng) * (pd + 4));
+          ui.stroke();
+          ui.restore();
         }
       }
+
+      // ── 하단에 현재 "홀드 프레임" 카운터 (계산되는 느낌 강조) ──
+      ui.save();
+      ui.globalAlpha = releaseFade * 0.4;
+      ui.fillStyle = TEXT_COLOR;
+      ui.font = `400 7px 'Pretendard', monospace`;
+      ui.textAlign = "left";
+      ui.textBaseline = "top";
+      const counter = String(holdFrame).padStart(5, "0");
+      ui.fillText("t=" + counter + "  n=" + CHARS.length, left, bot + 5);
+      ui.restore();
     }
 
     /* ═══════════════════════════════════════
@@ -617,6 +681,7 @@
       isHolding = true;
       holdX = e.clientX; holdY = e.clientY;
       mouseX = e.clientX; mouseY = e.clientY;
+      resetTextActive();
     });
     uiCvs.addEventListener("mouseup", e => {
       isHolding = false;
@@ -628,6 +693,7 @@
       mouseX = e.touches[0].clientX; mouseY = e.touches[0].clientY;
       holdX = mouseX; holdY = mouseY;
       prevMX = mouseX; prevMY = mouseY;
+      resetTextActive();
     });
     uiCvs.addEventListener("touchmove", e => {
       const tx = e.touches[0].clientX, ty = e.touches[0].clientY;
