@@ -21,6 +21,13 @@
       font-style: normal;
       font-display: swap;
     }
+    @font-face {
+      font-family: 'Eulyoo1945-Regular';
+      src: url('./assets/Eulyoo1945-Regular.otf') format('opentype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -87,28 +94,81 @@
          - 결과: 마우스로 쓸어넘기면 그 자리가 브러쉬처럼 칠해지며 이미지가 보이고,
                 마우스가 떠나도 칠해진 흔적이 천천히 페이드아웃 → 급작스럽지 않게 사라짐.
     */
+    /* 각 reveal 인스턴스 — JS에서 인라인 left/top으로 위치 지정.
+       .reveal-img-area: 이미지 + 브러쉬 캔버스 (고정 크기).
+       .reveal-text-box: 클릭 홀드 시 우측+아래로 펼쳐지는 흰 박스.
+                         이미지 좌상단을 기준으로 펼쳐지므로,
+                         이미지 영역과 같은 좌표에서 시작.
+    */
     .reveal {
       position: fixed;
-      left: 56%;
-      top:  48%;
-      transform: translate(-50%, -50%);
-      width: 120px;
-      height: 120px;
       z-index: 5;
       pointer-events: none;
-      /* 디버그용 — 영역이 어디 있는지 잠깐 보고 싶을 때 outline 켜기 */
-      /* outline: 1px dashed rgba(0,0,0,0.1); */
+      /* 위치/크기는 JS 인라인 스타일로 지정 (width/height = 이미지 박스 크기) */
     }
-    .reveal canvas {
+    .reveal-img-area {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .reveal-img-area canvas {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
       pointer-events: none;
     }
+    /* 펼쳐지는 흰 텍스트 박스
+       - 처음엔 width/height 0 (보이지 않음)
+       - 클릭 홀드 시 JS가 width/height 을 lerp로 키움
+       - 펼쳐지는 기준점은 이미지의 좌상단(transform-origin: top left)
+       - 박스 끝(아래)은 mask로 페이드 아웃 — 텍스트가 자연스럽게 잘리는 인상 */
+    .reveal-text-box {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 0;
+      height: 0;
+      background: #ffffff;
+      overflow: hidden;
+      pointer-events: none;
+      transform-origin: top left;
+      /* 박스 아래쪽이 부드럽게 페이드 — 텍스트가 잘리지 않고 안개처럼 사라지는 인상 */
+      -webkit-mask-image: linear-gradient(to bottom,
+        rgba(0,0,0,1) 0%,
+        rgba(0,0,0,1) 75%,
+        rgba(0,0,0,0) 100%);
+              mask-image: linear-gradient(to bottom,
+        rgba(0,0,0,1) 0%,
+        rgba(0,0,0,1) 75%,
+        rgba(0,0,0,0) 100%);
+    }
+    .reveal-text-content {
+      padding: 14px 16px;
+      font-family: 'Eyja-Regular', 'Eulyoo1945-Regular', serif;
+      font-size: 13px;
+      line-height: 1.55;
+      color: #000;
+      letter-spacing: -0.01em;
+      white-space: pre-wrap;
+      word-break: keep-all;
+    }
+    /* 타자기 커서 — 깜빡이는 막대 */
+    .reveal-text-content .caret {
+      display: inline-block;
+      width: 0.5em;
+      height: 1em;
+      margin-left: 1px;
+      background: #000;
+      vertical-align: -0.12em;
+      animation: reveal-caret-blink 0.9s steps(2) infinite;
+    }
+    @keyframes reveal-caret-blink {
+      to { opacity: 0; }
+    }
     /* <img> 는 더이상 직접 보여지지 않음 — 캔버스가 그릴 때 소스로만 사용.
-       메모리에는 로드되어야 하니 DOM에는 두되 화면 밖으로 숨김. */
-    #reveal-img {
+       메모리에 로드되어야 하니 DOM에는 두되 화면 밖으로 숨김. */
+    .reveal-img-source {
       position: absolute;
       width: 1px;
       height: 1px;
@@ -119,12 +179,8 @@
 </head>
 <body>
 
-  <!-- 마우스가 쓸어넘기면 브러쉬처럼 칠해지며 드러나는 이미지.
-       이미지는 한 자리에 고정 — 캔버스가 마스크 역할을 해서 칠해진 영역만 보여줌. -->
-  <div class="reveal" id="reveal">
-    <canvas id="reveal-canvas"></canvas>
-    <img id="reveal-img" alt="" draggable="false" />
-  </div>
+  <!-- reveal 인스턴스들은 JS가 동적으로 생성해 #reveal-root 안에 추가 -->
+  <div id="reveal-root"></div>
 
   <div class="hud" id="hud">
     <span class="row">Distance <span class="num" id="num-distance">100%</span></span>
@@ -170,41 +226,25 @@
     let isDragging = false;
     let dragLastX = 0, dragLastY = 0;
 
-    // 프레임 순환용 — 이미지 영역에서 누르고 있는 동안 currentFrame 을 자동으로 ++
-    let frameLoopTimer = null;
-    const FRAME_INTERVAL_MS = 280;   // 한 프레임에서 다음 프레임까지의 간격
-
-    function isInsideReveal(x, y) {
-      const el = document.getElementById("reveal");
-      if (!el) return false;
-      const r = el.getBoundingClientRect();
-      return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
-    }
-
-    function startFrameLoop() {
-      if (frameLoopTimer) return;
-      frameLoopTimer = setInterval(() => {
-        if (frames.length === 0) return;
-        currentFrame = (currentFrame + 1) % frames.length;
-      }, FRAME_INTERVAL_MS);
-    }
-    function stopFrameLoop() {
-      if (frameLoopTimer) {
-        clearInterval(frameLoopTimer);
-        frameLoopTimer = null;
-      }
-    }
+    /* 활성화된 reveal 인스턴스의 클릭 홀드 상태를 외부에서 관리.
+       각 인스턴스가 자신을 등록하면 mousedown 시 영역 체크 후 그 인스턴스만 활성화. */
+    const revealInstances = [];   // 인스턴스 객체들이 등록되는 배열
+    let activeHoldInstance = null;
 
     window.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;     // 좌클릭만
 
-      // 이미지 영역 안에서 누르면 → 프레임 순환만, Position 드래그는 시작 안 함
-      if (isInsideReveal(e.clientX, e.clientY)) {
-        startFrameLoop();
-        return;
+      // 마우스가 어떤 reveal 인스턴스 영역 안에 있는지 확인
+      for (const inst of revealInstances) {
+        if (inst.isInside(e.clientX, e.clientY)) {
+          // 이 인스턴스를 홀드 활성화
+          activeHoldInstance = inst;
+          inst.startHold();
+          return;       // Position 드래그는 시작 안 함
+        }
       }
 
-      // 그 외 영역 → 기존 Position 드래그
+      // 어떤 reveal 영역도 아님 → 기존 Position 드래그
       isDragging = true;
       dragLastX = e.clientX;
       dragLastY = e.clientY;
@@ -222,16 +262,24 @@
     });
 
     window.addEventListener("mouseup", () => {
-      // 어떤 이유로든 마우스를 떼면 프레임 순환은 정지
-      stopFrameLoop();
+      // 어떤 인스턴스가 홀드 중이었으면 정지
+      if (activeHoldInstance) {
+        activeHoldInstance.stopHold();
+        activeHoldInstance = null;
+      }
 
       if (!isDragging) return;
       isDragging = false;
       document.body.style.cursor = "grab";
     });
 
-    // 창에서 마우스가 빠져나가도 프레임 순환 정지 (안전판)
-    window.addEventListener("blur", stopFrameLoop);
+    // 창에서 포커스가 빠지면 홀드도 정지 (안전판)
+    window.addEventListener("blur", () => {
+      if (activeHoldInstance) {
+        activeHoldInstance.stopHold();
+        activeHoldInstance = null;
+      }
+    });
 
     /* ─────────────────────────────────────────────
        2) wheel 이벤트 분기
@@ -421,72 +469,361 @@
       return obj;
     }
 
-    /* 행 데이터 → 화면 적용
-       지금은 이미지만 다루지만, 같은 객체에 "기억 형식", "기억 조직 방식" 등이
-       함께 들어 있어서 다음 단계에서 모션/텍스트/관계로 자유롭게 확장 가능. */
-    let currentItem = null;   // 시트에서 가져온 현재 행 — 추후 다른 모듈에서 참조
+    /* ─────────────────────────────────────────────
+       Reveal 인스턴스 시스템
+       ─────────────────────────────────────────────
+       각 인스턴스는 시트의 한 행에 대응.
+       - 화면 좌표(left%, top%)에 이미지 박스(width×height)를 둠.
+       - 베이스 파일명(예: "79.png")으로 시리즈 8장 미리 로드 (79, 79-1, ..., 79-7).
+       - 마우스가 영향권에 들어오면 캔버스에 브러쉬 trail로 마스크 그려 이미지 드러남.
+       - 클릭 홀드 시 (1) 프레임 자동 순환, (2) 우측+아래로 흰 텍스트 박스 펼쳐짐,
+         (3) 그 안에 "호출 모션" 텍스트가 타자기처럼 한 글자씩 타이핑.
+       - 마우스를 떼면 텍스트 박스가 닫히고 텍스트 리셋.
+       ───────────────────────────────────────────── */
+
+    const FRAME_COUNT = 8;
+    const FRAME_INTERVAL_MS = 280;          // 이미지 프레임 순환 간격
+    const TYPE_INTERVAL_MS  = 50;           // 글자 한 자 타이핑 간격
+    const TEXT_BOX_W = 280;                 // 텍스트 박스가 펼쳐질 최대 너비(px)
+    const TEXT_BOX_H = 200;                 //                     최대 높이(px)
+    const REVEAL_INFLUENCE = 90;
+    const POINT_LIFE = 140;
+    const POINT_RADIUS = 75;
+
+    // 모든 reveal 인스턴스가 공유하는 전역 마우스 좌표
+    let mouseX = -9999, mouseY = -9999;
+    window.addEventListener("mousemove", (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    });
+
+    function createRevealInstance(config) {
+      // config: { leftPct, topPct, size, sheetRow, root }
+      const { leftPct, topPct, size, sheetRow, root } = config;
+
+      // ── DOM 구성 ────────────────────────────────────
+      const wrap = document.createElement("div");
+      wrap.className = "reveal";
+      // 펼쳐지는 텍스트 박스를 담을 공간 확보를 위해 wrap 자체는 이미지 크기로 두고,
+      // 텍스트 박스는 wrap 내부에서 절대 위치로 우측+아래로 자라남.
+      wrap.style.left   = `${leftPct}%`;
+      wrap.style.top    = `${topPct}%`;
+      wrap.style.width  = `${size}px`;
+      wrap.style.height = `${size}px`;
+
+      // 텍스트 박스(이미지보다 z-index 낮게 → 이미지가 텍스트 박스 위에 올라옴)
+      const textBox = document.createElement("div");
+      textBox.className = "reveal-text-box";
+      textBox.style.zIndex = "1";
+      const textInner = document.createElement("div");
+      textInner.className = "reveal-text-content";
+      textBox.appendChild(textInner);
+
+      // 이미지 영역
+      const imgArea = document.createElement("div");
+      imgArea.className = "reveal-img-area";
+      imgArea.style.zIndex = "2";
+      const canvas = document.createElement("canvas");
+      imgArea.appendChild(canvas);
+
+      // 숨김 소스 img는 더 이상 사용하지 않음 — frames 배열의 Image 객체를 직접 씀
+
+      wrap.appendChild(textBox);
+      wrap.appendChild(imgArea);
+      root.appendChild(wrap);
+
+      const ctx = canvas.getContext("2d");
+
+      // ── 캔버스 해상도 (DPR 대응) ────────────────────
+      function resizeCanvas() {
+        const rect = imgArea.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width  = Math.round(rect.width  * dpr);
+        canvas.height = Math.round(rect.height * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      resizeCanvas();
+      window.addEventListener("resize", resizeCanvas);
+
+      // ── 프레임 시리즈 ──────────────────────────────
+      const frames = [];
+      let currentFrame = 0;
+      let frameLoopTimer = null;
+
+      function loadFrameSeries(baseFilename) {
+        const dot = baseFilename.lastIndexOf(".");
+        const name = dot === -1 ? baseFilename : baseFilename.slice(0, dot);
+        const ext  = dot === -1 ? ""           : baseFilename.slice(dot);
+        frames.length = 0;
+        for (let i = 0; i < FRAME_COUNT; i++) {
+          const fname = (i === 0) ? `${name}${ext}` : `${name}-${i}${ext}`;
+          const img = new Image();
+          img.src = IMAGE_BASE_PATH + fname;
+          frames.push(img);
+        }
+        currentFrame = 0;
+        console.info(`[reveal] frames for "${baseFilename}":`,
+                     frames.map(im => im.src));
+      }
+
+      // ── 텍스트 타이핑 ─────────────────────────────
+      let fullText = "";
+      let typedLen = 0;
+      let typeTimer = null;
+
+      function setText(text) {
+        fullText = text || "";
+        typedLen = 0;
+        renderTypedText();
+      }
+      function renderTypedText() {
+        const visible = fullText.slice(0, typedLen);
+        // 안전한 텍스트 렌더 + 깜빡이는 caret 추가
+        textInner.textContent = visible;
+        // caret 추가 (innerHTML 안 쓰고 노드 직접 추가)
+        if (typedLen < fullText.length || isHolding) {
+          const caret = document.createElement("span");
+          caret.className = "caret";
+          textInner.appendChild(caret);
+        }
+      }
+      function startTyping() {
+        if (typeTimer) return;
+        typeTimer = setInterval(() => {
+          if (typedLen < fullText.length) {
+            typedLen++;
+            renderTypedText();
+          }
+          // 다 타이핑되면 그대로 둠 (홀드 끝날 때까지 유지)
+        }, TYPE_INTERVAL_MS);
+      }
+      function stopTyping() {
+        if (typeTimer) { clearInterval(typeTimer); typeTimer = null; }
+      }
+
+      // ── 텍스트 박스 펼침 애니메이션 ─────────────────
+      // open=1 이면 박스가 펼쳐진 상태, 0이면 닫힘.
+      // 매 프레임 lerp으로 부드럽게 보간.
+      let openTarget = 0;   // 0 또는 1
+      let openCurr   = 0;   // 현재 보간된 값
+
+      // ── 클릭 홀드 상태 ────────────────────────────
+      let isHolding = false;
+
+      function startHold() {
+        if (isHolding) return;
+        isHolding = true;
+        openTarget = 1;
+
+        // 프레임 순환 시작
+        if (!frameLoopTimer) {
+          frameLoopTimer = setInterval(() => {
+            if (frames.length > 0) {
+              currentFrame = (currentFrame + 1) % frames.length;
+            }
+          }, FRAME_INTERVAL_MS);
+        }
+        // 텍스트 타이핑 시작 (이미 다 타이핑된 상태면 그대로 둠)
+        if (typedLen === 0) startTyping();
+        else if (typedLen < fullText.length) startTyping();
+      }
+      function stopHold() {
+        if (!isHolding) return;
+        isHolding = false;
+        openTarget = 0;
+
+        if (frameLoopTimer) { clearInterval(frameLoopTimer); frameLoopTimer = null; }
+        stopTyping();
+        // 다음 홀드 때 처음부터 다시 타이핑되도록 리셋
+        // (박스가 완전히 닫히는 데 시간 걸리니, 약간 지연 후 리셋)
+        setTimeout(() => {
+          if (!isHolding) {
+            typedLen = 0;
+            renderTypedText();
+            currentFrame = 0;     // 이미지도 처음 프레임으로 리셋 (선택)
+          }
+        }, 500);
+      }
+
+      // ── 영역 판별 ─────────────────────────────────
+      // 클릭 홀드 트리거는 "이미지 영역" 안일 때만
+      function isInside(x, y) {
+        const r = imgArea.getBoundingClientRect();
+        return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+      }
+
+      // ── 브러쉬 trail ───────────────────────────────
+      const trail = [];
+      let prevMX = -9999, prevMY = -9999;
+
+      function pushTrailPoints(fromX, fromY, toX, toY) {
+        const dx = toX - fromX, dy = toY - fromY;
+        const dist = Math.hypot(dx, dy);
+        const steps = Math.max(1, Math.ceil(dist / 6));
+        for (let i = 1; i <= steps; i++) {
+          const t = i / steps;
+          trail.push({
+            x: fromX + dx * t,
+            y: fromY + dy * t,
+            age: 0,
+            maxAge: POINT_LIFE + (Math.random() - 0.5) * 40,
+            radius: POINT_RADIUS + (Math.random() - 0.5) * 22,
+            driftSeed: Math.random() * Math.PI * 2,
+            driftAmt:  6 + Math.random() * 8,
+          });
+        }
+        if (trail.length > 700) trail.splice(0, trail.length - 700);
+      }
+
+      // ── 매 프레임 업데이트 ───────────────────────
+      function tick() {
+        const rect = imgArea.getBoundingClientRect();
+
+        // 마우스가 영향권 안인지
+        const dx = Math.max(rect.left - mouseX, 0, mouseX - rect.right);
+        const dy = Math.max(rect.top  - mouseY, 0, mouseY - rect.bottom);
+        const distOutside = Math.hypot(dx, dy);
+        const inInfluence = distOutside <= REVEAL_INFLUENCE;
+
+        if (inInfluence) {
+          const lx = mouseX - rect.left;
+          const ly = mouseY - rect.top;
+          if (prevMX > -9000) {
+            const plx = prevMX - rect.left;
+            const ply = prevMY - rect.top;
+            pushTrailPoints(plx, ply, lx, ly);
+          } else {
+            pushTrailPoints(lx, ly, lx, ly);
+          }
+          prevMX = mouseX; prevMY = mouseY;
+        } else {
+          prevMX = -9999; prevMY = -9999;
+        }
+
+        // ── 캔버스 그리기 ──
+        const W = rect.width, H = rect.height;
+        ctx.clearRect(0, 0, W, H);
+
+        const frameImg = frames[currentFrame];
+        const frameReady = frameImg && frameImg.complete && frameImg.naturalWidth > 0;
+
+        if (frameReady && trail.length > 0) {
+          for (let i = trail.length - 1; i >= 0; i--) {
+            const p = trail[i];
+            p.age++;
+            if (p.age >= p.maxAge) { trail.splice(i, 1); continue; }
+
+            const life = p.age / p.maxAge;
+            let alpha;
+            if (life < 0.35) {
+              const t = life / 0.35;
+              const eased = t * t * t * (t * (t * 6 - 15) + 10);
+              alpha = eased * 0.7;
+            } else {
+              const t = (life - 0.35) / 0.65;
+              alpha = Math.pow(1 - t, 2.2) * 0.7;
+            }
+            if (alpha < 0.005) continue;
+
+            const drift = p.driftAmt * Math.sin(p.driftSeed + p.age * 0.025);
+            const drift2= p.driftAmt * Math.cos(p.driftSeed * 1.3 + p.age * 0.02);
+            const px = p.x + drift  * 0.6;
+            const py = p.y + drift2 * 0.6;
+            const r  = p.radius;
+
+            const grad = ctx.createRadialGradient(px, py, 0, px, py, r);
+            grad.addColorStop(0,    `rgba(0,0,0,${alpha})`);
+            grad.addColorStop(0.18, `rgba(0,0,0,${alpha * 0.92})`);
+            grad.addColorStop(0.40, `rgba(0,0,0,${alpha * 0.65})`);
+            grad.addColorStop(0.65, `rgba(0,0,0,${alpha * 0.30})`);
+            grad.addColorStop(0.85, `rgba(0,0,0,${alpha * 0.08})`);
+            grad.addColorStop(1,    `rgba(0,0,0,0)`);
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(px, py, r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.globalCompositeOperation = "source-in";
+          ctx.drawImage(frameImg, 0, 0, W, H);
+          ctx.globalCompositeOperation = "source-over";
+        }
+
+        // ── 텍스트 박스 펼침 보간 ──
+        // 닫힐 때보다 열릴 때를 살짝 빠르게 (느낌 좋음)
+        const lerpRate = openTarget > openCurr ? 0.08 : 0.06;
+        openCurr += (openTarget - openCurr) * lerpRate;
+        if (Math.abs(openTarget - openCurr) < 0.001) openCurr = openTarget;
+
+        const w = TEXT_BOX_W * openCurr;
+        const h = TEXT_BOX_H * openCurr;
+        textBox.style.width  = `${w}px`;
+        textBox.style.height = `${h}px`;
+
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+
+      // ── 외부 인터페이스 ────────────────────────────
+      const instance = {
+        loadFrameSeries,
+        setText,
+        isInside,
+        startHold,
+        stopHold,
+      };
+      revealInstances.push(instance);
+      return instance;
+    }
 
     /* ─────────────────────────────────────────────
-       프레임 시스템 — 한 주제의 변형 이미지를 시리즈로 로드
-       ─────────────────────────────────────────────
-       시트 H80이 "79.png" 라면 다음 8장을 미리 로드:
-         frames[0] = 79.png
-         frames[1] = 79-1.png
-         frames[2] = 79-2.png
-         ...
-         frames[7] = 79-7.png
-       마우스를 영역에 누르고 있으면 인덱스가 자동 순환.
+       시트 데이터 → 인스턴스에 적용
        ───────────────────────────────────────────── */
-    const FRAME_COUNT = 8;          // 베이스 + 7장
-    const frames = [];               // HTMLImageElement 배열
-    let currentFrame = 0;            // 현재 보여줄 인덱스
+    // 두 개의 reveal 인스턴스 — 시트의 80행/11행에 매핑
+    // 위치/크기는 화면 안에서 자연스럽게 흩어져 보이도록 결정.
+    const root = document.getElementById("reveal-root");
+    const inst79 = createRevealInstance({
+      leftPct: 60, topPct: 35, size: 120,
+      sheetRow: 80,
+      root,
+    });
+    const inst10 = createRevealInstance({
+      leftPct: 28, topPct: 65, size: 120,
+      sheetRow: 11,
+      root,
+    });
+    const allInstances = [
+      { inst: inst79, row: 80 },
+      { inst: inst10, row: 11 },
+    ];
 
-    function loadFrameSeries(baseFilename) {
-      // "79.png" → name="79", ext="png"
-      const dot = baseFilename.lastIndexOf(".");
-      const name = dot === -1 ? baseFilename : baseFilename.slice(0, dot);
-      const ext  = dot === -1 ? ""           : baseFilename.slice(dot);  // ".png"
-
-      frames.length = 0;
-      for (let i = 0; i < FRAME_COUNT; i++) {
-        const fname = (i === 0) ? `${name}${ext}` : `${name}-${i}${ext}`;
-        const img = new Image();
-        img.src = IMAGE_BASE_PATH + fname;
-        frames.push(img);
+    function applyRowsToInstances(rows) {
+      for (const { inst, row } of allInstances) {
+        const item = pickRowFromSheet(rows, row);
+        if (!item) {
+          // 행이 비어 있으면 fallback (해당 행에 대응하는 기본값)
+          const fb = (row === 80) ? "79.png" : "10.png";
+          inst.loadFrameSeries(fb);
+          inst.setText("");
+          continue;
+        }
+        const filename = item[SHEET_TARGET_COL_NAME] || (row === 80 ? "79.png" : "10.png");
+        inst.loadFrameSeries(filename);
+        // 텍스트는 "호출 모션" 컬럼에서 (시트의 E열)
+        inst.setText(item["호출 모션"] || "");
+        console.info(`[sheet] row ${row} →`, item);
       }
-      currentFrame = 0;
-
-      // tickReveal에서 frames[currentFrame].complete 를 체크해 그릴지 결정.
-      // (베이스 이미지가 로드되면 즉시 그리기 시작)
-      console.info(`[frames] loading ${FRAME_COUNT} frames for "${baseFilename}":`,
-                   frames.map(im => im.src));
     }
 
-    function applyItem(item) {
-      if (!item) return;
-      currentItem = item;
-
-      // 이미지 — 파일명만 시트에 들어옴 (예: "79.png")
-      const filename = item[SHEET_TARGET_COL_NAME];
-      if (filename) {
-        loadFrameSeries(filename);
-      } else {
-        applyFallback();
-      }
-
-      // 디버깅 — 같은 행의 다른 값들도 콘솔에 보여줌 (다음 단계 확장 시 참고용)
-      console.info("[sheet] full row:", item);
-    }
-
-    /* fallback — fetch 실패, URL 미설정, 또는 행이 비어있을 때 */
-    function applyFallback() {
-      loadFrameSeries("79.png");
-      console.info("[sheet] fallback (79.png 시리즈) 사용.");
+    function applyFallbackAll() {
+      inst79.loadFrameSeries("79.png");
+      inst79.setText("");
+      inst10.loadFrameSeries("10.png");
+      inst10.setText("");
+      console.info("[sheet] fallback (시트 미연결)");
     }
 
     if (!SHEET_CSV_URL) {
-      // URL 미설정 — fallback 으로 화면은 정상 표시
-      applyFallback();
+      applyFallbackAll();
     } else {
       fetch(SHEET_CSV_URL)
         .then(res => {
@@ -495,184 +832,13 @@
         })
         .then(text => {
           const rows = parseCSV(text);
-          const item = pickRowFromSheet(rows, SHEET_TARGET_ROW);
-          if (item) applyItem(item);
-          else      applyFallback();
+          applyRowsToInstances(rows);
         })
         .catch(err => {
-          console.warn("[sheet] fetch 실패 — fallback 사용:", err);
-          applyFallback();
+          console.warn("[sheet] fetch 실패 — fallback:", err);
+          applyFallbackAll();
         });
     }
-
-    /* ─────────────────────────────────────────────
-       6) Reveal 이미지 — Canvas 기반 궤적 브러쉬
-       ─────────────────────────────────────────────
-       동작:
-         - 마우스가 이미지 영역(또는 영향권 안)에 들어오면 매 프레임 좌표를
-           기록해 trail 배열에 점으로 추가.
-         - 각 점은 자기 수명(life: 0→1)이 있어 시간이 지나며 옅어짐.
-         - 매 프레임 캔버스를 지우고, 모든 점을 라디얼 그라디언트(부드러운
-           원형 브러쉬)로 알파 누적해서 그림.
-         - 마지막에 globalCompositeOperation = 'source-in' 으로 이미지를
-           그 알파 모양대로 마스킹 → 칠해진 자리만 이미지가 드러남.
-         - 마우스가 떠나도 이미 그려진 점들이 자기 페이스대로 천천히 사라짐
-           → 사용자가 묘사한 "쓸어넘기며 그려지고, 급작스럽지 않게 사라지는" 느낌.
-       ───────────────────────────────────────────── */
-    const reveal     = document.getElementById("reveal");
-    const revCanvas  = document.getElementById("reveal-canvas");
-    const revCtx     = revCanvas.getContext("2d");
-
-    // (이미지 로드 체크는 매 프레임 frames[currentFrame].complete 로 직접 함)
-
-    // 캔버스 픽셀 해상도를 박스에 맞추기 (DPR 대응)
-    function resizeRevealCanvas() {
-      const rect = reveal.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      revCanvas.width  = Math.round(rect.width  * dpr);
-      revCanvas.height = Math.round(rect.height * dpr);
-      revCtx.setTransform(dpr, 0, 0, dpr, 0, 0);   // CSS 픽셀 좌표계로 그릴 수 있게
-    }
-    resizeRevealCanvas();
-    window.addEventListener("resize", resizeRevealCanvas);
-
-    // 마우스 좌표 (window 기준 px). 페이지 들어왔을 때 즉시 영향 안 가도록 멀리.
-    let mouseX = -9999, mouseY = -9999;
-    let prevMX = -9999, prevMY = -9999;
-
-    // 궤적 — 점들의 배열. 각 점: {x, y, age, maxAge, radius}
-    // x,y 는 reveal 박스 내부 좌표 (좌상단 기준, CSS px).
-    const trail = [];
-
-    // 영향권: 박스에서 이만큼 밖까지는 점이 추가됨 (자연스러운 시작/끝)
-    const REVEAL_INFLUENCE = 90;
-
-    // 한 점의 기본 수명(프레임). 길수록 잔향이 오래 — 신비로운 느낌의 핵심.
-    const POINT_LIFE = 140;
-
-    // 한 점의 기본 반지름(px). 클수록 안개처럼 부드럽게 번짐.
-    const POINT_RADIUS = 75;
-
-    // 두 점 사이를 보간해 점을 촘촘히 추가 (마우스가 빠르게 움직여도 끊기지 않게)
-    function pushTrailPoints(fromX, fromY, toX, toY) {
-      const dx = toX - fromX, dy = toY - fromY;
-      const dist = Math.hypot(dx, dy);
-      // 거리에 비례해 점 개수 결정 — 6px 마다 한 점 (더 촘촘히)
-      const steps = Math.max(1, Math.ceil(dist / 6));
-      for (let i = 1; i <= steps; i++) {
-        const t = i / steps;
-        trail.push({
-          x: fromX + dx * t,
-          y: fromY + dy * t,
-          age: 0,
-          maxAge: POINT_LIFE + (Math.random() - 0.5) * 40,   // 점마다 수명 더 다양하게
-          radius: POINT_RADIUS + (Math.random() - 0.5) * 22,
-          // 드리프트용 시드 — 각 점이 시간 따라 천천히 떠다니게 (안개·연기 느낌)
-          driftSeed: Math.random() * Math.PI * 2,
-          driftAmt:  6 + Math.random() * 8,                  // 떠다니는 거리(px)
-        });
-      }
-      // 너무 많아지면 오래된 것부터 제거 (성능 안전판) — 수명이 길어졌으니 한도도 키움
-      if (trail.length > 700) trail.splice(0, trail.length - 700);
-    }
-
-    window.addEventListener("mousemove", (e) => {
-      mouseX = e.clientX;
-      mouseY = e.clientY;
-    });
-
-    function tickReveal() {
-      const rect = reveal.getBoundingClientRect();
-
-      // 마우스가 영향권(박스 + 여유) 안에 있는지
-      const dx = Math.max(rect.left - mouseX, 0, mouseX - rect.right);
-      const dy = Math.max(rect.top  - mouseY, 0, mouseY - rect.bottom);
-      const distOutside = Math.hypot(dx, dy);
-      const inInfluence = distOutside <= REVEAL_INFLUENCE;
-
-      if (inInfluence) {
-        // 박스 좌표계로 변환
-        const lx = mouseX - rect.left;
-        const ly = mouseY - rect.top;
-        if (prevMX > -9000) {
-          const plx = prevMX - rect.left;
-          const ply = prevMY - rect.top;
-          pushTrailPoints(plx, ply, lx, ly);
-        } else {
-          // 영향권에 막 들어옴 — 단일 점부터
-          pushTrailPoints(lx, ly, lx, ly);
-        }
-        prevMX = mouseX; prevMY = mouseY;
-      } else {
-        // 영향권 밖이면 prev 리셋 — 다음에 들어올 때 점프 안 하게
-        prevMX = -9999; prevMY = -9999;
-      }
-
-      // ── 캔버스 그리기 ──
-      const W = rect.width, H = rect.height;
-      revCtx.clearRect(0, 0, W, H);
-
-      // 현재 프레임 이미지 가져오기 (로드 안 됐으면 그리기 스킵)
-      const frameImg = frames[currentFrame];
-      const frameReady = frameImg && frameImg.complete && frameImg.naturalWidth > 0;
-
-      if (frameReady && trail.length > 0) {
-        // 1) 모든 점을 부드러운 라디얼 그라디언트로 그리기
-        //    (alpha 채널이 곧 마스크가 됨)
-        for (let i = trail.length - 1; i >= 0; i--) {
-          const p = trail[i];
-          p.age++;
-          if (p.age >= p.maxAge) { trail.splice(i, 1); continue; }
-
-          const life = p.age / p.maxAge;       // 0→1
-
-          // 알파 페이드 — 등장과 사라짐 모두 길고 부드럽게.
-          //   처음 35% : 천천히 스며듦 (smoothstep ease-in-out)
-          //   이후 65% : 매우 긴 ease-out — 잔향
-          // 최대 알파 0.7 — 가장자리에서 이미지 색이 안개처럼 더 자연스럽게 번지게.
-          let alpha;
-          if (life < 0.35) {
-            const t = life / 0.35;
-            // smoothstep: 매우 부드러운 ease-in-out
-            const eased = t * t * t * (t * (t * 6 - 15) + 10);
-            alpha = eased * 0.7;
-          } else {
-            const t = (life - 0.35) / 0.65;
-            alpha = Math.pow(1 - t, 2.2) * 0.7;
-          }
-          if (alpha < 0.005) continue;
-
-          // 점이 시간 따라 천천히 떠다니듯 미세하게 흔들림 (안개·연기 느낌)
-          const drift = p.driftAmt * Math.sin(p.driftSeed + p.age * 0.025);
-          const drift2= p.driftAmt * Math.cos(p.driftSeed * 1.3 + p.age * 0.02);
-          const px = p.x + drift  * 0.6;
-          const py = p.y + drift2 * 0.6;
-          const r  = p.radius;
-
-          // 그라디언트 — 더 길고 부드러운 페더.
-          // 가장자리에서 이미지 색이 안개처럼 점점 번지듯 드러나도록 stop을 다섯 단계로.
-          const grad = revCtx.createRadialGradient(px, py, 0, px, py, r);
-          grad.addColorStop(0,    `rgba(0,0,0,${alpha})`);
-          grad.addColorStop(0.18, `rgba(0,0,0,${alpha * 0.92})`);
-          grad.addColorStop(0.40, `rgba(0,0,0,${alpha * 0.65})`);
-          grad.addColorStop(0.65, `rgba(0,0,0,${alpha * 0.30})`);
-          grad.addColorStop(0.85, `rgba(0,0,0,${alpha * 0.08})`);
-          grad.addColorStop(1,    `rgba(0,0,0,0)`);
-          revCtx.fillStyle = grad;
-          revCtx.beginPath();
-          revCtx.arc(px, py, r, 0, Math.PI * 2);
-          revCtx.fill();
-        }
-
-        // 2) source-in: 지금까지 그려진 알파 영역 안쪽에만 이미지를 그림
-        revCtx.globalCompositeOperation = "source-in";
-        revCtx.drawImage(frameImg, 0, 0, W, H);
-        revCtx.globalCompositeOperation = "source-over";   // 원래대로
-      }
-
-      requestAnimationFrame(tickReveal);
-    }
-    requestAnimationFrame(tickReveal);
   </script>
 
 </body>
