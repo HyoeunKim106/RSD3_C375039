@@ -5,22 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RSD3_C375039</title>
   <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sunghyunzz/eulyoo1945/eulyoo1945.css" />
   <style>
     /* ───────── 로컬 폰트 ───────── */
     @font-face {
       font-family: 'Eyja-Regular';
       src: url('./assets/fonnts_com-eyjaunlicensedtrial-regular.otf') format('opentype');
-      font-weight: 400;
-      font-style: normal;
-      font-display: swap;
-    }
-    /* Eulyoo1945 별칭 — ohezin 사이트가 'Eulyoo1945-Regular' 이름으로
-       지정하므로 동일 이름으로도 잡히도록 별칭 @font-face 추가 */
-    @font-face {
-      font-family: 'Eulyoo1945-Regular';
-      src: url('https://cdn.jsdelivr.net/gh/sunghyunzz/eulyoo1945/Eulyoo1945-Regular.woff2') format('woff2'),
-           url('https://cdn.jsdelivr.net/gh/sunghyunzz/eulyoo1945/Eulyoo1945-Regular.woff') format('woff');
       font-weight: 400;
       font-style: normal;
       font-display: swap;
@@ -63,7 +52,7 @@
       z-index: 10;
       pointer-events: none;
       color: #000;
-      font-family: 'Eyja-Regular', 'Eulyoo1945-Regular', 'Eulyoo1945', serif;
+      font-family: 'Eyja-Regular', 'Eulyoo1945-Regular', serif;
       font-weight: 400;
       font-size: 15px;
       line-height: 18px;
@@ -73,13 +62,23 @@
     .hud .row {
       display: block;
     }
+    /* 숫자만 자간을 강하게 줄여 영문 비례에 맞춤
+       (트라이얼 Eyja의 기본 숫자 트래킹이 살짝 넓음) */
+    .hud .num {
+      letter-spacing: -0.04em;
+    }
+    /* 영문(라벨) 다음에 오는 숫자와의 간격을 좁힘
+       — 그냥 공백을 쓰면 너무 벌어져서 시각적으로 맞춰주는 보정 */
+    .hud .num {
+      margin-left: -0.12em;
+    }
   </style>
 </head>
 <body>
 
   <div class="hud" id="hud">
-    <span class="row" id="row-distance">Distance 100%</span>
-    <span class="row" id="row-position">Position X 000 Y 000</span>
+    <span class="row">Distance <span class="num" id="num-distance">100%</span></span>
+    <span class="row">Position X <span class="num" id="num-pos-x">000</span> Y <span class="num" id="num-pos-y">000</span></span>
   </div>
 
   <script>
@@ -93,11 +92,12 @@
     let posX = 0;
     let posY = 0;
 
-    const rowDistance = document.getElementById("row-distance");
-    const rowPosition = document.getElementById("row-position");
+    const numDistance = document.getElementById("num-distance");
+    const numPosX     = document.getElementById("num-pos-x");
+    const numPosY     = document.getElementById("num-pos-y");
 
     /* ── 숫자 포매터 ──
-       Position은 000/000 형태로 항상 3자리 0-padding (음수면 - 부호 포함) */
+       Position 좌표는 항상 3자리 0-padding (음수면 - 부호 포함) */
     function fmt3(n) {
       const s = Math.trunc(n);
       const sign = s < 0 ? "-" : "";
@@ -106,9 +106,9 @@
     }
 
     function renderHUD() {
-      // distance는 정수 % 로 표시
-      rowDistance.textContent = `Distance ${Math.round(distance)}%`;
-      rowPosition.textContent = `Position X ${fmt3(posX)} Y ${fmt3(posY)}`;
+      numDistance.textContent = `${Math.round(distance)}%`;
+      numPosX.textContent = fmt3(posX);
+      numPosY.textContent = fmt3(posY);
     }
     renderHUD();
 
