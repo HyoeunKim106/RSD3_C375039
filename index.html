@@ -5,11 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RSD3_C375039</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sunghyunzz/eulyoo1945/eulyoo1945.css" />
   <style>
     /* ───────── 로컬 폰트 ───────── */
     @font-face {
       font-family: 'Eyja-Regular';
       src: url('./assets/fonnts_com-eyjaunlicensedtrial-regular.otf') format('opentype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    /* Eulyoo1945 별칭 — ohezin 사이트가 'Eulyoo1945-Regular' 이름으로
+       지정하므로 동일 이름으로도 잡히도록 별칭 @font-face 추가 */
+    @font-face {
+      font-family: 'Eulyoo1945-Regular';
+      src: url('https://cdn.jsdelivr.net/gh/sunghyunzz/eulyoo1945/Eulyoo1945-Regular.woff2') format('woff2'),
+           url('https://cdn.jsdelivr.net/gh/sunghyunzz/eulyoo1945/Eulyoo1945-Regular.woff') format('woff');
       font-weight: 400;
       font-style: normal;
       font-display: swap;
@@ -52,14 +63,12 @@
       z-index: 10;
       pointer-events: none;
       color: #000;
-      font-family: 'Eyja-Regular', 'Eulyoo1945-Regular', serif;
+      font-family: 'Eyja-Regular', 'Eulyoo1945-Regular', 'Eulyoo1945', serif;
       font-weight: 400;
-      font-size: 13px;
+      font-size: 15px;
       line-height: 18px;
       letter-spacing: normal;
       white-space: nowrap;
-      /* tabular-nums 제거 — 숫자 사이가 비정상적으로 벌어지는 문제 해결.
-         자릿수는 항상 3자리 zero-pad 라서 폭 변화 거의 없음. */
     }
     .hud .row {
       display: block;
@@ -70,7 +79,7 @@
 
   <div class="hud" id="hud">
     <span class="row" id="row-distance">Distance 100%</span>
-    <span class="row" id="row-position">Position 000/000</span>
+    <span class="row" id="row-position">Position X 000 Y 000</span>
   </div>
 
   <script>
@@ -99,7 +108,7 @@
     function renderHUD() {
       // distance는 정수 % 로 표시
       rowDistance.textContent = `Distance ${Math.round(distance)}%`;
-      rowPosition.textContent = `Position ${fmt3(posX)}/${fmt3(posY)}`;
+      rowPosition.textContent = `Position X ${fmt3(posX)} Y ${fmt3(posY)}`;
     }
     renderHUD();
 
