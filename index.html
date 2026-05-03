@@ -58,8 +58,8 @@
       line-height: 15px;
       letter-spacing: normal;
       white-space: nowrap;
-      font-feature-settings: "tnum" 1, "lnum" 1;
-      font-variant-numeric: tabular-nums lining-nums;
+      /* tabular-nums 제거 — 숫자 사이가 비정상적으로 벌어지는 문제 해결.
+         자릿수는 항상 3자리 zero-pad 라서 폭 변화 거의 없음. */
     }
     .hud .row {
       display: block;
