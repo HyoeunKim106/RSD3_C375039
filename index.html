@@ -8,6 +8,13 @@
   <style>
     /* ───────── 로컬 폰트 ───────── */
     @font-face {
+      font-family: 'Eyja-Regular';
+      src: url('./assets/fonnts_com-eyjaunlicensedtrial-regular.otf') format('opentype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
       font-family: 'NewCenturySchoolbook';
       src: url('./assets/New Century Schoolbook Roman.otf') format('opentype');
       font-weight: 400;
@@ -32,9 +39,11 @@
     }
 
     /* ───────── 좌측 하단 HUD ─────────
-       New Century Schoolbook Roman / 18pt / width 96% / tracking -10
-       (자간 -10 은 InDesign 1000-단위 기준 → -0.01em)
-       (가로폭 96% 는 transform scaleX(0.96) 으로 구현)
+       ohezin.kr/work 의 All / Index 와 동일 사양:
+         font-family : Eyja-Regular, Eulyoo1945-Regular, serif
+         font-size   : 15px
+         line-height : 15px (= 1)
+         color       : #000
     */
     .hud {
       position: fixed;
@@ -43,15 +52,13 @@
       z-index: 10;
       pointer-events: none;
       color: #000;
-      font-family: 'NewCenturySchoolbook', 'Century Schoolbook', 'Times New Roman', Times, serif;
+      font-family: 'Eyja-Regular', 'Eulyoo1945-Regular', serif;
       font-weight: 400;
-      font-size: 18pt;
-      line-height: 1.05;
-      letter-spacing: -0.01em;          /* tracking -10 */
-      transform: scaleX(0.96);           /* horizontal scale 96% */
-      transform-origin: 0 100%;
+      font-size: 15px;
+      line-height: 15px;
+      letter-spacing: normal;
       white-space: nowrap;
-      font-feature-settings: "tnum" 1, "lnum" 1;  /* 숫자 폭 균일 (탭룰러) */
+      font-feature-settings: "tnum" 1, "lnum" 1;
       font-variant-numeric: tabular-nums lining-nums;
     }
     .hud .row {
