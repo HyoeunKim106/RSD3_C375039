@@ -213,6 +213,94 @@
       transform-origin: 0 0;
       will-change: transform, opacity;
     }
+
+    /* ───────── 확장 패널 (cognosco.online 스타일) ─────────
+       이미지 클릭 시 화면에 등장하는 큰 흰 패널.
+       - 본문은 세로 스크롤
+       - 패널 상단을 잡고 드래그해서 옮길 수 있음
+       - 아래쪽은 그라데이션으로 페이드
+    */
+    .expanded-panel {
+      position: fixed;
+      width: 380px;
+      max-width: 88vw;
+      height: 520px;
+      max-height: 80vh;
+      background: #ffffff;
+      z-index: 50;
+      pointer-events: auto;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      transform: scale(0.92);
+      transition:
+        opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .expanded-panel.is-visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .expanded-panel-header {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px 6px 14px;
+      cursor: grab;
+      user-select: none;
+    }
+    .expanded-panel-header.is-dragging { cursor: grabbing; }
+    .expanded-panel-handle {
+      font-family: 'Eyja-Regular', 'Eulyoo1945-Regular', serif;
+      font-size: 12px;
+      color: #000;
+      letter-spacing: -0.01em;
+    }
+    .expanded-panel-close {
+      font-family: 'Eyja-Regular', 'Eulyoo1945-Regular', serif;
+      font-size: 12px;
+      color: #000;
+      cursor: pointer;
+      padding: 2px 6px;
+      letter-spacing: -0.01em;
+    }
+    .expanded-panel-close:hover { opacity: 0.5; }
+    .expanded-panel-body {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 8px 18px 60px 18px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      -webkit-mask-image: linear-gradient(to bottom,
+        rgba(0,0,0,1) 0%,
+        rgba(0,0,0,1) 78%,
+        rgba(0,0,0,0) 100%);
+              mask-image: linear-gradient(to bottom,
+        rgba(0,0,0,1) 0%,
+        rgba(0,0,0,1) 78%,
+        rgba(0,0,0,0) 100%);
+    }
+    .expanded-panel-body::-webkit-scrollbar { display: none; }
+    .expanded-panel-image {
+      width: 100%;
+      height: auto;
+      display: block;
+      margin-bottom: 16px;
+      pointer-events: none;
+      -webkit-user-drag: none;
+    }
+    .expanded-panel-text {
+      font-family: 'Eulyoo1945-Regular', 'Eyja-Regular', serif;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #000;
+      letter-spacing: -0.01em;
+      white-space: pre-wrap;
+      word-break: keep-all;
+    }
   </style>
 </head>
 <body>
@@ -272,10 +360,20 @@
     window.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;     // 좌클릭만
 
+      // 패널이 이미 열려 있고 그 위에서 클릭한 거면 reveal 처리하지 않음
+      // (패널의 자체 mousedown 핸들러가 잡도록 함)
+      if (e.target.closest && e.target.closest(".expanded-panel")) return;
+
       // 마우스가 어떤 reveal 인스턴스 영역 안에 있는지 확인
       for (const inst of revealInstances) {
         if (inst.isInside(e.clientX, e.clientY)) {
-          // 이 인스턴스를 홀드 활성화
+          // expandable 인스턴스 → 패널 띄움
+          if (inst.expandable) {
+            const data = inst.getExpandData();
+            showExpandedPanel(data.filename, data.text, e.clientX, e.clientY);
+            return;
+          }
+          // 일반 인스턴스 → 클릭 홀드 시스템
           activeHoldInstance = inst;
           inst.startHold();
           return;       // Position 드래그는 시작 안 함
@@ -536,10 +634,12 @@
     });
 
     function createRevealInstance(config) {
-      // config: { leftPct, topPct, size, sheetRow, root, interactive }
+      // config: { leftPct, topPct, size, sheetRow, root, interactive, expandable }
       // interactive === false 이면 호버 브러쉬만 작동 — 클릭/홀드/부피 모션 모두 비활성.
+      // expandable === true 이면 클릭 시 외부 확장 패널을 띄움 (별도 시스템).
       const { leftPct, topPct, size, sheetRow, root } = config;
       const interactive = config.interactive !== false;
+      const expandable  = config.expandable === true;
 
       // ── DOM 구성 ────────────────────────────────────
       const wrap = document.createElement("div");
@@ -877,11 +977,26 @@
 
       // ── 영역 판별 ─────────────────────────────────
       // 클릭 홀드 트리거는 "이미지 영역" 안일 때만.
-      // 단, interactive=false 인 인스턴스는 클릭 자체를 가로채지 않음 — 페이지 드래그가 정상 동작.
+      // - interactive 인스턴스: 클릭이 영역 안이면 잡음 (Position 드래그 차단)
+      // - expandable 인스턴스: 클릭 시 패널을 띄워야 하므로 영역 안이면 잡음
+      // - 둘 다 아닌 인스턴스: 클릭 가로채지 않음 (페이지 드래그가 정상 동작)
       function isInside(x, y) {
-        if (!interactive) return false;
+        if (!interactive && !expandable) return false;
         const r = imgArea.getBoundingClientRect();
         return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+      }
+
+      // ── 확장 패널 데이터 ───────────────────────────
+      // expandable 인스턴스는 자기 데이터(이미지 파일명, About 텍스트)를 보관하다가
+      // 클릭 시 외부 시스템(showExpandedPanel)에 넘겨 패널을 띄운다.
+      let expandImageFile = "";
+      let expandText = "";
+      function setExpandData(filename, text) {
+        expandImageFile = filename || "";
+        expandText = text || "";
+      }
+      function getExpandData() {
+        return { filename: expandImageFile, text: expandText };
       }
 
       // ── 브러쉬 trail ───────────────────────────────
@@ -997,6 +1112,10 @@
         isInside,
         startHold,
         stopHold,
+        // expandable 전용
+        expandable,
+        setExpandData,
+        getExpandData,
       };
       revealInstances.push(instance);
       return instance;
@@ -1016,13 +1135,146 @@
     const inst10 = createRevealInstance({
       leftPct: 28, topPct: 65, size: 120,
       sheetRow: 11,
-      interactive: false,    // 10은 호버 reveal만 작동 — 클릭/홀드/부피 모션 모두 비활성
+      // 호버 reveal은 정상 작동, 그러나 기본 클릭(홀드/부피) 시스템은 비활성.
+      // 대신 클릭하면 '확장 패널'이 뜸 — cognosco.online 스타일.
+      interactive: false,
+      expandable: true,
       root,
     });
     const allInstances = [
       { inst: inst79, row: 80 },
       { inst: inst10, row: 11 },
     ];
+
+    /* ─────────────────────────────────────────────
+       확장 패널 시스템 (cognosco.online 스타일)
+       ─────────────────────────────────────────────
+       - 한 번에 하나의 패널만 표시
+       - 헤더를 잡고 드래그해서 옮길 수 있음
+       - 본문은 자체 스크롤
+       - 우상단 [close] 또는 패널 외부 클릭 시 닫힘
+       ───────────────────────────────────────────── */
+    let currentPanel = null;
+
+    function showExpandedPanel(filename, text, originX, originY) {
+      // 이미 있으면 닫고 새로 열기
+      if (currentPanel) closeExpandedPanel();
+
+      const panel = document.createElement("div");
+      panel.className = "expanded-panel";
+
+      const header = document.createElement("div");
+      header.className = "expanded-panel-header";
+      const handle = document.createElement("div");
+      handle.className = "expanded-panel-handle";
+      handle.textContent = "INFO";
+      const closeBtn = document.createElement("div");
+      closeBtn.className = "expanded-panel-close";
+      closeBtn.textContent = "close";
+      header.appendChild(handle);
+      header.appendChild(closeBtn);
+
+      const body = document.createElement("div");
+      body.className = "expanded-panel-body";
+      const img = document.createElement("img");
+      img.className = "expanded-panel-image";
+      img.src = IMAGE_BASE_PATH + (filename || "10.png");
+      img.alt = "";
+      img.draggable = false;
+      const txt = document.createElement("div");
+      txt.className = "expanded-panel-text";
+      txt.textContent = text || "";
+      body.appendChild(img);
+      body.appendChild(txt);
+
+      panel.appendChild(header);
+      panel.appendChild(body);
+      document.body.appendChild(panel);
+
+      // 등장 위치 — 클릭 위치 근처에서 살짝 오프셋 (화면 안에 들어오도록 클램프)
+      const w = panel.offsetWidth;
+      const h = panel.offsetHeight;
+      let px = (originX || window.innerWidth / 2)  - w / 2;
+      let py = (originY || window.innerHeight / 2) - h / 3;   // 클릭 지점 약간 위에서 시작
+      px = Math.max(8, Math.min(window.innerWidth  - w - 8, px));
+      py = Math.max(8, Math.min(window.innerHeight - h - 8, py));
+      panel.style.left = `${px}px`;
+      panel.style.top  = `${py}px`;
+
+      // 다음 프레임에 is-visible 적용 → 트랜지션 발동
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => panel.classList.add("is-visible"));
+      });
+
+      // ── 헤더 드래그 ──
+      let dragging = false;
+      let dragOffsetX = 0, dragOffsetY = 0;
+      header.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        if (e.target === closeBtn) return;   // 닫기 버튼 위는 드래그 X
+        dragging = true;
+        const r = panel.getBoundingClientRect();
+        dragOffsetX = e.clientX - r.left;
+        dragOffsetY = e.clientY - r.top;
+        header.classList.add("is-dragging");
+        e.stopPropagation();
+        e.preventDefault();
+      });
+      // 드래그는 window 단에서 추적 (헤더 밖으로 나가도 따라옴)
+      const onMove = (e) => {
+        if (!dragging) return;
+        let nx = e.clientX - dragOffsetX;
+        let ny = e.clientY - dragOffsetY;
+        // 화면 안에 살짝 클램프 (완전히 못 나가게 — 최소 60px은 보이도록)
+        nx = Math.max(60 - w, Math.min(window.innerWidth  - 60, nx));
+        ny = Math.max(0,      Math.min(window.innerHeight - 30, ny));
+        panel.style.left = `${nx}px`;
+        panel.style.top  = `${ny}px`;
+      };
+      const onUp = () => {
+        if (!dragging) return;
+        dragging = false;
+        header.classList.remove("is-dragging");
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+
+      // ── 닫기 ──
+      closeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        closeExpandedPanel();
+      });
+
+      // 패널 자체 클릭은 — 페이지 mousedown 핸들러까지 안 가게 막음
+      // (패널 안의 본문에서 마우스 휠로 스크롤하는 것 보장)
+      panel.addEventListener("mousedown", (e) => e.stopPropagation());
+      panel.addEventListener("wheel", (e) => e.stopPropagation());
+
+      currentPanel = {
+        el: panel,
+        cleanup: () => {
+          window.removeEventListener("mousemove", onMove);
+          window.removeEventListener("mouseup", onUp);
+        },
+      };
+    }
+
+    function closeExpandedPanel() {
+      if (!currentPanel) return;
+      const { el, cleanup } = currentPanel;
+      el.classList.remove("is-visible");
+      cleanup();
+      currentPanel = null;
+      // 트랜지션 끝나면 DOM에서 제거
+      setTimeout(() => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }, 600);
+    }
+
+    // ESC 키로도 닫기
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeExpandedPanel();
+    });
 
     function applyRowsToInstances(rows) {
       for (const { inst, row } of allInstances) {
@@ -1032,12 +1284,17 @@
           const fb = (row === 80) ? "79.png" : "10.png";
           inst.loadFrameSeries(fb);
           inst.setText("");
+          if (inst.expandable && inst.setExpandData) inst.setExpandData(fb, "");
           continue;
         }
         const filename = item[SHEET_TARGET_COL_NAME] || (row === 80 ? "79.png" : "10.png");
         inst.loadFrameSeries(filename);
         // 텍스트는 "당사자의 직접 설명" 컬럼에서 (시트의 E열)
         inst.setText(item["당사자의 직접 설명"] || "");
+        // 확장 패널용 텍스트는 D열("About") 컬럼에서
+        if (inst.expandable && inst.setExpandData) {
+          inst.setExpandData(filename, item["About"] || "");
+        }
         console.info(`[sheet] row ${row} →`, item);
       }
     }
