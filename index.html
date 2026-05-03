@@ -215,25 +215,25 @@
     }
 
     /* ───────── 확장 패널 (cognosco.online 스타일) ─────────
-       이미지 클릭 시 화면에 등장하는 큰 흰 패널.
-       - 본문은 세로 스크롤
-       - 패널 상단을 잡고 드래그해서 옮길 수 있음
-       - 아래쪽은 그라데이션으로 페이드
+       이미지(10-1.png) 위에 반투명 흰색 안개와 텍스트가 떠 있는 구조.
+       - 패널 = 이미지 컨테이너 (이미지 비율 그대로 보여줌)
+       - 이미지 위에 .panel-mist (흰색 라디얼 그라데이션) — 텍스트 영역 주위로
+         흰색이 안개처럼 번져서 텍스트가 읽히게
+       - .panel-text — 실제 글이 들어가는 영역. 휠/드래그로 스크롤
+       - 패널은 그 자체로 잡고 끌어 옮길 수 있음 (이미지 가장자리 부분에서)
+       - 텍스트 위에서 마우스를 굴리면 → 텍스트 스크롤 (드래그가 아닌 휠은 스크롤)
+       - 텍스트 영역 자체를 잡고 위아래로 끌면 → 텍스트 스크롤 (드래그 스크롤)
     */
     .expanded-panel {
       position: fixed;
-      width: 380px;
-      max-width: 88vw;
-      height: 520px;
-      max-height: 80vh;
-      background: #ffffff;
       z-index: 50;
       pointer-events: auto;
-      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
-      display: flex;
-      flex-direction: column;
+      /* 크기는 JS가 이미지 자연 크기로 인라인 지정 (max는 화면 안에 맞춤) */
+      max-width: 90vw;
+      max-height: 90vh;
+      cursor: grab;
       opacity: 0;
-      transform: scale(0.92);
+      transform: scale(0.94);
       transition:
         opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1),
         transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
@@ -242,64 +242,77 @@
       opacity: 1;
       transform: scale(1);
     }
-    .expanded-panel-header {
-      flex: 0 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 14px 6px 14px;
-      cursor: grab;
+    .expanded-panel.is-dragging { cursor: grabbing; }
+
+    .expanded-panel-image {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;       /* 이미지 자체는 이벤트 안 받음 — 패널이 받음 */
+      -webkit-user-drag: none;
       user-select: none;
     }
-    .expanded-panel-header.is-dragging { cursor: grabbing; }
-    .expanded-panel-handle {
-      font-family: 'Eyja-Regular', 'Eulyoo1945-Regular', serif;
-      font-size: 12px;
-      color: #000;
-      letter-spacing: -0.01em;
-    }
-    .expanded-panel-close {
-      font-family: 'Eyja-Regular', 'Eulyoo1945-Regular', serif;
-      font-size: 12px;
-      color: #000;
-      cursor: pointer;
-      padding: 2px 6px;
-      letter-spacing: -0.01em;
-    }
-    .expanded-panel-close:hover { opacity: 0.5; }
-    .expanded-panel-body {
-      flex: 1 1 auto;
+
+    /* 텍스트 영역 — 이미지 위에 떠 있고, 자체 스크롤 가능 */
+    .expanded-panel-text-wrap {
+      position: absolute;
+      /* 이미지 안쪽으로 살짝 패딩 — cognosco 사진의 비율에 가깝게 */
+      left: 14%;
+      top:  10%;
+      width: 72%;
+      height: 80%;
       overflow-y: auto;
       overflow-x: hidden;
-      padding: 8px 18px 60px 18px;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
+      cursor: text;
+      /* 위/아래 페이드 — 텍스트가 자연스럽게 시작/사라지는 인상 */
       -webkit-mask-image: linear-gradient(to bottom,
-        rgba(0,0,0,1) 0%,
-        rgba(0,0,0,1) 78%,
+        rgba(0,0,0,0) 0%,
+        rgba(0,0,0,1) 8%,
+        rgba(0,0,0,1) 84%,
         rgba(0,0,0,0) 100%);
               mask-image: linear-gradient(to bottom,
-        rgba(0,0,0,1) 0%,
-        rgba(0,0,0,1) 78%,
+        rgba(0,0,0,0) 0%,
+        rgba(0,0,0,1) 8%,
+        rgba(0,0,0,1) 84%,
         rgba(0,0,0,0) 100%);
+      /* 스크롤바 숨김 */
+      scrollbar-width: none;
+      -ms-overflow-style: none;
     }
-    .expanded-panel-body::-webkit-scrollbar { display: none; }
-    .expanded-panel-image {
-      width: 100%;
-      height: auto;
-      display: block;
-      margin-bottom: 16px;
+    .expanded-panel-text-wrap::-webkit-scrollbar { display: none; }
+
+    /* 흰색 안개 그라데이션 — 텍스트 뒤로 스며드는 흰 빛.
+       텍스트 영역 안에서 가운데로 갈수록 진하고 가장자리는 투명. */
+    .expanded-panel-mist {
+      position: absolute;
+      inset: 0;
       pointer-events: none;
-      -webkit-user-drag: none;
+      background: radial-gradient(ellipse 70% 80% at 50% 50%,
+        rgba(255,255,255,0.95) 0%,
+        rgba(255,255,255,0.92) 35%,
+        rgba(255,255,255,0.78) 60%,
+        rgba(255,255,255,0.40) 80%,
+        rgba(255,255,255,0)    100%);
     }
+
     .expanded-panel-text {
+      position: relative;       /* 안개(.panel-mist) 위로 올라옴 */
+      z-index: 1;
+      padding: 24px 28px 60px 28px;
       font-family: 'Eulyoo1945-Regular', 'Eyja-Regular', serif;
-      font-size: 13px;
-      line-height: 1.7;
+      font-size: 14px;
+      line-height: 1.75;
       color: #000;
       letter-spacing: -0.01em;
       white-space: pre-wrap;
       word-break: keep-all;
+    }
+    .expanded-panel-text .title {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 14px;
+      font-size: 15px;
     }
   </style>
 </head>
@@ -360,9 +373,14 @@
     window.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;     // 좌클릭만
 
-      // 패널이 이미 열려 있고 그 위에서 클릭한 거면 reveal 처리하지 않음
-      // (패널의 자체 mousedown 핸들러가 잡도록 함)
-      if (e.target.closest && e.target.closest(".expanded-panel")) return;
+      // 패널이 열려 있을 때:
+      //   - 패널 위에서 클릭 → 그대로 통과 (패널 자체 mousedown 핸들러가 처리)
+      //   - 패널 밖에서 클릭 → 패널 닫고, 그 클릭은 reveal/Position 드래그로 진행
+      if (currentPanel) {
+        if (e.target.closest && e.target.closest(".expanded-panel")) return;
+        closeExpandedPanel();
+        // 닫고 나서도 그 클릭은 다른 인스턴스에 적용될 수 있으니 흐름 계속
+      }
 
       // 마우스가 어떤 reveal 인스턴스 영역 안에 있는지 확인
       for (const inst of revealInstances) {
@@ -1160,94 +1178,114 @@
       // 이미 있으면 닫고 새로 열기
       if (currentPanel) closeExpandedPanel();
 
+      // 10.png 클릭 시 보여줄 큰 변형은 -1 버전.
+      // (이름이 "10.png" 면 "10-1.png" 로 자동 변환)
+      const dot = filename.lastIndexOf(".");
+      const name = dot === -1 ? filename : filename.slice(0, dot);
+      const ext  = dot === -1 ? ""       : filename.slice(dot);
+      const expandedFilename = `${name}-1${ext}`;
+
       const panel = document.createElement("div");
       panel.className = "expanded-panel";
 
-      const header = document.createElement("div");
-      header.className = "expanded-panel-header";
-      const handle = document.createElement("div");
-      handle.className = "expanded-panel-handle";
-      handle.textContent = "INFO";
-      const closeBtn = document.createElement("div");
-      closeBtn.className = "expanded-panel-close";
-      closeBtn.textContent = "close";
-      header.appendChild(handle);
-      header.appendChild(closeBtn);
-
-      const body = document.createElement("div");
-      body.className = "expanded-panel-body";
+      // 1) 베이스 이미지 (10-1.png) — 패널의 모양/크기를 결정
       const img = document.createElement("img");
       img.className = "expanded-panel-image";
-      img.src = IMAGE_BASE_PATH + (filename || "10.png");
       img.alt = "";
       img.draggable = false;
+      img.src = IMAGE_BASE_PATH + expandedFilename;
+
+      // 2) 텍스트 영역 (안개 + 글)
+      const textWrap = document.createElement("div");
+      textWrap.className = "expanded-panel-text-wrap";
+      const mist = document.createElement("div");
+      mist.className = "expanded-panel-mist";
       const txt = document.createElement("div");
       txt.className = "expanded-panel-text";
       txt.textContent = text || "";
-      body.appendChild(img);
-      body.appendChild(txt);
+      textWrap.appendChild(mist);
+      textWrap.appendChild(txt);
 
-      panel.appendChild(header);
-      panel.appendChild(body);
+      panel.appendChild(img);
+      panel.appendChild(textWrap);
       document.body.appendChild(panel);
 
-      // 등장 위치 — 클릭 위치 근처에서 살짝 오프셋 (화면 안에 들어오도록 클램프)
-      const w = panel.offsetWidth;
-      const h = panel.offsetHeight;
-      let px = (originX || window.innerWidth / 2)  - w / 2;
-      let py = (originY || window.innerHeight / 2) - h / 3;   // 클릭 지점 약간 위에서 시작
-      px = Math.max(8, Math.min(window.innerWidth  - w - 8, px));
-      py = Math.max(8, Math.min(window.innerHeight - h - 8, py));
-      panel.style.left = `${px}px`;
-      panel.style.top  = `${py}px`;
+      // 이미지가 로드된 후 크기를 결정 (자연 비율 유지하면서 화면에 맞게).
+      // 화면 안에서 적당히 큰 사이즈로: 가로 max 80vw, 세로 max 80vh
+      const positionPanel = () => {
+        const naturalW = img.naturalWidth  || 800;
+        const naturalH = img.naturalHeight || 600;
+        const maxW = window.innerWidth  * 0.80;
+        const maxH = window.innerHeight * 0.80;
+        const ratio = Math.min(maxW / naturalW, maxH / naturalH, 1);
+        const w = naturalW * ratio;
+        const h = naturalH * ratio;
+        panel.style.width  = `${w}px`;
+        panel.style.height = `${h}px`;
 
-      // 다음 프레임에 is-visible 적용 → 트랜지션 발동
+        // 화면 중앙 부근에 위치 — 클릭 좌표 근처지만 화면 안에 클램프
+        let px = (originX || window.innerWidth  / 2) - w / 2;
+        let py = (originY || window.innerHeight / 2) - h / 2;
+        px = Math.max(8, Math.min(window.innerWidth  - w - 8, px));
+        py = Math.max(8, Math.min(window.innerHeight - h - 8, py));
+        panel.style.left = `${px}px`;
+        panel.style.top  = `${py}px`;
+      };
+
+      if (img.complete && img.naturalWidth > 0) {
+        positionPanel();
+      } else {
+        img.addEventListener("load", positionPanel);
+        // 로드 실패해도 일단 기본 크기로 띄움
+        img.addEventListener("error", positionPanel);
+      }
+
+      // 등장 트랜지션
       requestAnimationFrame(() => {
         requestAnimationFrame(() => panel.classList.add("is-visible"));
       });
 
-      // ── 헤더 드래그 ──
+      // ── 패널 드래그 (이미지 영역에서 잡고 끌기) ──
+      // 단, 텍스트 영역(textWrap) 안에서 누른 건 드래그 시작이 아닌 텍스트 스크롤로.
       let dragging = false;
       let dragOffsetX = 0, dragOffsetY = 0;
-      header.addEventListener("mousedown", (e) => {
+      panel.addEventListener("mousedown", (e) => {
         if (e.button !== 0) return;
-        if (e.target === closeBtn) return;   // 닫기 버튼 위는 드래그 X
+        // 텍스트 영역 안이면 패널 드래그 시작 안 함 (텍스트 자체 스크롤이 우선)
+        if (textWrap.contains(e.target)) {
+          // 패널 드래그도, 페이지 mousedown도 막음 — 텍스트는 자체 동작 유지
+          e.stopPropagation();
+          return;
+        }
         dragging = true;
         const r = panel.getBoundingClientRect();
         dragOffsetX = e.clientX - r.left;
         dragOffsetY = e.clientY - r.top;
-        header.classList.add("is-dragging");
+        panel.classList.add("is-dragging");
         e.stopPropagation();
         e.preventDefault();
       });
-      // 드래그는 window 단에서 추적 (헤더 밖으로 나가도 따라옴)
       const onMove = (e) => {
         if (!dragging) return;
+        const w = panel.offsetWidth;
+        const h = panel.offsetHeight;
         let nx = e.clientX - dragOffsetX;
         let ny = e.clientY - dragOffsetY;
-        // 화면 안에 살짝 클램프 (완전히 못 나가게 — 최소 60px은 보이도록)
-        nx = Math.max(60 - w, Math.min(window.innerWidth  - 60, nx));
-        ny = Math.max(0,      Math.min(window.innerHeight - 30, ny));
+        // 화면 안에 클램프 (최소 80px은 보이게)
+        nx = Math.max(80 - w, Math.min(window.innerWidth  - 80, nx));
+        ny = Math.max(0,      Math.min(window.innerHeight - 40, ny));
         panel.style.left = `${nx}px`;
         panel.style.top  = `${ny}px`;
       };
       const onUp = () => {
         if (!dragging) return;
         dragging = false;
-        header.classList.remove("is-dragging");
+        panel.classList.remove("is-dragging");
       };
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
 
-      // ── 닫기 ──
-      closeBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        closeExpandedPanel();
-      });
-
-      // 패널 자체 클릭은 — 페이지 mousedown 핸들러까지 안 가게 막음
-      // (패널 안의 본문에서 마우스 휠로 스크롤하는 것 보장)
-      panel.addEventListener("mousedown", (e) => e.stopPropagation());
+      // 패널 안의 wheel 은 페이지로 전파 안 됨 (텍스트 영역에서 자체 스크롤 보장)
       panel.addEventListener("wheel", (e) => e.stopPropagation());
 
       currentPanel = {
