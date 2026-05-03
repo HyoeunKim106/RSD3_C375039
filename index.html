@@ -438,10 +438,7 @@
        URL이 비어 있으면 fetch를 건너뛰고 fallback(./assets/79.png) 표시 →
        개발 중에도 화면이 정상 동작.
        ───────────────────────────────────────────── */
-    // 비공식이지만 오래 동작하는 gviz CSV 엔드포인트.
-    // 시트가 "링크가 있는 모든 사용자가 볼 수 있음" 권한이면 fetch 가능.
-    // 만약 동작 안 하면 정식 "웹에 게시" URL로 교체.
-    const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1pintIO8VNpryzS56eqXaNjqzx5f3EeAV/gviz/tq?tqx=out:csv&gid=0";
+    const SHEET_CSV_URL = "";   // ← 여기에 게시된 CSV URL을 붙여넣기
 
     // 시트의 어느 행/열을 쓸지 — 1-based (스프레드시트 좌표 그대로)
     const SHEET_TARGET_ROW = 80;       // 80행
@@ -539,8 +536,10 @@
     });
 
     function createRevealInstance(config) {
-      // config: { leftPct, topPct, size, sheetRow, root }
+      // config: { leftPct, topPct, size, sheetRow, root, interactive }
+      // interactive === false 이면 호버 브러쉬만 작동 — 클릭/홀드/부피 모션 모두 비활성.
       const { leftPct, topPct, size, sheetRow, root } = config;
+      const interactive = config.interactive !== false;
 
       // ── DOM 구성 ────────────────────────────────────
       const wrap = document.createElement("div");
@@ -599,12 +598,32 @@
         for (let i = 0; i < FRAME_COUNT; i++) {
           const fname = (i === 0) ? `${name}${ext}` : `${name}-${i}${ext}`;
           const img = new Image();
+          // 로드 실패한 프레임은 broken 플래그로 표시 → 순환 시 건너뜀
+          img.onerror = () => { img._broken = true; };
           img.src = IMAGE_BASE_PATH + fname;
           frames.push(img);
         }
         currentFrame = 0;
         console.info(`[reveal] frames for "${baseFilename}":`,
                      frames.map(im => im.src));
+      }
+
+      // 다음 "정상 로드된" 프레임 인덱스를 찾음 (순환).
+      // 모든 프레임이 broken이면 -1 반환 (그리지 않음).
+      function nextValidFrame(from) {
+        const n = frames.length;
+        if (n === 0) return -1;
+        for (let i = 1; i <= n; i++) {
+          const idx = (from + i) % n;
+          const im = frames[idx];
+          if (!im._broken && im.complete && im.naturalWidth > 0) return idx;
+          // 아직 로딩 중이면 일단 시도해볼 가치 있음
+          if (!im._broken && !im.complete) return idx;
+        }
+        // 모두 broken이면 베이스(0)가 멀쩡한지 확인
+        const base = frames[0];
+        if (base && !base._broken) return 0;
+        return -1;
       }
 
       // ── 텍스트 타이핑 ─────────────────────────────
@@ -648,15 +667,18 @@
       let isVolumeMode = false;
 
       function startHold() {
+        if (!interactive) return;     // 호버만 동작하는 인스턴스 — 클릭 무시
         if (isHolding) return;
         if (isVolumeMode) return;     // 부피 모드 중엔 클릭 무시
         isHolding = true;
 
         // 프레임 자동 순환 시작 (79 → 79-1 → ... → 79-7 → 79 → ...)
+        // 변형 파일이 없는 경우엔 자동으로 건너뜀 — 베이스만 있어도 안전 동작.
         if (!frameLoopTimer) {
           frameLoopTimer = setInterval(() => {
             if (frames.length > 0) {
-              currentFrame = (currentFrame + 1) % frames.length;
+              const next = nextValidFrame(currentFrame);
+              if (next !== -1) currentFrame = next;
             }
           }, FRAME_INTERVAL_MS);
         }
@@ -854,8 +876,10 @@
       }
 
       // ── 영역 판별 ─────────────────────────────────
-      // 클릭 홀드 트리거는 "이미지 영역" 안일 때만
+      // 클릭 홀드 트리거는 "이미지 영역" 안일 때만.
+      // 단, interactive=false 인 인스턴스는 클릭 자체를 가로채지 않음 — 페이지 드래그가 정상 동작.
       function isInside(x, y) {
+        if (!interactive) return false;
         const r = imgArea.getBoundingClientRect();
         return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
       }
@@ -992,6 +1016,7 @@
     const inst10 = createRevealInstance({
       leftPct: 28, topPct: 65, size: 120,
       sheetRow: 11,
+      interactive: false,    // 10은 호버 reveal만 작동 — 클릭/홀드/부피 모션 모두 비활성
       root,
     });
     const allInstances = [
