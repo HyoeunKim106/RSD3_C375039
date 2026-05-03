@@ -515,7 +515,7 @@
        - 베이스 파일명(예: "79.png")으로 시리즈 8장 미리 로드 (79, 79-1, ..., 79-7).
        - 마우스가 영향권에 들어오면 캔버스에 브러쉬 trail로 마스크 그려 이미지 드러남.
        - 클릭 홀드 시 (1) 프레임 자동 순환, (2) 우측+아래로 흰 텍스트 박스 펼쳐짐,
-         (3) 그 안에 "호출 모션" 텍스트가 타자기처럼 한 글자씩 타이핑.
+         (3) 그 안에 "당사자의 직접 설명" 텍스트가 타자기처럼 한 글자씩 타이핑.
        - 마우스를 떼면 텍스트 박스가 닫히고 텍스트 리셋.
        ───────────────────────────────────────────── */
 
@@ -1047,18 +1047,23 @@
         }
         const filename = item[SHEET_TARGET_COL_NAME] || (row === 80 ? "79.png" : "10.png");
         inst.loadFrameSeries(filename);
-        // 텍스트는 "호출 모션" 컬럼에서 (시트의 E열)
-        inst.setText(item["호출 모션"] || "");
+        // 텍스트는 "당사자의 직접 설명" 컬럼에서 (시트의 E열)
+        inst.setText(item["당사자의 직접 설명"] || "");
         console.info(`[sheet] row ${row} →`, item);
       }
     }
 
     function applyFallbackAll() {
+      // 시트 게시 URL이 없을 때 임시로 사용할 텍스트.
+      // 시트 게시 URL을 SHEET_CSV_URL에 넣으면 시트 값이 우선 적용되어 이건 무시됨.
       inst79.loadFrameSeries("79.png");
-      inst79.setText("");
+      inst79.setText(
+        "I can imagine an apple in front of me. " +
+        "I know where the skin is. I know how big it is. I can't see it."
+      );
       inst10.loadFrameSeries("10.png");
-      inst10.setText("");
-      console.info("[sheet] fallback (시트 미연결)");
+      inst10.setText("");      // 10행 임시 텍스트는 비워둠 — 시트에 채우는 대로 적용
+      console.info("[sheet] fallback (시트 미연결) — 임시 텍스트 사용");
     }
 
     if (!SHEET_CSV_URL) {
