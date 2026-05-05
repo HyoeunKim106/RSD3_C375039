@@ -8,15 +8,8 @@
   <style>
     /* ───────── 로컬 폰트 ───────── */
     @font-face {
-      font-family: 'Eyja-Regular';
-      src: url('./assets/fonnts_com-eyjaunlicensedtrial-regular.otf') format('opentype');
-      font-weight: 400;
-      font-style: normal;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'NewCenturySchoolbook';
-      src: url('./assets/New Century Schoolbook Roman.otf') format('opentype');
+      font-family: 'Binomic';
+      src: url('./assets/binomic-3.ttf') format('truetype');
       font-weight: 400;
       font-style: normal;
       font-display: swap;
@@ -47,10 +40,10 @@
 
     /* ───────── 좌측 하단 HUD ─────────
        ohezin.kr/work 의 All / Index 와 동일 사양:
-         font-family : Eyja-Regular, Eulyoo1945-Regular, serif
+         font-family : Binomic, Eulyoo1945-Regular, serif
          font-size   : 15px
          line-height : 15px (= 1)
-         color       : #000
+         color       : #ff3f51
     */
     .hud {
       position: fixed;
@@ -58,53 +51,22 @@
       bottom: 14px;
       z-index: 10;
       pointer-events: none;
-      color: #000;
-      font-family: 'Eyja-Regular', 'Eulyoo1945-Regular', serif;
+      color: #ff3f51;
+      font-family: 'Binomic', 'Eulyoo1945-Regular', serif;
       font-weight: 400;
       font-size: 15px;
       line-height: 18px;
-      letter-spacing: normal;
       white-space: nowrap;
     }
     .hud .row {
       display: block;
     }
-    /* 숫자만 자간을 강하게 줄여 영문 비례에 맞춤
-       (트라이얼 Eyja의 기본 숫자 트래킹이 살짝 넓음) */
-    .hud .num {
-      letter-spacing: -0.07em;
-    }
-    /* 영문(라벨) 다음에 오는 숫자와의 간격을 좁힘
-       — 그냥 공백을 쓰면 너무 벌어져서 시각적으로 맞춰주는 보정 */
-    .hud .num {
-      margin-left: -0.22em;
-    }
-    /* 콜론(:) 다음에 오는 숫자는 살짝 띄움 — 콜론과 숫자가 들러붙지 않게 */
-    .hud .num.after-colon {
-      margin-left: 0.08em;
-    }
 
-    /* ───────── Reveal Image — Canvas 기반 궤적 브러쉬 ─────────
-       핵심 원리 (Immersive Garden의 시그니처 동작):
-         - 이미지는 화면 한 자리에 가만히 있다 (절대 안 움직임).
-         - 그 위에 같은 크기의 <canvas>가 마스크 역할.
-         - 마우스 좌표를 매 프레임 기록해 trail(궤적)에 점으로 추가.
-         - 각 점은 자기 수명(life)이 있어 시간이 지나면 천천히 옅어짐.
-         - 캔버스에 그려진 모든 점들의 합집합 영역만큼만 이미지가 드러남.
-         - 결과: 마우스로 쓸어넘기면 그 자리가 브러쉬처럼 칠해지며 이미지가 보이고,
-                마우스가 떠나도 칠해진 흔적이 천천히 페이드아웃 → 급작스럽지 않게 사라짐.
-    */
-    /* 각 reveal 인스턴스 — JS에서 인라인 left/top으로 위치 지정.
-       .reveal-img-area: 이미지 + 브러쉬 캔버스 (고정 크기).
-       .reveal-text-box: 클릭 홀드 시 우측+아래로 펼쳐지는 흰 박스.
-                         이미지 좌상단을 기준으로 펼쳐지므로,
-                         이미지 영역과 같은 좌표에서 시작.
-    */
+    /* ───────── Reveal Image — Canvas 기반 궤적 브러쉬 ───────── */
     .reveal {
       position: fixed;
       z-index: 5;
       pointer-events: none;
-      /* 위치/크기는 JS 인라인 스타일로 지정 (width/height = 이미지 박스 크기) */
     }
     .reveal-img-area {
       position: absolute;
@@ -118,11 +80,7 @@
       height: 100%;
       pointer-events: none;
     }
-    /* 펼쳐지는 흰 텍스트 박스
-       - 처음엔 width/height 0 (보이지 않음)
-       - 클릭 홀드 시 JS가 width/height 을 lerp로 키움
-       - 펼쳐지는 기준점은 이미지의 좌상단(transform-origin: top left)
-       - 박스 끝(아래)은 mask로 페이드 아웃 — 텍스트가 자연스럽게 잘리는 인상 */
+    /* 펼쳐지는 흰 텍스트 박스 */
     .reveal-text-box {
       position: absolute;
       left: 0;
@@ -133,7 +91,6 @@
       overflow: hidden;
       pointer-events: none;
       transform-origin: top left;
-      /* 박스 아래쪽이 부드럽게 페이드 — 텍스트가 잘리지 않고 안개처럼 사라지는 인상 */
       -webkit-mask-image: linear-gradient(to bottom,
         rgba(0,0,0,1) 0%,
         rgba(0,0,0,1) 75%,
@@ -145,11 +102,10 @@
     }
     .reveal-text-content {
       padding: 14px 16px;
-      font-family: 'Eyja-Regular', 'Eulyoo1945-Regular', serif;
+      font-family: 'Binomic', 'Eulyoo1945-Regular', serif;
       font-size: 13px;
       line-height: 1.55;
-      color: #000;
-      letter-spacing: -0.01em;
+      color: #ff3f51;
       white-space: pre-wrap;
       word-break: keep-all;
     }
@@ -159,15 +115,13 @@
       width: 0.5em;
       height: 1em;
       margin-left: 1px;
-      background: #000;
+      background: #ff3f51;
       vertical-align: -0.12em;
       animation: reveal-caret-blink 0.9s steps(2) infinite;
     }
     @keyframes reveal-caret-blink {
       to { opacity: 0; }
     }
-    /* <img> 는 더이상 직접 보여지지 않음 — 캔버스가 그릴 때 소스로만 사용.
-       메모리에 로드되어야 하니 DOM에는 두되 화면 밖으로 숨김. */
     .reveal-img-source {
       position: absolute;
       width: 1px;
@@ -176,17 +130,11 @@
       pointer-events: none;
     }
 
-    /* ───────── 부피 텍스트 클라우드 ─────────
-       클릭을 떼고 나서 발동: 문장이 글자 단위로 분해되어
-       보이지 않는 비대칭 구체 표면에 흩어지고, 천천히 회전·부유.
-       각 글자는 자신의 응집 좌표(원래 문장 위치)와 분산 좌표(구면 위) 사이를
-       sin 파동으로 보간 → 응집·확산이 무한 루프되는 인상.
-    */
+    /* ───────── 부피 텍스트 클라우드 ───────── */
     .text-volume {
       position: fixed;
       pointer-events: none;
-      z-index: 4;            /* reveal(5)보다 살짝 아래 — 새로 호버 시 reveal이 위에 겹침 */
-      /* 3D 효과를 위한 perspective. 거리감을 부드럽게 — 너무 작으면 왜곡 심함. */
+      z-index: 4;
       perspective: 900px;
       perspective-origin: 50% 50%;
       will-change: transform;
@@ -204,31 +152,20 @@
       position: absolute;
       left: 0;
       top:  0;
-      font-family: 'Eulyoo1945-Regular', 'Eyja-Regular', serif;
+      font-family: 'Eulyoo1945-Regular', 'Binomic', serif;
       font-size: 13px;
       line-height: 1;
-      color: #000;
-      letter-spacing: -0.01em;
-      white-space: pre;        /* 공백 글자도 그대로 유지 */
+      color: #ff3f51;
+      white-space: pre;
       transform-origin: 0 0;
       will-change: transform, opacity;
     }
 
-    /* ───────── 확장 패널 (cognosco.online 스타일) ─────────
-       이미지(10-1.png) 위에 반투명 흰색 안개와 텍스트가 떠 있는 구조.
-       - 패널 = 이미지 컨테이너 (이미지 비율 그대로 보여줌)
-       - 이미지 위에 .panel-mist (흰색 라디얼 그라데이션) — 텍스트 영역 주위로
-         흰색이 안개처럼 번져서 텍스트가 읽히게
-       - .panel-text — 실제 글이 들어가는 영역. 휠/드래그로 스크롤
-       - 패널은 그 자체로 잡고 끌어 옮길 수 있음 (이미지 가장자리 부분에서)
-       - 텍스트 위에서 마우스를 굴리면 → 텍스트 스크롤 (드래그가 아닌 휠은 스크롤)
-       - 텍스트 영역 자체를 잡고 위아래로 끌면 → 텍스트 스크롤 (드래그 스크롤)
-    */
+    /* ───────── 확장 패널 (cognosco.online 스타일) ───────── */
     .expanded-panel {
       position: fixed;
       z-index: 50;
       pointer-events: auto;
-      /* 크기는 JS가 이미지 자연 크기로 인라인 지정 (max는 화면 안에 맞춤) */
       max-width: 90vw;
       max-height: 90vh;
       cursor: grab;
@@ -249,20 +186,16 @@
       width: 100%;
       height: 100%;
       object-fit: contain;
-      pointer-events: none;       /* 이미지 자체는 이벤트 안 받음 — 패널이 받음 */
+      pointer-events: none;
       -webkit-user-drag: none;
       user-select: none;
     }
 
-    /* 마우스 스포트라이트 — 검정 배경 위에 흰 빛이 마우스를 따라 흐름.
-       이 빛이 이미지와 합성되어 그 자리만 밝아짐 → 텍스트 가독성 + 그래픽 인상.
-       lighten 블렌드: 두 픽셀 중 밝은 쪽을 선택 → 흰 빛은 그대로, 검정 영역도 부분적으로 밝아짐. */
     .expanded-panel-spotlight {
       position: absolute;
       inset: 0;
       pointer-events: none;
-      mix-blend-mode: lighten;   /* 이미지를 부분적으로 밝게 */
-      /* 빛은 JS 가 매 프레임 위치 갱신 — 인라인 background-image 로 */
+      mix-blend-mode: lighten;
       background-position: 50% 50%;
       background-repeat: no-repeat;
       background-image: radial-gradient(circle 280px at 50% 50%,
@@ -273,10 +206,6 @@
         rgba(255,255,255,0)    100%);
     }
 
-    /* 텍스트 영역 — 이미지+스포트라이트 위에 difference 로 합성.
-       검정 영역 위 → 흰 글자
-       스포트라이트가 닿은 밝은 영역 위 → 자동으로 어두워짐
-       → 마우스가 텍스트 위를 지나갈 때 글자색이 바뀌는 그래픽 인상. */
     .expanded-panel-text-wrap {
       position: absolute;
       left: 12%;
@@ -303,11 +232,10 @@
 
     .expanded-panel-text {
       padding: 12px 18px 50px 18px;
-      font-family: 'Eulyoo1945-Regular', 'Eyja-Regular', serif;
+      font-family: 'Eulyoo1945-Regular', 'Binomic', serif;
       font-size: 13px;
       line-height: 1.7;
-      color: #ffffff;
-      letter-spacing: -0.01em;
+      color: #ff3f51;
       white-space: pre-wrap;
       word-break: keep-all;
       mix-blend-mode: difference;
@@ -327,9 +255,6 @@
   <script>
     /* ─────────────────────────────────────────────
        상태값
-       ─────────────────────────────────────────────
-       distance : 확대율(%) — 휠/핀치로 변경
-       posX/posY: 위치     — 마우스 드래그/트랙패드 슬라이딩으로 변경
        ───────────────────────────────────────────── */
     let distance = 100;     // %
     let posX = 0;
@@ -339,8 +264,6 @@
     const numPosX     = document.getElementById("num-pos-x");
     const numPosY     = document.getElementById("num-pos-y");
 
-    /* ── 숫자 포매터 ──
-       Position 좌표는 항상 3자리 0-padding (음수면 - 부호 포함) */
     function fmt3(n) {
       const s = Math.trunc(n);
       const sign = s < 0 ? "-" : "";
@@ -357,46 +280,34 @@
 
     /* ─────────────────────────────────────────────
        1) 마우스 드래그 (잡고 끌기) → Position
-       ─────────────────────────────────────────────
-       마우스를 누른 채 끌면 끄는 방향대로 위치가 이동
        ───────────────────────────────────────────── */
     let isDragging = false;
     let dragLastX = 0, dragLastY = 0;
 
-    /* 활성화된 reveal 인스턴스의 클릭 홀드 상태를 외부에서 관리.
-       각 인스턴스가 자신을 등록하면 mousedown 시 영역 체크 후 그 인스턴스만 활성화. */
-    const revealInstances = [];   // 인스턴스 객체들이 등록되는 배열
+    const revealInstances = [];
     let activeHoldInstance = null;
 
     window.addEventListener("mousedown", (e) => {
-      if (e.button !== 0) return;     // 좌클릭만
+      if (e.button !== 0) return;
 
-      // 패널이 열려 있을 때:
-      //   - 패널 위에서 클릭 → 그대로 통과 (패널 자체 mousedown 핸들러가 처리)
-      //   - 패널 밖에서 클릭 → 패널 닫고, 그 클릭은 reveal/Position 드래그로 진행
       if (currentPanel) {
         if (e.target.closest && e.target.closest(".expanded-panel")) return;
         closeExpandedPanel();
-        // 닫고 나서도 그 클릭은 다른 인스턴스에 적용될 수 있으니 흐름 계속
       }
 
-      // 마우스가 어떤 reveal 인스턴스 영역 안에 있는지 확인
       for (const inst of revealInstances) {
         if (inst.isInside(e.clientX, e.clientY)) {
-          // expandable 인스턴스 → 패널 띄움
           if (inst.expandable) {
             const data = inst.getExpandData();
             showExpandedPanel(data.filename, data.text, e.clientX, e.clientY);
             return;
           }
-          // 일반 인스턴스 → 클릭 홀드 시스템
           activeHoldInstance = inst;
           inst.startHold();
-          return;       // Position 드래그는 시작 안 함
+          return;
         }
       }
 
-      // 어떤 reveal 영역도 아님 → 기존 Position 드래그
       isDragging = true;
       dragLastX = e.clientX;
       dragLastY = e.clientY;
@@ -405,7 +316,6 @@
 
     window.addEventListener("mousemove", (e) => {
       if (!isDragging) return;
-      // 끄는 방향으로 위치 이동 (캔버스를 손으로 잡아 끄는 느낌)
       posX += (e.clientX - dragLastX);
       posY += (e.clientY - dragLastY);
       dragLastX = e.clientX;
@@ -414,7 +324,6 @@
     });
 
     window.addEventListener("mouseup", () => {
-      // 어떤 인스턴스가 홀드 중이었으면 정지
       if (activeHoldInstance) {
         activeHoldInstance.stopHold();
         activeHoldInstance = null;
@@ -425,7 +334,6 @@
       document.body.style.cursor = "grab";
     });
 
-    // 창에서 포커스가 빠지면 홀드도 정지 (안전판)
     window.addEventListener("blur", () => {
       if (activeHoldInstance) {
         activeHoldInstance.stopHold();
@@ -435,38 +343,22 @@
 
     /* ─────────────────────────────────────────────
        2) wheel 이벤트 분기
-          - 마우스 휠 / 트랙패드 핀치  → Distance (줌)
-          - 트랙패드 두 손가락 슬라이딩 → Position (이동)
-       ─────────────────────────────────────────────
-       브라우저는 트랙패드 핀치를 ctrlKey === true 로 표시한
-       wheel 이벤트로 보내준다 (Chrome/Safari/Firefox 공통).
-       이걸로 핀치(줌)와 슬라이딩(패닝)을 구분.
        ───────────────────────────────────────────── */
     window.addEventListener("wheel", (e) => {
       e.preventDefault();
 
       if (e.ctrlKey) {
-        // ── 트랙패드 핀치: 손가락 모으면 줌아웃, 벌리면 줌인 ──
-        // deltaY가 음수면 핀치아웃(확대), 양수면 핀치인(축소)
         const factor = Math.exp(-e.deltaY * 0.01);
         distance = Math.max(0, distance * factor);
       } else {
-        // ── 일반 마우스 휠: 줌 (위로 = 줌인, 아래로 = 줌아웃) ──
-        // 트랙패드 두 손가락 수직 스크롤도 여기로 옴 → 어떻게 분기할지 결정 필요
-        // 휠은 deltaY 값이 보통 100 단위로 큰 step이 들어오고,
-        // 트랙패드는 작고 연속적인 값이 deltaX/deltaY 둘 다로 들어옴.
-        // → deltaX 가 의미있게 있거나, 작은 픽셀단위 deltaY 면 패닝으로 간주
         const isTrackpadPan =
-          Math.abs(e.deltaX) > 0 ||                          // 가로 성분 있음
-          (e.deltaMode === 0 && Math.abs(e.deltaY) < 50);    // 픽셀모드 + 작은값
+          Math.abs(e.deltaX) > 0 ||
+          (e.deltaMode === 0 && Math.abs(e.deltaY) < 50);
 
         if (isTrackpadPan) {
-          // 트랙패드 두 손가락 슬라이딩 → Position
           posX -= e.deltaX;
           posY -= e.deltaY;
         } else {
-          // 진짜 마우스 휠 → Distance 줌
-          // 위로(▲ deltaY 음수) = 줌인, 아래로(▼ deltaY 양수) = 줌아웃
           const factor = Math.exp(-e.deltaY * 0.001);
           distance = Math.max(0, distance * factor);
         }
@@ -476,10 +368,8 @@
 
     /* ─────────────────────────────────────────────
        3) 터치(모바일/태블릿)
-          - 한 손가락 드래그 → Position
-          - 두 손가락 핀치  → Distance
        ───────────────────────────────────────────── */
-    let touchMode = null;        // 'pan' | 'pinch' | null
+    let touchMode = null;
     let lastTouchX = 0, lastTouchY = 0;
     let pinchStartDist = 0;
     let pinchStartDistance = 100;
@@ -529,43 +419,20 @@
       }
     });
 
-    /* 컨텍스트 메뉴 차단(우클릭으로 동작이 끊기는 것 방지) */
     window.addEventListener("contextmenu", (e) => e.preventDefault());
 
     /* ─────────────────────────────────────────────
        5) Google Sheet 연동
-       ─────────────────────────────────────────────
-       흐름:
-         1. CSV 게시 URL을 fetch
-         2. CSV 파싱
-         3. 80행을 객체로 변환 — { "기억 형식": "...", "기억 조직 방식": "...",
-                                    "기억 주제": "79.png", ... }
-         4. "기억 주제" 값(파일명)을 ./assets/ 폴더 경로로 prefix → <img src>
-         5. 같은 행 객체는 currentItem 으로 보관 — 추후 모션/텍스트 모듈에서 참조
-
-       시트 게시 방법:
-         Google Sheets → 파일 → 공유 → 웹에 게시
-         → 형식: '쉼표로 구분된 값(.csv)'
-         → 시트: 해당 시트만 선택
-         → 게시 후 나오는 URL을 SHEET_CSV_URL 에 붙여넣기
-
-       URL이 비어 있으면 fetch를 건너뛰고 fallback(./assets/79.png) 표시 →
-       개발 중에도 화면이 정상 동작.
        ───────────────────────────────────────────── */
-    // 비공식이지만 오래 동작하는 gviz CSV 엔드포인트.
-    // 시트가 "링크가 있는 모든 사용자가 볼 수 있음" 권한이면 fetch 가능.
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1pintIO8VNpryzS56eqXaNjqzx5f3EeAV/gviz/tq?tqx=out:csv&gid=0";
 
-    // 시트의 어느 행/열을 쓸지 — 1-based (스프레드시트 좌표 그대로)
-    const SHEET_TARGET_ROW = 80;       // 80행
-    const SHEET_TARGET_COL_NAME = "기억 주제";   // H열 헤더
+    const SHEET_TARGET_ROW = 80;
+    const SHEET_TARGET_COL_NAME = "기억 주제";
 
-    // 이미지 파일명을 어디 폴더에서 찾을지
     const IMAGE_BASE_PATH = "./assets/";
 
     const revealImg = document.getElementById("reveal-img");
 
-    /* 간단한 CSV 파서 — 셀 안의 콤마/줄바꿈/이스케이프된 따옴표 모두 처리 */
     function parseCSV(text) {
       const rows = [];
       let row = [];
@@ -574,7 +441,7 @@
       for (let i = 0; i < text.length; i++) {
         const ch = text[i];
         if (inQuotes) {
-          if (ch === '"' && text[i + 1] === '"') {       // 이스케이프된 ""
+          if (ch === '"' && text[i + 1] === '"') {
             cell += '"'; i++;
           } else if (ch === '"') {
             inQuotes = false;
@@ -590,13 +457,12 @@
             row.push(cell); cell = "";
             rows.push(row); row = [];
           } else if (ch === "\r") {
-            // 무시 (CRLF 처리)
+            // 무시
           } else {
             cell += ch;
           }
         }
       }
-      // 마지막 셀/행 flush
       if (cell.length > 0 || row.length > 0) {
         row.push(cell);
         rows.push(row);
@@ -604,11 +470,9 @@
       return rows;
     }
 
-    /* 시트의 한 행 전체를 {헤더명: 값} 객체로 변환 */
     function pickRowFromSheet(rows, targetRow) {
       if (!rows || rows.length === 0) return null;
       const header = rows[0];
-      // targetRow 는 1-based. 헤더가 1행이므로, 데이터행 80 → rows[79]
       const dataRow = rows[targetRow - 1];
       if (!dataRow) {
         console.warn(`[sheet] ${targetRow}행이 비어 있습니다.`);
@@ -625,26 +489,17 @@
 
     /* ─────────────────────────────────────────────
        Reveal 인스턴스 시스템
-       ─────────────────────────────────────────────
-       각 인스턴스는 시트의 한 행에 대응.
-       - 화면 좌표(left%, top%)에 이미지 박스(width×height)를 둠.
-       - 베이스 파일명(예: "79.png")으로 시리즈 8장 미리 로드 (79, 79-1, ..., 79-7).
-       - 마우스가 영향권에 들어오면 캔버스에 브러쉬 trail로 마스크 그려 이미지 드러남.
-       - 클릭 홀드 시 (1) 프레임 자동 순환, (2) 우측+아래로 흰 텍스트 박스 펼쳐짐,
-         (3) 그 안에 "당사자의 직접 설명" 텍스트가 타자기처럼 한 글자씩 타이핑.
-       - 마우스를 떼면 텍스트 박스가 닫히고 텍스트 리셋.
        ───────────────────────────────────────────── */
 
     const FRAME_COUNT = 8;
-    const FRAME_INTERVAL_MS = 280;          // 이미지 프레임 순환 간격
-    const TYPE_INTERVAL_MS  = 50;           // 글자 한 자 타이핑 간격
-    const TEXT_BOX_W = 280;                 // 텍스트 박스가 펼쳐질 최대 너비(px)
-    const TEXT_BOX_H = 200;                 //                     최대 높이(px)
+    const FRAME_INTERVAL_MS = 280;
+    const TYPE_INTERVAL_MS  = 50;
+    const TEXT_BOX_W = 280;
+    const TEXT_BOX_H = 200;
     const REVEAL_INFLUENCE = 90;
     const POINT_LIFE = 140;
     const POINT_RADIUS = 75;
 
-    // 모든 reveal 인스턴스가 공유하는 전역 마우스 좌표
     let mouseX = -9999, mouseY = -9999;
     window.addEventListener("mousemove", (e) => {
       mouseX = e.clientX;
@@ -652,27 +507,18 @@
     });
 
     function createRevealInstance(config) {
-      // config: { leftPct, topPct, size, sheetRow, root, interactive, expandable, framesCount }
-      // interactive === false 이면 호버 브러쉬만 작동 — 클릭/홀드/부피 모션 모두 비활성.
-      // expandable === true 이면 클릭 시 외부 확장 패널을 띄움 (별도 시스템).
-      // framesCount: 시리즈 변형 개수. 기본 8 (베이스 + 7장).
-      //              1이면 베이스만 로드 → 변형 없는 인스턴스는 이렇게.
       const { leftPct, topPct, size, sheetRow, root } = config;
       const interactive = config.interactive !== false;
       const expandable  = config.expandable === true;
       const framesCount = (config.framesCount != null) ? config.framesCount : FRAME_COUNT;
 
-      // ── DOM 구성 ────────────────────────────────────
       const wrap = document.createElement("div");
       wrap.className = "reveal";
-      // 펼쳐지는 텍스트 박스를 담을 공간 확보를 위해 wrap 자체는 이미지 크기로 두고,
-      // 텍스트 박스는 wrap 내부에서 절대 위치로 우측+아래로 자라남.
       wrap.style.left   = `${leftPct}%`;
       wrap.style.top    = `${topPct}%`;
       wrap.style.width  = `${size}px`;
       wrap.style.height = `${size}px`;
 
-      // 텍스트 박스(이미지보다 z-index 낮게 → 이미지가 텍스트 박스 위에 올라옴)
       const textBox = document.createElement("div");
       textBox.className = "reveal-text-box";
       textBox.style.zIndex = "1";
@@ -680,14 +526,11 @@
       textInner.className = "reveal-text-content";
       textBox.appendChild(textInner);
 
-      // 이미지 영역
       const imgArea = document.createElement("div");
       imgArea.className = "reveal-img-area";
       imgArea.style.zIndex = "2";
       const canvas = document.createElement("canvas");
       imgArea.appendChild(canvas);
-
-      // 숨김 소스 img는 더 이상 사용하지 않음 — frames 배열의 Image 객체를 직접 씀
 
       wrap.appendChild(textBox);
       wrap.appendChild(imgArea);
@@ -695,7 +538,6 @@
 
       const ctx = canvas.getContext("2d");
 
-      // ── 캔버스 해상도 (DPR 대응) ────────────────────
       function resizeCanvas() {
         const rect = imgArea.getBoundingClientRect();
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -706,7 +548,6 @@
       resizeCanvas();
       window.addEventListener("resize", resizeCanvas);
 
-      // ── 프레임 시리즈 ──────────────────────────────
       const frames = [];
       let currentFrame = 0;
       let frameLoopTimer = null;
@@ -719,7 +560,6 @@
         for (let i = 0; i < framesCount; i++) {
           const fname = (i === 0) ? `${name}${ext}` : `${name}-${i}${ext}`;
           const img = new Image();
-          // 로드 실패한 프레임은 broken 플래그로 표시 → 순환 시 건너뜀
           img.onerror = () => { img._broken = true; };
           img.src = IMAGE_BASE_PATH + fname;
           frames.push(img);
@@ -729,8 +569,6 @@
                      frames.map(im => im.src));
       }
 
-      // 다음 "정상 로드된" 프레임 인덱스를 찾음 (순환).
-      // 모든 프레임이 broken이면 -1 반환 (그리지 않음).
       function nextValidFrame(from) {
         const n = frames.length;
         if (n === 0) return -1;
@@ -738,16 +576,13 @@
           const idx = (from + i) % n;
           const im = frames[idx];
           if (!im._broken && im.complete && im.naturalWidth > 0) return idx;
-          // 아직 로딩 중이면 일단 시도해볼 가치 있음
           if (!im._broken && !im.complete) return idx;
         }
-        // 모두 broken이면 베이스(0)가 멀쩡한지 확인
         const base = frames[0];
         if (base && !base._broken) return 0;
         return -1;
       }
 
-      // ── 텍스트 타이핑 ─────────────────────────────
       let fullText = "";
       let typedLen = 0;
       let typeTimer = null;
@@ -759,9 +594,7 @@
       }
       function renderTypedText() {
         const visible = fullText.slice(0, typedLen);
-        // 안전한 텍스트 렌더 + 깜빡이는 caret 추가
         textInner.textContent = visible;
-        // caret 추가 (innerHTML 안 쓰고 노드 직접 추가)
         if (typedLen < fullText.length || isHolding) {
           const caret = document.createElement("span");
           caret.className = "caret";
@@ -775,26 +608,21 @@
             typedLen++;
             renderTypedText();
           }
-          // 다 타이핑되면 그대로 둠 (홀드 끝날 때까지 유지)
         }, TYPE_INTERVAL_MS);
       }
       function stopTyping() {
         if (typeTimer) { clearInterval(typeTimer); typeTimer = null; }
       }
 
-      // ── 클릭 홀드 상태 ────────────────────────────
       let isHolding = false;
-      // 부피 모드 진입 후엔 이미지(브러쉬 호버)와 모든 클릭 모션을 비활성화.
       let isVolumeMode = false;
 
       function startHold() {
-        if (!interactive) return;     // 호버만 동작하는 인스턴스 — 클릭 무시
+        if (!interactive) return;
         if (isHolding) return;
-        if (isVolumeMode) return;     // 부피 모드 중엔 클릭 무시
+        if (isVolumeMode) return;
         isHolding = true;
 
-        // 프레임 자동 순환 시작 (79 → 79-1 → ... → 79-7 → 79 → ...)
-        // 변형 파일이 없는 경우엔 자동으로 건너뜀 — 베이스만 있어도 안전 동작.
         if (!frameLoopTimer) {
           frameLoopTimer = setInterval(() => {
             if (frames.length > 0) {
@@ -803,27 +631,21 @@
             }
           }, FRAME_INTERVAL_MS);
         }
-        // 텍스트 박스/타이핑은 일부러 시작하지 않음 — 클릭 떼면 부피 텍스트로.
       }
-      // ── 부피 텍스트 시스템 ─────────────────────────
-      // 클릭을 뗐을 때 fullText를 글자 단위로 분해해 비대칭 구체 표면에 흩어 놓고
-      // 천천히 회전·부유시키는 클라우드. 무한 루프.
-      let volumeRoot = null;     // .text-volume 컨테이너
-      let volumeStage = null;    // 3D 변환을 받을 무대
-      let volumeGlyphs = [];     // {el, basePos:{x,y}, spherePos:{x,y,z}, phase}
+
+      let volumeRoot = null;
+      let volumeStage = null;
+      let volumeGlyphs = [];
       let volumeStartTime = 0;
       let volumeRafId = 0;
-      // 화면을 떠다니는 위치 (이제는 이미지 박스 중앙으로 매 프레임 정렬됨)
       let volX = 0, volY = 0;
 
       function buildVolumeText(text) {
-        // 기존 정리
         teardownVolumeText();
         if (!text || text.trim().length === 0) return;
 
         volumeRoot = document.createElement("div");
         volumeRoot.className = "text-volume";
-        // 시작 위치는 이미지 박스 위치
         const r = wrap.getBoundingClientRect();
         volX = r.left + r.width / 2;
         volY = r.top  + r.height / 2;
@@ -837,8 +659,6 @@
         volumeRoot.appendChild(volumeStage);
         document.body.appendChild(volumeRoot);
 
-        // 응집 좌표(2D) 계산 — 한 줄로 펼쳐졌을 때 각 글자의 x 위치
-        // 임시로 측정용 span을 만들어 폭을 잰다.
         const measure = document.createElement("span");
         measure.className = "text-volume-glyph";
         measure.style.position = "fixed";
@@ -855,7 +675,7 @@
         }
         document.body.removeChild(measure);
         const totalW = charWidths.reduce((a, b) => a + b, 0);
-        const startX = -totalW / 2;     // 응집 시 가운데 정렬
+        const startX = -totalW / 2;
 
         volumeGlyphs = [];
         let cx = startX;
@@ -866,42 +686,34 @@
           el.textContent = ch;
           volumeStage.appendChild(el);
 
-          // 응집 좌표 (2D, 평면 한 줄)
           const flatX = cx;
           const flatY = 0;
           cx += charWidths[i];
 
-          // 분산 좌표 — 약간 비대칭한 구면 위 점.
-          // theta=경도(0~2π), phi=위도(0~π). 균등 분포에 가깝게 잡되,
-          // 위쪽이 살짝 우묵하고 약간 비대칭이 되도록 노이즈를 가미.
           const u = Math.random();
           const v = Math.random();
           const theta = 2 * Math.PI * u;
-          const phi   = Math.acos(2 * v - 1);   // 균등한 구면 분포
-          const baseR = 80;                      // 기본 반지름
-          // 비대칭: 위(phi 작을수록)는 살짝 들어가고, 아래는 더 부풀게
+          const phi   = Math.acos(2 * v - 1);
+          const baseR = 80;
           const radiusMod = 1 + Math.sin(phi - 0.3) * 0.15
                               + Math.cos(theta * 2) * 0.06;
           const R = baseR * radiusMod;
           const sx = R * Math.sin(phi) * Math.cos(theta);
-          const sy = R * Math.cos(phi) - 8;     // 살짝 위로 (사과 꼭지 쪽 우묵)
+          const sy = R * Math.cos(phi) - 8;
           const sz = R * Math.sin(phi) * Math.sin(theta);
 
           volumeGlyphs.push({
             el,
             flatX, flatY,
             sphereX: sx, sphereY: sy, sphereZ: sz,
-            // 글자마다 위상 어긋남 — 동시에 응집/확산하지 않고 자연스럽게 흐름
             phase: Math.random() * Math.PI * 2,
-            // 표면 위 미세 흐름용 시드
             flowSeed: Math.random() * 1000,
           });
         }
 
         volumeStartTime = performance.now();
-        // RAF 시작
         const tickVol = (now) => {
-          if (!volumeRoot) return;       // 정리됨
+          if (!volumeRoot) return;
           updateVolume(now);
           volumeRafId = requestAnimationFrame(tickVol);
         };
@@ -909,56 +721,40 @@
       }
 
       function updateVolume(now) {
-        const t = (now - volumeStartTime) / 1000;   // 초 단위
+        const t = (now - volumeStartTime) / 1000;
 
-        // 위치: 이미지 박스의 현재 중심에 정확히 정렬 (윈도우 리사이즈에도 따라옴)
         const r = wrap.getBoundingClientRect();
         volX = r.left + r.width / 2;
         volY = r.top  + r.height / 2;
         volumeRoot.style.left = `${volX}px`;
         volumeRoot.style.top  = `${volY}px`;
 
-        // 전체 회전 — 매우 느리게
-        const rotY = t * 12;       // 도(°). 30초에 한 바퀴 정도
+        const rotY = t * 12;
         const rotX = Math.sin(t * 0.15) * 8;
         volumeStage.style.transform =
           `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
 
-        // 응집/확산 사이클 — 8초 주기로 sin 보간
-        // morph 0 = 완전 응집(한 줄), 1 = 완전 분산(구체)
         const morphCycle = (Math.sin(t * (Math.PI * 2 / 8)) + 1) / 2;
-        // 처음 1.5초는 응집 → 분산으로 천천히 진입 (등장 효과)
         const intro = Math.min(1, t / 1.5);
         const morph = morphCycle * intro;
 
-        // 각 글자 업데이트
         for (const g of volumeGlyphs) {
-          // 응집과 분산 사이를 글자별 위상 어긋남으로 보간
-          // 글자마다 자기 phase에 따라 morph 값이 살짝 다르게 적용됨 → 흩날리는 인상
           const localMorph = Math.max(0, Math.min(1,
             morph + Math.sin(t * 0.5 + g.phase) * 0.15
           ));
 
-          // 분산 위치 — 표면을 따라 미세하게 흐름
           const flow = Math.sin(t * 0.3 + g.flowSeed) * 4;
           const sx = g.sphereX + Math.cos(g.flowSeed) * flow;
           const sy = g.sphereY + Math.sin(g.flowSeed * 1.3) * flow * 0.8;
           const sz = g.sphereZ + Math.cos(g.flowSeed * 0.7) * flow;
 
-          // 응집 ↔ 분산 보간
           const x = g.flatX * (1 - localMorph) + sx * localMorph;
           const y = g.flatY * (1 - localMorph) + sy * localMorph;
           const z =                          0 * (1 - localMorph) + sz * localMorph;
 
-          // CSS 3D transform — perspective는 부모(text-volume)가 적용
-          // translateZ에 의해 깊이감이 자동 처리되지만, 추가로 opacity/scale도 z에 따라 보정
-          // (rotateY로 회전했을 때 글자가 뒷면에 가는 경우 더 옅어지게)
-          // 회전된 후의 실제 z 위치 = sz * cos(rotY) + sx * sin(rotY) ... 같은 식이지만
-          // CSS가 이미 처리해주므로 raw z만으로 근사 보정.
           const rotYRad = rotY * Math.PI / 180;
           const effectiveZ = z * Math.cos(rotYRad) + x * Math.sin(rotYRad);
-          // -baseR ~ +baseR 범위 → 0.4 ~ 1.0 opacity, 0.85 ~ 1.15 scale
-          const depthN = (effectiveZ + 80) / 160;        // 0~1
+          const depthN = (effectiveZ + 80) / 160;
           const opacity = 0.35 + Math.max(0, Math.min(1, depthN)) * 0.65;
           const scale   = 0.85 + Math.max(0, Math.min(1, depthN)) * 0.30;
 
@@ -983,33 +779,22 @@
         if (!isHolding) return;
         isHolding = false;
 
-        // 프레임 순환 정지
         if (frameLoopTimer) { clearInterval(frameLoopTimer); frameLoopTimer = null; }
 
-        // 클릭을 떼면 즉시 부피 모드로 전환 (텍스트가 있을 때만)
         if (fullText && fullText.trim().length > 0) {
-          isVolumeMode = true;       // 이후 호버/클릭 모두 무시
-          // 캔버스 즉시 클리어 (이미지 사라짐)
+          isVolumeMode = true;
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           trail.length = 0;
           buildVolumeText(fullText);
         }
       }
 
-      // ── 영역 판별 ─────────────────────────────────
-      // 클릭 홀드 트리거는 "이미지 영역" 안일 때만.
-      // - interactive 인스턴스: 클릭이 영역 안이면 잡음 (Position 드래그 차단)
-      // - expandable 인스턴스: 클릭 시 패널을 띄워야 하므로 영역 안이면 잡음
-      // - 둘 다 아닌 인스턴스: 클릭 가로채지 않음 (페이지 드래그가 정상 동작)
       function isInside(x, y) {
         if (!interactive && !expandable) return false;
         const r = imgArea.getBoundingClientRect();
         return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
       }
 
-      // ── 확장 패널 데이터 ───────────────────────────
-      // expandable 인스턴스는 자기 데이터(이미지 파일명, About 텍스트)를 보관하다가
-      // 클릭 시 외부 시스템(showExpandedPanel)에 넘겨 패널을 띄운다.
       let expandImageFile = "";
       let expandText = "";
       function setExpandData(filename, text) {
@@ -1020,7 +805,6 @@
         return { filename: expandImageFile, text: expandText };
       }
 
-      // ── 브러쉬 trail ───────────────────────────────
       const trail = [];
       let prevMX = -9999, prevMY = -9999;
 
@@ -1043,9 +827,7 @@
         if (trail.length > 700) trail.splice(0, trail.length - 700);
       }
 
-      // ── 매 프레임 업데이트 ───────────────────────
       function tick() {
-        // 부피 모드면 호버 트레일도 만들지 않고 캔버스에 아무것도 그리지 않음
         if (isVolumeMode) {
           requestAnimationFrame(tick);
           return;
@@ -1053,7 +835,6 @@
 
         const rect = imgArea.getBoundingClientRect();
 
-        // 마우스가 영향권 안인지
         const dx = Math.max(rect.left - mouseX, 0, mouseX - rect.right);
         const dy = Math.max(rect.top  - mouseY, 0, mouseY - rect.bottom);
         const distOutside = Math.hypot(dx, dy);
@@ -1074,7 +855,6 @@
           prevMX = -9999; prevMY = -9999;
         }
 
-        // ── 캔버스 그리기 ──
         const W = rect.width, H = rect.height;
         ctx.clearRect(0, 0, W, H);
 
@@ -1126,14 +906,12 @@
       }
       requestAnimationFrame(tick);
 
-      // ── 외부 인터페이스 ────────────────────────────
       const instance = {
         loadFrameSeries,
         setText,
         isInside,
         startHold,
         stopHold,
-        // expandable 전용
         expandable,
         setExpandData,
         getExpandData,
@@ -1145,8 +923,6 @@
     /* ─────────────────────────────────────────────
        시트 데이터 → 인스턴스에 적용
        ───────────────────────────────────────────── */
-    // 두 개의 reveal 인스턴스 — 시트의 80행/11행에 매핑
-    // 위치/크기는 화면 안에서 자연스럽게 흩어져 보이도록 결정.
     const root = document.getElementById("reveal-root");
     const inst79 = createRevealInstance({
       leftPct: 60, topPct: 35, size: 120,
@@ -1156,12 +932,8 @@
     const inst10 = createRevealInstance({
       leftPct: 28, topPct: 65, size: 120,
       sheetRow: 11,
-      // 호버 reveal은 정상 작동, 그러나 기본 클릭(홀드/부피) 시스템은 비활성.
-      // 대신 클릭하면 '확장 패널'이 뜸 — cognosco.online 스타일.
       interactive: false,
       expandable: true,
-      // 시리즈 순환 안 함 — 베이스(10.png) 한 장만 로드.
-      // 클릭 시 보여지는 큰 이미지(10-1.png)는 패널 시스템이 별도 로드.
       framesCount: 1,
       root,
     });
@@ -1171,21 +943,13 @@
     ];
 
     /* ─────────────────────────────────────────────
-       확장 패널 시스템 (cognosco.online 스타일)
-       ─────────────────────────────────────────────
-       - 한 번에 하나의 패널만 표시
-       - 헤더를 잡고 드래그해서 옮길 수 있음
-       - 본문은 자체 스크롤
-       - 우상단 [close] 또는 패널 외부 클릭 시 닫힘
+       확장 패널 시스템
        ───────────────────────────────────────────── */
     let currentPanel = null;
 
     function showExpandedPanel(filename, text, originX, originY) {
-      // 이미 있으면 닫고 새로 열기
       if (currentPanel) closeExpandedPanel();
 
-      // 10.png 클릭 시 보여줄 큰 변형은 -1 버전.
-      // (이름이 "10.png" 면 "10-1.png" 로 자동 변환)
       const dot = filename.lastIndexOf(".");
       const name = dot === -1 ? filename : filename.slice(0, dot);
       const ext  = dot === -1 ? ""       : filename.slice(dot);
@@ -1194,18 +958,15 @@
       const panel = document.createElement("div");
       panel.className = "expanded-panel";
 
-      // 1) 베이스 이미지 (10-1.png) — 패널의 모양/크기를 결정
       const img = document.createElement("img");
       img.className = "expanded-panel-image";
       img.alt = "";
       img.draggable = false;
       img.src = IMAGE_BASE_PATH + expandedFilename;
 
-      // 2) 마우스 스포트라이트 — 빛이 마우스 따라 흐르며 이미지와 lighten 합성
       const spotlight = document.createElement("div");
       spotlight.className = "expanded-panel-spotlight";
 
-      // 3) 텍스트 영역 — 이미지+스포트라이트 위에 difference 로 합성
       const textWrap = document.createElement("div");
       textWrap.className = "expanded-panel-text-wrap";
       const txt = document.createElement("div");
@@ -1213,14 +974,12 @@
       txt.textContent = text || "";
       textWrap.appendChild(txt);
 
-      // 쌓기 순서: 이미지(맨 아래) → 스포트라이트 → 텍스트(맨 위)
       panel.appendChild(img);
       panel.appendChild(spotlight);
       panel.appendChild(textWrap);
       document.body.appendChild(panel);
 
-      // 스포트라이트 위치 추적 (패널 내부 좌표, lerp 으로 부드럽게)
-      let spotTargetX = 50, spotTargetY = 50;   // 백분율
+      let spotTargetX = 50, spotTargetY = 50;
       let spotCurrX   = 50, spotCurrY   = 50;
       const updateSpotlightTarget = (e) => {
         const r = panel.getBoundingClientRect();
@@ -1228,11 +987,9 @@
         spotTargetY = ((e.clientY - r.top)  / r.height) * 100;
       };
       panel.addEventListener("mousemove", updateSpotlightTarget);
-      // 마우스가 패널 밖이어도 부드럽게 끝까지 따라가다가 멈춤 — 일단 패널 안에서만 추적
 
       let spotRafId = 0;
       const tickSpotlight = () => {
-        // 현재 위치를 목표로 부드럽게 lerp
         spotCurrX += (spotTargetX - spotCurrX) * 0.18;
         spotCurrY += (spotTargetY - spotCurrY) * 0.18;
         spotlight.style.backgroundImage =
@@ -1246,8 +1003,6 @@
       };
       spotRafId = requestAnimationFrame(tickSpotlight);
 
-      // 이미지가 로드된 후 크기를 결정 (자연 비율 유지).
-      // 더 작은 사이즈로: 가로 55vw / 세로 65vh
       const positionPanel = () => {
         const naturalW = img.naturalWidth  || 800;
         const naturalH = img.naturalHeight || 600;
@@ -1259,7 +1014,6 @@
         panel.style.width  = `${w}px`;
         panel.style.height = `${h}px`;
 
-        // 화면 중앙 부근에 위치 — 클릭 좌표 근처지만 화면 안에 클램프
         let px = (originX || window.innerWidth  / 2) - w / 2;
         let py = (originY || window.innerHeight / 2) - h / 2;
         px = Math.max(8, Math.min(window.innerWidth  - w - 8, px));
@@ -1272,24 +1026,18 @@
         positionPanel();
       } else {
         img.addEventListener("load", positionPanel);
-        // 로드 실패해도 일단 기본 크기로 띄움
         img.addEventListener("error", positionPanel);
       }
 
-      // 등장 트랜지션
       requestAnimationFrame(() => {
         requestAnimationFrame(() => panel.classList.add("is-visible"));
       });
 
-      // ── 패널 드래그 (이미지 영역에서 잡고 끌기) ──
-      // 단, 텍스트 영역(textWrap) 안에서 누른 건 드래그 시작이 아닌 텍스트 스크롤로.
       let dragging = false;
       let dragOffsetX = 0, dragOffsetY = 0;
       panel.addEventListener("mousedown", (e) => {
         if (e.button !== 0) return;
-        // 텍스트 영역 안이면 패널 드래그 시작 안 함 (텍스트 자체 스크롤이 우선)
         if (textWrap.contains(e.target)) {
-          // 패널 드래그도, 페이지 mousedown도 막음 — 텍스트는 자체 동작 유지
           e.stopPropagation();
           return;
         }
@@ -1307,7 +1055,6 @@
         const h = panel.offsetHeight;
         let nx = e.clientX - dragOffsetX;
         let ny = e.clientY - dragOffsetY;
-        // 화면 안에 클램프 (최소 80px은 보이게)
         nx = Math.max(80 - w, Math.min(window.innerWidth  - 80, nx));
         ny = Math.max(0,      Math.min(window.innerHeight - 40, ny));
         panel.style.left = `${nx}px`;
@@ -1321,7 +1068,6 @@
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
 
-      // 패널 안의 wheel 은 페이지로 전파 안 됨 (텍스트 영역에서 자체 스크롤 보장)
       panel.addEventListener("wheel", (e) => e.stopPropagation());
 
       currentPanel = {
@@ -1340,13 +1086,11 @@
       el.classList.remove("is-visible");
       cleanup();
       currentPanel = null;
-      // 트랜지션 끝나면 DOM에서 제거
       setTimeout(() => {
         if (el.parentNode) el.parentNode.removeChild(el);
       }, 600);
     }
 
-    // ESC 키로도 닫기
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") closeExpandedPanel();
     });
@@ -1355,7 +1099,6 @@
       for (const { inst, row } of allInstances) {
         const item = pickRowFromSheet(rows, row);
         if (!item) {
-          // 행이 비어 있으면 fallback (해당 행에 대응하는 기본값)
           const fb = (row === 80) ? "79.png" : "10.png";
           inst.loadFrameSeries(fb);
           inst.setText("");
@@ -1364,9 +1107,7 @@
         }
         const filename = item[SHEET_TARGET_COL_NAME] || (row === 80 ? "79.png" : "10.png");
         inst.loadFrameSeries(filename);
-        // 텍스트는 "당사자의 직접 설명" 컬럼에서 (시트의 E열)
         inst.setText(item["당사자의 직접 설명"] || "");
-        // 확장 패널용 텍스트는 D열("About") 컬럼에서
         if (inst.expandable && inst.setExpandData) {
           inst.setExpandData(filename, item["About"] || "");
         }
@@ -1375,15 +1116,13 @@
     }
 
     function applyFallbackAll() {
-      // 시트 게시 URL이 없을 때 임시로 사용할 텍스트.
-      // 시트 게시 URL을 SHEET_CSV_URL에 넣으면 시트 값이 우선 적용되어 이건 무시됨.
       inst79.loadFrameSeries("79.png");
       inst79.setText(
         "I can imagine an apple in front of me. " +
         "I know where the skin is. I know how big it is. I can't see it."
       );
       inst10.loadFrameSeries("10.png");
-      inst10.setText("");      // 10행 임시 텍스트는 비워둠 — 시트에 채우는 대로 적용
+      inst10.setText("");
       console.info("[sheet] fallback (시트 미연결) — 임시 텍스트 사용");
     }
 
