@@ -1410,7 +1410,6 @@
       leftPct: 28, topPct: 65, size: 120,
       sheetRow: 11,
       interactive: false,
-      expandable: true,
       framesCount: 1,
       root,
     });
@@ -1598,7 +1597,12 @@
         else if (row === 29) defaultFile = "28.png";
         const filename = item[SHEET_TARGET_COL_NAME] || defaultFile;
         inst.loadFrameSeries(filename);
-        inst.setText(item["당사자의 직접 설명"] || "");
+        // row 11 (10.png) 은 텍스트 없이 이미지만 — hold/expand 모두 비활성
+        if (row === 11) {
+          inst.setText("");
+        } else {
+          inst.setText(item["당사자의 직접 설명"] || "");
+        }
         if (inst.expandable && inst.setExpandData) {
           inst.setExpandData(filename, item["About"] || "");
         }
