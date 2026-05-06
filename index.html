@@ -1881,33 +1881,32 @@
             return { x: b.x, y: b.y, ang: Math.atan2(b.y - a.y, b.x - a.x) };
           }
 
-          // 사용 가능한 경로 화면 호 길이 (현재 줌이 다르면 약간 어긋날 수 있어도 시각적 흐름은 유지)
+          // 사용 가능한 경로 화면 호 길이
           const pathScreenLen = pathPts[pathPts.length - 1].sScreen;
 
-          // pendingText를 path 위로 흘려보내며 그림. 경로 끝나면 다시 처음부터 (반복)
-          // 단, 같은 경로를 너무 많이 덮어 그리면 지저분해지니
-          // 텍스트가 경로보다 길면 텍스트 길이만큼만 한 사이클 그리고 끝.
-          let s = 0;
-          // 시작점에서 약간 들어가서 시작 (경로 첫 점에 글자가 몰리지 않게)
-          let i = 0;
-          let cycleGuard = 0;
-          while (i < pendingText.length && cycleGuard < pendingText.length * 3) {
-            cycleGuard++;
-            const ch = pendingText[i];
-            const chW = octx.measureText(ch).width;
-            // 공백은 그리지 않고 너비만 진행
-            if (ch !== " ") {
-              // 경로 길이를 넘어서면 종료 (반복 없이 한 번만)
-              if (s > pathScreenLen) break;
-              const sample = sampleAt(s);
-              octx.save();
-              octx.translate(sample.x, sample.y);
-              octx.rotate(sample.ang);
-              octx.fillText(ch, 0, 0);
-              octx.restore();
+          // pendingText를 path 위로 흘려보내며 그림.
+          // 텍스트가 짧으면 경로 끝까지 반복해서 채움(공백으로 구분).
+          if (pendingText.length > 0) {
+            const loop = pendingText + "  ";
+            let s = 0;
+            let i = 0;
+            let safety = 0;
+            const safetyMax = 50000; // 경로가 매우 길어도 무한루프 방지
+            while (s <= pathScreenLen && safety < safetyMax) {
+              safety++;
+              const ch = loop[i % loop.length];
+              const chW = octx.measureText(ch).width || 4;
+              if (ch !== " ") {
+                const sample = sampleAt(s);
+                octx.save();
+                octx.translate(sample.x, sample.y);
+                octx.rotate(sample.ang);
+                octx.fillText(ch, 0, 0);
+                octx.restore();
+              }
+              s += chW;
+              i++;
             }
-            s += chW;
-            i++;
           }
 
           octx.textAlign = "start";
