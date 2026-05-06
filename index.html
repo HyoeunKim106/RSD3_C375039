@@ -52,6 +52,49 @@
       touch-action: none;
     }
 
+    /* ───────── 월드 컨테이너 (카메라 변환을 받음) ─────────
+       Position(팬)과 Distance(줌)을 실제 transform으로 적용해서
+       공간 자체가 움직이고 확대되게 함
+    */
+    #world {
+      position: fixed;
+      inset: 0;
+      transform-origin: 50% 50%;
+      will-change: transform;
+      pointer-events: none; /* 자식들이 개별적으로 받음 */
+    }
+    #reveal-root {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    /* ───────── 우상단 캡처 버튼 ───────── */
+    #capture-btn {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #000000;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      z-index: 100;
+      transition: transform 0.18s ease, opacity 0.18s ease;
+    }
+    #capture-btn:hover {
+      transform: scale(1.18);
+    }
+    #capture-btn:active {
+      transform: scale(0.92);
+    }
+    #capture-btn.is-busy {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
     /* ───────── 좌측 하단 HUD ───────── */
     .hud {
       position: fixed;
@@ -292,13 +335,19 @@
 </head>
 <body>
 
-  <!-- reveal 인스턴스들은 JS가 동적으로 생성해 #reveal-root 안에 추가 -->
-  <div id="reveal-root"></div>
+  <!-- 카메라 변환을 받는 월드 컨테이너 -->
+  <div id="world">
+    <!-- reveal 인스턴스들은 JS가 동적으로 생성해 #reveal-root 안에 추가 -->
+    <div id="reveal-root"></div>
+  </div>
 
   <div class="hud" id="hud">
     <span class="row">DISTANCE <span class="num" id="num-distance">100%</span></span>
     <span class="row">POSITION X:<span class="num after-colon" id="num-pos-x">000</span> Y:<span class="num after-colon" id="num-pos-y">000</span></span>
   </div>
+
+  <!-- 우상단 캡처 버튼 -->
+  <button id="capture-btn" type="button" aria-label="Capture trajectory"></button>
 
   <script>
     /* ─────────────────────────────────────────────
@@ -319,12 +368,31 @@
       return sign + abs;
     }
 
+    const worldEl = document.getElementById("world");
+
     function renderHUD() {
       numDistance.textContent = `${Math.round(distance)}%`;
       numPosX.textContent = fmt3(posX);
       numPosY.textContent = fmt3(posY);
+      // 카메라 변환 — Position은 공간 이동, Distance는 확대 비율
+      const scale = distance / 100;
+      worldEl.style.transform =
+        `translate(${posX}px, ${posY}px) scale(${scale.toFixed(4)})`;
     }
     renderHUD();
+
+    /* 화면(client) 좌표 → 월드 좌표 변환 */
+    function screenToWorld(clientX, clientY) {
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const scale = distance / 100;
+      // world transform: translate(posX, posY) scale(scale) (origin 중앙)
+      // 역변환
+      return {
+        x: (clientX - cx - posX) / scale + cx,
+        y: (clientY - cy - posY) / scale + cy,
+      };
+    }
 
     /* ─────────────────────────────────────────────
        1) 마우스 드래그 (잡고 끌기) → Position
@@ -392,12 +460,30 @@
     /* ─────────────────────────────────────────────
        2) wheel 이벤트 분기
        ───────────────────────────────────────────── */
+    function applyZoomAt(clientX, clientY, factor) {
+      // 마우스 커서를 고정점으로 줌
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const oldScale = distance / 100;
+      const newDistance = Math.max(5, distance * factor);
+      const newScale = newDistance / 100;
+      // 마우스 위치의 월드 좌표가 줌 전후로 같도록 posX/posY 조정
+      // screen = (world - center) * scale + center + pos
+      // world = (screen - center - pos) / scale + center
+      const worldX = (clientX - cx - posX) / oldScale + cx;
+      const worldY = (clientY - cy - posY) / oldScale + cy;
+      // 이 worldX/Y가 줌 후에도 같은 screen 위치가 되도록
+      posX = clientX - cx - (worldX - cx) * newScale;
+      posY = clientY - cy - (worldY - cy) * newScale;
+      distance = newDistance;
+    }
+
     window.addEventListener("wheel", (e) => {
       e.preventDefault();
 
       if (e.ctrlKey) {
         const factor = Math.exp(-e.deltaY * 0.01);
-        distance = Math.max(0, distance * factor);
+        applyZoomAt(e.clientX, e.clientY, factor);
       } else {
         const isTrackpadPan =
           Math.abs(e.deltaX) > 0 ||
@@ -408,7 +494,7 @@
           posY -= e.deltaY;
         } else {
           const factor = Math.exp(-e.deltaY * 0.001);
-          distance = Math.max(0, distance * factor);
+          applyZoomAt(e.clientX, e.clientY, factor);
         }
       }
       renderHUD();
@@ -452,7 +538,12 @@
       } else if (touchMode === "pinch" && e.touches.length === 2) {
         const d = touchDistance(e.touches[0], e.touches[1]);
         if (pinchStartDist > 0) {
-          distance = Math.max(0, pinchStartDistance * (d / pinchStartDist));
+          // 두 손가락 중심점 기준으로 줌
+          const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+          const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+          const targetDistance = Math.max(5, pinchStartDistance * (d / pinchStartDist));
+          const factor = targetDistance / distance;
+          applyZoomAt(midX, midY, factor);
           renderHUD();
         }
       }
@@ -1293,6 +1384,10 @@
         if (trail.length > 700) trail.splice(0, trail.length - 700);
       }
 
+      // 영향 영역 진입/이탈 상태 추적 — 외부 콜백(trajectory)
+      let wasInInfluence = false;
+      let onInfluenceEnter = null; // function(instance) {}
+
       function tick() {
         if (isVolumeMode) {
           requestAnimationFrame(tick);
@@ -1305,6 +1400,14 @@
         const dy = Math.max(rect.top  - mouseY, 0, mouseY - rect.bottom);
         const distOutside = Math.hypot(dx, dy);
         const inInfluence = distOutside <= REVEAL_INFLUENCE;
+
+        // 진입 시점 캡처 (이탈했다가 다시 들어오면 또 트리거)
+        if (inInfluence && !wasInInfluence) {
+          if (typeof onInfluenceEnter === "function") {
+            onInfluenceEnter(instance);
+          }
+        }
+        wasInInfluence = inInfluence;
 
         if (inInfluence) {
           const lx = mouseX - rect.left;
@@ -1386,12 +1489,15 @@
       const instance = {
         loadFrameSeries,
         setText,
+        getText: () => fullText,
         isInside,
         startHold,
         stopHold,
         expandable,
         setExpandData,
         getExpandData,
+        name: config.name || "",
+        setOnInfluenceEnter: (fn) => { onInfluenceEnter = fn; },
       };
       revealInstances.push(instance);
       return instance;
@@ -1404,11 +1510,13 @@
     const inst79 = createRevealInstance({
       leftPct: 60, topPct: 35, size: 120,
       sheetRow: 80,
+      name: "79",
       root,
     });
     const inst10 = createRevealInstance({
       leftPct: 28, topPct: 65, size: 120,
       sheetRow: 11,
+      name: "10",
       interactive: false,
       framesCount: 1,
       root,
@@ -1416,7 +1524,8 @@
     /* 28.png 인스턴스 — hold 시 페이드 루프, 떼면 붕괴 텍스트 모션 */
     const inst28 = createRevealInstance({
       leftPct: 18, topPct: 22, size: 120,
-      sheetRow: 29,             // 28.png는 시트 29행 (헤더가 1행이므로 데이터 28번째)
+      sheetRow: 29,
+      name: "28",
       root,
       holdPulse: true,
       outroMode: "decay",
@@ -1609,6 +1718,195 @@
         console.info(`[sheet] row ${row} →`, item);
       }
     }
+
+    /* ─────────────────────────────────────────────
+       궤적 추적 — 사용자가 만진 인스턴스를 시간 순으로 기록
+       ───────────────────────────────────────────── */
+    const trajectory = []; // [{name, text, t}]
+    let lastTrajectoryName = null; // 같은 인스턴스 연속 진입은 한 번만 기록
+
+    function recordTrajectory(inst) {
+      const text = inst.getText ? inst.getText() : "";
+      // 같은 인스턴스를 떠나지 않고 계속 영향권 안에 있으면 한 번만 기록
+      // (영향권을 벗어났다 다시 들어오면 다른 항목으로 기록)
+      if (lastTrajectoryName === inst.name) return;
+      lastTrajectoryName = inst.name;
+      trajectory.push({
+        name: inst.name,
+        text: text,
+        t: Date.now(),
+      });
+      console.info(`[trajectory] entered ${inst.name}, total ${trajectory.length}`);
+    }
+
+    // 각 인스턴스에 영향 영역 진입 콜백 연결
+    for (const inst of revealInstances) {
+      if (inst.setOnInfluenceEnter) {
+        inst.setOnInfluenceEnter(recordTrajectory);
+      }
+    }
+
+    // 영향권을 모두 벗어나면 lastTrajectoryName 리셋 — 다음 진입이 새 항목으로
+    setInterval(() => {
+      // 별도 검사 — 모든 인스턴스가 영향권 밖이면 마지막 이름 리셋
+      // (간단하게: 마우스가 어떤 인스턴스 영향권에도 없으면 리셋)
+      let anyIn = false;
+      for (const inst of revealInstances) {
+        if (inst.isInside && inst.isInside(mouseX, mouseY)) {
+          anyIn = true; break;
+        }
+      }
+      if (!anyIn) lastTrajectoryName = null;
+    }, 200);
+
+    /* ─────────────────────────────────────────────
+       캡처 시스템 — 화면 캡처 + 궤적 텍스트 다운로드
+       ───────────────────────────────────────────── */
+    const captureBtn = document.getElementById("capture-btn");
+
+    async function captureScreen() {
+      // 캔버스 + DOM 요소들을 합성해 한 장의 PNG로 만든다.
+      // SVG foreignObject 트릭으로 DOM을 이미지로 렌더링.
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+
+      // 1) 빈 캔버스 준비
+      const out = document.createElement("canvas");
+      out.width = W;
+      out.height = H;
+      const octx = out.getContext("2d");
+      // 흰 배경
+      octx.fillStyle = "#ffffff";
+      octx.fillRect(0, 0, W, H);
+
+      // 2) 각 reveal 인스턴스의 캔버스를 화면 위치에 그대로 그려넣는다
+      //    canvas는 getBoundingClientRect로 화면 좌표를 정확히 안다.
+      const revealCanvases = document.querySelectorAll(".reveal-img-area canvas");
+      for (const c of revealCanvases) {
+        const r = c.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) continue;
+        try {
+          octx.drawImage(c, r.left, r.top, r.width, r.height);
+        } catch (e) { /* tainted 등 무시 */ }
+      }
+
+      // 3) 부피/decay 텍스트 글리프들을 글자 단위로 그려넣는다
+      //    (각 .text-volume-glyph / .text-decay-glyph 의 화면 위치와 transform 적용 후 위치)
+      const glyphs = document.querySelectorAll(".text-volume-glyph, .text-decay-glyph");
+      octx.fillStyle = "#000000";
+      // 폰트는 실제 적용된 것을 사용 (Vivaldi)
+      octx.font = "13px Vivaldi, Eulyoo1945-Regular, serif";
+      octx.textBaseline = "top";
+      for (const g of glyphs) {
+        const r = g.getBoundingClientRect();
+        const cs = window.getComputedStyle(g);
+        const op = parseFloat(cs.opacity);
+        if (!isFinite(op) || op <= 0.01) continue;
+        if (r.left > W || r.right < 0 || r.top > H || r.bottom < 0) continue;
+        octx.globalAlpha = op;
+        octx.fillText(g.textContent, r.left, r.top);
+      }
+      octx.globalAlpha = 1;
+
+      // 4) reveal-text-content (타이프된 텍스트 박스) 도 그려넣음
+      const textBlocks = document.querySelectorAll(".reveal-text-content");
+      octx.font = "13px Vivaldi, Eulyoo1945-Regular, serif";
+      for (const tb of textBlocks) {
+        const txt = tb.textContent;
+        if (!txt) continue;
+        const r = tb.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) continue;
+        // 줄바꿈 처리
+        const lineHeight = 13 * 1.55;
+        const maxWidth = r.width - 32;
+        const words = txt.split(/(\s+)/);
+        let line = "";
+        let y = r.top + 14;
+        for (const w of words) {
+          const testLine = line + w;
+          const m = octx.measureText(testLine);
+          if (m.width > maxWidth && line.length > 0) {
+            octx.fillText(line, r.left + 16, y);
+            y += lineHeight;
+            line = w.replace(/^\s+/, "");
+          } else {
+            line = testLine;
+          }
+        }
+        if (line) octx.fillText(line, r.left + 16, y);
+      }
+
+      // 5) HUD
+      const hudEl = document.getElementById("hud");
+      const hudCS = window.getComputedStyle(hudEl);
+      octx.font = "15px GravesendSansLight, sans-serif";
+      octx.fillStyle = "#000000";
+      const lines = hudEl.innerText.split("\n");
+      let hy = H - 14 - (lines.length - 1) * 18 - 4;
+      for (const ln of lines) {
+        octx.fillText(ln.toUpperCase(), 16, hy);
+        hy += 18;
+      }
+
+      return out;
+    }
+
+    function buildTrajectoryText() {
+      // 궤적의 텍스트들을 시간 순으로 빈 줄로 구분해 이어붙인다.
+      // 같은 인스턴스가 다시 등장해도 그대로 기록되었으니
+      // 만진 순서를 그대로 문장 흐름으로 보여줌.
+      const parts = [];
+      for (const item of trajectory) {
+        const t = (item.text || "").trim();
+        if (t) parts.push(t);
+      }
+      if (parts.length === 0) {
+        return "(no trajectory yet — move around and touch the images first.)";
+      }
+      return parts.join("\n\n");
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    captureBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (captureBtn.classList.contains("is-busy")) return;
+      captureBtn.classList.add("is-busy");
+
+      try {
+        // 1) 화면 합성
+        const canvas = await captureScreen();
+        // 2) PNG 다운로드
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        await new Promise((resolve) => {
+          canvas.toBlob((blob) => {
+            if (blob) downloadBlob(blob, `trajectory-${stamp}.png`);
+            resolve();
+          }, "image/png");
+        });
+        // 3) 궤적 텍스트 다운로드
+        const text = buildTrajectoryText();
+        const txtBlob = new Blob([text], { type: "text/plain;charset=utf-8" });
+        downloadBlob(txtBlob, `trajectory-${stamp}.txt`);
+      } catch (err) {
+        console.error("[capture] failed:", err);
+      } finally {
+        captureBtn.classList.remove("is-busy");
+      }
+    });
+
+    // 캡처 버튼은 어떤 mousedown 핸들러도 가로채지 않도록
+    captureBtn.addEventListener("mousedown", (e) => e.stopPropagation());
 
     function applyFallbackAll() {
       inst79.loadFrameSeries("79.png");
