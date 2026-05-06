@@ -38,13 +38,7 @@
       touch-action: none;
     }
 
-    /* ───────── 좌측 하단 HUD ─────────
-       ohezin.kr/work 의 All / Index 와 동일 사양:
-         font-family : Binomic, Eulyoo1945-Regular, serif
-         font-size   : 15px
-         line-height : 15px (= 1)
-         color       : #ff3f51
-    */
+    /* ───────── 좌측 하단 HUD ───────── */
     .hud {
       position: fixed;
       left: 16px;
@@ -62,7 +56,7 @@
       display: block;
     }
 
-    /* ───────── Reveal Image — Canvas 기반 궤적 브러쉬 ───────── */
+    /* ───────── Reveal Image ───────── */
     .reveal {
       position: fixed;
       z-index: 5;
@@ -109,7 +103,7 @@
       white-space: pre-wrap;
       word-break: keep-all;
     }
-    /* 타자기 커서 — 깜빡이는 막대 */
+    /* 타자기 커서 */
     .reveal-text-content .caret {
       display: inline-block;
       width: 0.5em;
@@ -161,7 +155,43 @@
       will-change: transform, opacity;
     }
 
-    /* ───────── 확장 패널 (cognosco.online 스타일) ───────── */
+    /* ───────── 붕괴(decay) 텍스트 모션 ─────────
+       28.png 전용. 떼면 출현. 페이즈:
+       1) scattered (멀리 흩어짐)
+       2) gathering (형상으로 끌려옴)
+       3) forming   (잠깐 완성에 가까운 상태)
+       4) escape    (핵심 단어들이 먼저 이탈)
+       5) collapse  (글자 단위로 가속 이탈)
+       6) silence   (잠깐 공백)
+       다시 1로. 루프마다 형성시간 단축, 붕괴 가속.
+    */
+    .text-decay {
+      position: fixed;
+      pointer-events: none;
+      z-index: 4;
+      will-change: transform;
+    }
+    .text-decay-stage {
+      position: absolute;
+      left: 50%;
+      top:  50%;
+      width: 0;
+      height: 0;
+    }
+    .text-decay-glyph {
+      position: absolute;
+      left: 0;
+      top:  0;
+      font-family: 'Binomic', 'Eulyoo1945-Regular', serif;
+      font-size: 13px;
+      line-height: 1;
+      color: #ff3f51;
+      white-space: pre;
+      transform-origin: 50% 50%;
+      will-change: transform, opacity;
+    }
+
+    /* ───────── 확장 패널 ───────── */
     .expanded-panel {
       position: fixed;
       z-index: 50;
@@ -500,6 +530,9 @@
     const POINT_LIFE = 140;
     const POINT_RADIUS = 75;
 
+    /* 28.png 전용 hold 페이드 루프 주기(ms) */
+    const HOLD_PULSE_PERIOD_MS = 1600;
+
     let mouseX = -9999, mouseY = -9999;
     window.addEventListener("mousemove", (e) => {
       mouseX = e.clientX;
@@ -511,6 +544,10 @@
       const interactive = config.interactive !== false;
       const expandable  = config.expandable === true;
       const framesCount = (config.framesCount != null) ? config.framesCount : FRAME_COUNT;
+      /* hold 중에 알파가 사인파처럼 페이드 루프되는지 (28.png 전용) */
+      const holdPulse   = config.holdPulse === true;
+      /* 떼면 보여줄 outro 모션 종류: "volume" (기본) | "decay" */
+      const outroMode   = config.outroMode || "volume";
 
       const wrap = document.createElement("div");
       wrap.className = "reveal";
@@ -616,12 +653,15 @@
 
       let isHolding = false;
       let isVolumeMode = false;
+      /* hold 시작 시각 → pulse 페이즈 계산용 */
+      let holdStartTime = 0;
 
       function startHold() {
         if (!interactive) return;
         if (isHolding) return;
         if (isVolumeMode) return;
         isHolding = true;
+        holdStartTime = performance.now();
 
         if (!frameLoopTimer) {
           frameLoopTimer = setInterval(() => {
@@ -775,6 +815,401 @@
         volumeGlyphs = [];
       }
 
+      /* ─────────────────────────────────────────
+         붕괴(decay) 텍스트 — 28.png 전용 outro
+         ───────────────────────────────────────── */
+      let decayRoot = null;
+      let decayStage = null;
+      let decayGlyphs = [];     // {el, ch, isCore, baseX, baseY, scatterX, scatterY, escapeDir, escapeSpeed, fallSeed, decayPhase}
+      let decayWords = [];      // [{startIdx, endIdx, isCore}]
+      let decayRafId = 0;
+      let decayStartTime = 0;
+      let decayLoopCount = 0;
+      let decayLoopStart = 0;
+      let decayCycleDuration = 0;
+
+      /* 형상 좌표를 만들어내는 함수: 사람의 옆얼굴 실루엣을 닮은 점들 */
+      function generateSilhouettePoints(count, variant) {
+        const points = [];
+        // variant 마다 살짝 다른 형상: 0=옆얼굴, 1=빈 의자, 2=프레임
+        // 정확하지 않게, 닮은 듯 아닌 듯한 윤곽
+        for (let i = 0; i < count; i++) {
+          const t = i / count;
+          let x, y;
+          if (variant === 0) {
+            // 옆얼굴: 이마-코-입-턱 곡선
+            const angle = t * Math.PI * 2;
+            // 머리 윗부분(둥근 형태) + 얼굴 라인(꺾임)
+            if (t < 0.5) {
+              // 머리 윗부분 - 타원
+              const a = t * 2; // 0~1
+              const aRad = a * Math.PI;
+              x = Math.cos(aRad - Math.PI / 2) * 55;
+              y = Math.sin(aRad - Math.PI / 2) * 70 - 10;
+            } else {
+              // 얼굴 라인: 이마 → 코 끝 → 입 → 턱
+              const a = (t - 0.5) * 2; // 0~1
+              const profile = [
+                {x:  55, y: -40},  // 이마
+                {x:  68, y: -15},  // 콧대
+                {x:  75, y:   5},  // 코끝
+                {x:  60, y:  20},  // 인중
+                {x:  62, y:  35},  // 입
+                {x:  48, y:  55},  // 턱
+                {x:  10, y:  70},  // 목 시작
+                {x: -55, y:  70},  // 목 뒤
+              ];
+              const seg = a * (profile.length - 1);
+              const i0 = Math.floor(seg);
+              const i1 = Math.min(profile.length - 1, i0 + 1);
+              const f = seg - i0;
+              x = profile[i0].x * (1 - f) + profile[i1].x * f;
+              y = profile[i0].y * (1 - f) + profile[i1].y * f;
+            }
+          } else if (variant === 1) {
+            // 빈 의자: 직사각형 윤곽 + 등받이
+            const segs = [
+              {x: -45, y:  50}, {x: -45, y:   0},  // 왼쪽 등받이
+              {x: -45, y: -45}, {x:  45, y: -45},  // 윗부분
+              {x:  45, y:   0}, {x:  45, y:  50},  // 오른쪽 등받이
+              {x:  35, y:  60}, {x: -35, y:  60},  // 다리 아래
+            ];
+            const seg = t * segs.length;
+            const i0 = Math.floor(seg) % segs.length;
+            const i1 = (i0 + 1) % segs.length;
+            const f = seg - Math.floor(seg);
+            x = segs[i0].x * (1 - f) + segs[i1].x * f;
+            y = segs[i0].y * (1 - f) + segs[i1].y * f;
+          } else {
+            // 프레임(액자)
+            const r = 60;
+            const a = t * Math.PI * 2;
+            const sq = Math.max(Math.abs(Math.cos(a)), Math.abs(Math.sin(a)));
+            x = (Math.cos(a) / sq) * r;
+            y = (Math.sin(a) / sq) * r * 0.85;
+          }
+          // 약간의 노이즈로 "정확하지 않게"
+          x += (Math.random() - 0.5) * 8;
+          y += (Math.random() - 0.5) * 8;
+          points.push({ x, y });
+        }
+        return points;
+      }
+
+      function buildDecayText(text) {
+        teardownDecayText();
+        if (!text || text.trim().length === 0) return;
+
+        decayRoot = document.createElement("div");
+        decayRoot.className = "text-decay";
+        const r = wrap.getBoundingClientRect();
+        const cx0 = r.left + r.width / 2;
+        const cy0 = r.top  + r.height / 2;
+        decayRoot.style.left = `${cx0}px`;
+        decayRoot.style.top  = `${cy0}px`;
+        decayRoot.style.width  = "0px";
+        decayRoot.style.height = "0px";
+
+        decayStage = document.createElement("div");
+        decayStage.className = "text-decay-stage";
+        decayRoot.appendChild(decayStage);
+        document.body.appendChild(decayRoot);
+
+        // 핵심(이탈하는) 단어들 — 사용자가 지정한 것
+        const CORE_WORDS = new Set([
+          "see", "lost", "loved", "one", "relive", "quicker"
+        ]);
+
+        // 단어 단위 인덱스 산출 (공백 단위로 끊되, 글자 인덱스 기록)
+        decayWords = [];
+        {
+          let i = 0;
+          while (i < text.length) {
+            // 공백 스킵
+            while (i < text.length && /\s/.test(text[i])) i++;
+            if (i >= text.length) break;
+            const startIdx = i;
+            while (i < text.length && !/\s/.test(text[i])) i++;
+            const endIdx = i; // exclusive
+            // 단어에서 알파벳만 추출해 비교
+            const wordRaw = text.slice(startIdx, endIdx);
+            const wordKey = wordRaw.replace(/[^A-Za-z]/g, "").toLowerCase();
+            const isCore = CORE_WORDS.has(wordKey);
+            decayWords.push({ startIdx, endIdx, isCore });
+          }
+        }
+
+        // 글자 폭 측정
+        const measure = document.createElement("span");
+        measure.className = "text-decay-glyph";
+        measure.style.position = "fixed";
+        measure.style.visibility = "hidden";
+        measure.style.left = "-9999px";
+        document.body.appendChild(measure);
+
+        // 한 줄 너비를 잡아 줄바꿈 처리: 박스 폭 ~ 360px
+        const LINE_WIDTH = 360;
+        const LINE_HEIGHT = 18;
+
+        // 글자별 폭 미리 계산
+        const charWidths = [];
+        for (const ch of text) {
+          measure.textContent = ch === " " ? "\u00a0" : ch;
+          charWidths.push(measure.getBoundingClientRect().width);
+        }
+        document.body.removeChild(measure);
+
+        // 단어 단위로 줄바꿈 처리
+        const layout = []; // [{ch, lineX, lineY, isSpace, wordIdx, isCore}]
+        let curX = 0;
+        let curY = 0;
+        for (let w = 0; w < decayWords.length; w++) {
+          const word = decayWords[w];
+          // 단어 너비 계산
+          let wordWidth = 0;
+          for (let i = word.startIdx; i < word.endIdx; i++) {
+            wordWidth += charWidths[i];
+          }
+          // 공백(앞) 너비
+          const spaceCh = (w === 0) ? "" : " ";
+          const spaceW = (w === 0) ? 0 : charWidths[word.startIdx - 1] || 4;
+          // 줄바꿈 판단
+          if (curX + spaceW + wordWidth > LINE_WIDTH && curX > 0) {
+            curX = 0;
+            curY += LINE_HEIGHT;
+          } else if (w > 0) {
+            // 공백을 한 글자로 추가
+            layout.push({
+              ch: " ",
+              lineX: curX,
+              lineY: curY,
+              isSpace: true,
+              wordIdx: -1,
+              isCore: false,
+            });
+            curX += spaceW;
+          }
+          // 단어 글자들 추가
+          for (let i = word.startIdx; i < word.endIdx; i++) {
+            layout.push({
+              ch: text[i],
+              lineX: curX,
+              lineY: curY,
+              isSpace: false,
+              wordIdx: w,
+              isCore: word.isCore,
+            });
+            curX += charWidths[i];
+          }
+        }
+
+        // 전체 텍스트 박스를 중앙 정렬
+        const totalH = curY + LINE_HEIGHT;
+        const offsetX = -LINE_WIDTH / 2;
+        const offsetY = -totalH / 2;
+
+        // glyph 생성
+        decayGlyphs = [];
+        for (let i = 0; i < layout.length; i++) {
+          const it = layout[i];
+          if (it.isSpace) continue; // 공백은 시각 글리프 생성 안 함
+
+          const el = document.createElement("span");
+          el.className = "text-decay-glyph";
+          el.textContent = it.ch;
+          decayStage.appendChild(el);
+
+          const baseX = it.lineX + offsetX;
+          const baseY = it.lineY + offsetY;
+
+          // 흩어진 시작 위치 (멀리, 랜덤)
+          const scatterAngle = Math.random() * Math.PI * 2;
+          const scatterDist  = 220 + Math.random() * 240;
+          const scatterX = Math.cos(scatterAngle) * scatterDist;
+          const scatterY = Math.sin(scatterAngle) * scatterDist * 0.7;
+
+          // 이탈 방향 (랜덤)
+          const escapeAngle = Math.random() * Math.PI * 2;
+          const escapeSpeed = 80 + Math.random() * 120;
+
+          decayGlyphs.push({
+            el,
+            ch: it.ch,
+            wordIdx: it.wordIdx,
+            isCore: it.isCore,
+            baseX, baseY,
+            scatterX, scatterY,
+            escapeDX: Math.cos(escapeAngle),
+            escapeDY: Math.sin(escapeAngle),
+            escapeSpeed,
+            phase: Math.random() * Math.PI * 2,
+            // 핵심 단어는 이탈 시각이 빨라짐
+            wordIdxRand: Math.random(),
+          });
+        }
+
+        // 실루엣 점도 미리 만들어 둠 (루프마다 셔플)
+        decayStartTime = performance.now();
+        decayLoopStart = decayStartTime;
+        decayLoopCount = 0;
+        decayCycleDuration = 9000; // 첫 사이클: 9초
+
+        const tickDecay = (now) => {
+          if (!decayRoot) return;
+          updateDecay(now);
+          decayRafId = requestAnimationFrame(tickDecay);
+        };
+        decayRafId = requestAnimationFrame(tickDecay);
+      }
+
+      // 실루엣 좌표 캐시 (사이클당 1세트)
+      let decayCachedSilhouette = null;
+      let decayCachedVariant = -1;
+
+      function updateDecay(now) {
+        // 따라다니기
+        const r = wrap.getBoundingClientRect();
+        const cx0 = r.left + r.width / 2;
+        const cy0 = r.top  + r.height / 2;
+        decayRoot.style.left = `${cx0}px`;
+        decayRoot.style.top  = `${cy0}px`;
+
+        // 사이클 진행도
+        const elapsed = now - decayLoopStart;
+        let cycleT = elapsed / decayCycleDuration;
+        if (cycleT >= 1) {
+          // 다음 루프
+          decayLoopCount++;
+          // 형성 시간 단축, 붕괴 가속 — 사이클이 짧아짐
+          decayCycleDuration = Math.max(4500, 9000 * Math.pow(0.85, decayLoopCount));
+          decayLoopStart = now;
+          decayCachedSilhouette = null; // 새 형상 셔플
+          cycleT = 0;
+        }
+
+        // 페이즈 분배 (루프가 진행될수록 형상 시간↓, 붕괴 시간↓)
+        // 0.00 - 0.10 : scattered
+        // 0.10 - 0.40 : gathering (점점 짧아짐)
+        // 0.40 - 0.50 : forming (잠깐 완성)
+        // 0.50 - 0.62 : escape (핵심 단어 이탈)
+        // 0.62 - 0.92 : collapse (모든 글자 가속 이탈)
+        // 0.92 - 1.00 : silence
+        const decayLoopFactor = Math.pow(0.88, decayLoopCount);
+        const formingEnd = 0.40 + 0.10 * decayLoopFactor; // 점점 빨리 끝남
+        const escapeStart = formingEnd;
+        const escapeEnd   = escapeStart + 0.12 * decayLoopFactor;
+        const collapseStart = escapeEnd;
+        const collapseEnd   = 0.92;
+
+        // 실루엣 좌표 보장
+        if (!decayCachedSilhouette) {
+          const variant = (decayLoopCount + decayCachedVariant + 1) % 3;
+          decayCachedVariant = variant;
+          decayCachedSilhouette = generateSilhouettePoints(decayGlyphs.length, variant);
+          // 글자에 형상 점 매핑 (단어 순서대로 나란히 두면 단어가 형상에 줄지어 박힘 → 셔플)
+          const idxs = decayGlyphs.map((_, i) => i);
+          for (let i = idxs.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [idxs[i], idxs[j]] = [idxs[j], idxs[i]];
+          }
+          for (let i = 0; i < decayGlyphs.length; i++) {
+            const sp = decayCachedSilhouette[idxs[i]];
+            decayGlyphs[i].silX = sp.x;
+            decayGlyphs[i].silY = sp.y;
+          }
+        }
+
+        for (const g of decayGlyphs) {
+          let x, y, opacity;
+
+          if (cycleT < 0.10) {
+            // scattered: 흩어진 위치, 매우 희미
+            const u = cycleT / 0.10;
+            const drift = Math.sin(now * 0.001 + g.phase) * 6;
+            x = g.scatterX + drift;
+            y = g.scatterY + Math.cos(now * 0.001 + g.phase) * 4;
+            opacity = 0.08 + u * 0.07; // 0.08 → 0.15
+          } else if (cycleT < formingEnd) {
+            // gathering: 흩어진 → 실루엣 형상
+            const u = (cycleT - 0.10) / (formingEnd - 0.10);
+            // easeOutCubic
+            const eu = 1 - Math.pow(1 - u, 3);
+            const tx = g.silX;
+            const ty = g.silY;
+            x = g.scatterX * (1 - eu) + tx * eu;
+            y = g.scatterY * (1 - eu) + ty * eu;
+            opacity = 0.15 + eu * 0.55; // 0.15 → 0.70
+          } else if (cycleT < escapeStart) {
+            // forming: 형상 잠깐 유지, 약간의 떨림
+            const u = (cycleT - formingEnd) / Math.max(0.0001, escapeStart - formingEnd);
+            const tremor = Math.sin(now * 0.012 + g.phase) * 1.2;
+            x = g.silX + tremor;
+            y = g.silY + Math.cos(now * 0.011 + g.phase) * 1.2;
+            opacity = 0.85;
+          } else if (cycleT < escapeEnd) {
+            // escape: 핵심 단어 먼저 빠짐
+            const u = (cycleT - escapeStart) / (escapeEnd - escapeStart);
+            if (g.isCore) {
+              // 핵심 단어 이탈
+              const eu = u * u; // easeIn
+              const flyDist = g.escapeSpeed * eu * 1.4;
+              x = g.silX + g.escapeDX * flyDist;
+              y = g.silY + g.escapeDY * flyDist - eu * 30; // 살짝 위로
+              opacity = (1 - eu) * 0.85;
+            } else {
+              // 비핵심: 약간 떨리며 자기 자리 유지, 형상이 무너지기 시작
+              const tremor = Math.sin(now * 0.018 + g.phase) * (2 + u * 4);
+              x = g.silX + tremor;
+              y = g.silY + Math.cos(now * 0.016 + g.phase) * (2 + u * 3);
+              opacity = 0.85 - u * 0.15;
+            }
+          } else if (cycleT < collapseEnd) {
+            // collapse: 글자 단위로 가속 이탈, 뒤로 갈수록 빨라짐
+            const u = (cycleT - collapseStart) / (collapseEnd - collapseStart);
+            // 가속 곡선 — 뒤로 갈수록 더 빨리
+            const accel = Math.pow(u, 2.4);
+            // 글자별로 약간 다른 시작 (시차)
+            const startOffset = g.wordIdxRand * 0.25;
+            const localU = Math.max(0, (u - startOffset) / Math.max(0.0001, 1 - startOffset));
+            const localAccel = Math.pow(localU, 2.4);
+            // 핵심 단어는 이미 이탈 → 더 멀리
+            const baseDist = g.escapeSpeed * (g.isCore ? 2.0 : 1.4);
+            const flyDist = baseDist * localAccel * (1 + decayLoopCount * 0.25);
+            x = g.silX + g.escapeDX * flyDist;
+            y = g.silY + g.escapeDY * flyDist - localAccel * 18;
+            opacity = (1 - localAccel) * 0.78;
+            if (g.isCore) {
+              // 이미 이탈 상태에서 더 빠르게
+              const extra = (cycleT - escapeEnd) / Math.max(0.0001, collapseEnd - escapeEnd);
+              const ext = extra * extra * 1.8;
+              x += g.escapeDX * g.escapeSpeed * ext;
+              y += g.escapeDY * g.escapeSpeed * ext - ext * 20;
+              opacity = Math.max(0, opacity - extra * 0.3);
+            }
+          } else {
+            // silence: 완전 공백
+            x = g.silX + g.escapeDX * 600;
+            y = g.silY + g.escapeDY * 600;
+            opacity = 0;
+          }
+
+          g.el.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0)`;
+          g.el.style.opacity = opacity.toFixed(3);
+        }
+      }
+
+      function teardownDecayText() {
+        if (decayRafId) { cancelAnimationFrame(decayRafId); decayRafId = 0; }
+        if (decayRoot && decayRoot.parentNode) {
+          decayRoot.parentNode.removeChild(decayRoot);
+        }
+        decayRoot = null;
+        decayStage = null;
+        decayGlyphs = [];
+        decayWords = [];
+        decayCachedSilhouette = null;
+      }
+
       function stopHold() {
         if (!isHolding) return;
         isHolding = false;
@@ -785,7 +1220,11 @@
           isVolumeMode = true;
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           trail.length = 0;
-          buildVolumeText(fullText);
+          if (outroMode === "decay") {
+            buildDecayText(fullText);
+          } else {
+            buildVolumeText(fullText);
+          }
         }
       }
 
@@ -861,6 +1300,15 @@
         const frameImg = frames[currentFrame];
         const frameReady = frameImg && frameImg.complete && frameImg.naturalWidth > 0;
 
+        // hold 중인 28.png는 알파가 사인파처럼 페이드
+        let holdAlpha = 1;
+        if (holdPulse && isHolding) {
+          const elapsedHold = performance.now() - holdStartTime;
+          const phase = (elapsedHold % HOLD_PULSE_PERIOD_MS) / HOLD_PULSE_PERIOD_MS;
+          // 0~1 → 사인 0~1: 한 사이클당 fade-out → fade-in 한 번
+          holdAlpha = 0.5 + 0.5 * Math.cos(phase * Math.PI * 2);
+        }
+
         if (frameReady && trail.length > 0) {
           for (let i = trail.length - 1; i >= 0; i--) {
             const p = trail[i];
@@ -877,6 +1325,8 @@
               const t = (life - 0.35) / 0.65;
               alpha = Math.pow(1 - t, 2.2) * 0.7;
             }
+            // hold pulse 적용 (28.png 전용)
+            alpha *= holdAlpha;
             if (alpha < 0.005) continue;
 
             const drift = p.driftAmt * Math.sin(p.driftSeed + p.age * 0.025);
@@ -937,9 +1387,18 @@
       framesCount: 1,
       root,
     });
+    /* 28.png 인스턴스 — hold 시 페이드 루프, 떼면 붕괴 텍스트 모션 */
+    const inst28 = createRevealInstance({
+      leftPct: 18, topPct: 22, size: 120,
+      sheetRow: 29,             // 28.png는 시트 29행 (헤더가 1행이므로 데이터 28번째)
+      root,
+      holdPulse: true,
+      outroMode: "decay",
+    });
     const allInstances = [
       { inst: inst79, row: 80 },
       { inst: inst10, row: 11 },
+      { inst: inst28, row: 29 },
     ];
 
     /* ─────────────────────────────────────────────
@@ -1099,13 +1558,18 @@
       for (const { inst, row } of allInstances) {
         const item = pickRowFromSheet(rows, row);
         if (!item) {
-          const fb = (row === 80) ? "79.png" : "10.png";
+          let fb = "79.png";
+          if (row === 11) fb = "10.png";
+          else if (row === 29) fb = "28.png";
           inst.loadFrameSeries(fb);
           inst.setText("");
           if (inst.expandable && inst.setExpandData) inst.setExpandData(fb, "");
           continue;
         }
-        const filename = item[SHEET_TARGET_COL_NAME] || (row === 80 ? "79.png" : "10.png");
+        let defaultFile = "79.png";
+        if (row === 11) defaultFile = "10.png";
+        else if (row === 29) defaultFile = "28.png";
+        const filename = item[SHEET_TARGET_COL_NAME] || defaultFile;
         inst.loadFrameSeries(filename);
         inst.setText(item["당사자의 직접 설명"] || "");
         if (inst.expandable && inst.setExpandData) {
@@ -1123,6 +1587,10 @@
       );
       inst10.loadFrameSeries("10.png");
       inst10.setText("");
+      inst28.loadFrameSeries("28.png");
+      inst28.setText(
+        "Without the ability to see the lost loved one or relive times with them, they do tend fade from mind quicker."
+      );
       console.info("[sheet] fallback (시트 미연결) — 임시 텍스트 사용");
     }
 
