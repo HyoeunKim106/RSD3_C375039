@@ -252,6 +252,38 @@
       will-change: transform, opacity;
     }
 
+    /* ───────── Ripple(파동) 텍스트 모션 ─────────
+       09.png 전용. 떼면 출현. 글자들이 본래 위치에 있되
+       사인파가 좌→우로 흘러가며 위아래로 일렁이고,
+       가벼운 회전과 알파 파동으로 물결처럼 보이게.
+    */
+    .text-ripple {
+      position: fixed;
+      pointer-events: none;
+      z-index: 4;
+      will-change: transform;
+    }
+    .text-ripple-stage {
+      position: absolute;
+      left: 50%;
+      top:  50%;
+      width: 0;
+      height: 0;
+      will-change: transform;
+    }
+    .text-ripple-glyph {
+      position: absolute;
+      left: 0;
+      top:  0;
+      font-family: 'Vivaldi', 'Eulyoo1945-Regular', serif;
+      font-size: 13px;
+      line-height: 1;
+      color: #000000;
+      white-space: pre;
+      transform-origin: 50% 50%;
+      will-change: transform, opacity;
+    }
+
     /* ───────── 확장 패널 ───────── */
     .expanded-panel {
       position: fixed;
@@ -641,6 +673,11 @@
 
     /* 28.png 전용 hold 페이드 루프 주기(ms) — 빠른 페이드 */
     const HOLD_PULSE_PERIOD_MS = 700;
+    /* 09.png 전용 hold 저해상도 모핑 루프 주기(ms) */
+    const HOLD_LOWRES_PERIOD_MS = 1400;
+    /* 09.png 저해상도 모핑 픽셀 사이즈 범위 */
+    const HOLD_LOWRES_MIN_PX = 6;
+    const HOLD_LOWRES_MAX_PX = 90;
 
     let mouseX = -9999, mouseY = -9999;
 
@@ -701,7 +738,9 @@
       const framesCount = (config.framesCount != null) ? config.framesCount : FRAME_COUNT;
       /* hold 중에 알파가 사인파처럼 페이드 루프되는지 (28.png 전용) */
       const holdPulse   = config.holdPulse === true;
-      /* 떼면 보여줄 outro 모션 종류: "volume" (기본) | "decay" */
+      /* hold 중에 저해상도 모핑 루프(픽셀화) 적용 (09.png 전용) */
+      const holdLowRes  = config.holdLowRes === true;
+      /* 떼면 보여줄 outro 모션 종류: "volume" (기본) | "decay" | "ripple" */
       const outroMode   = config.outroMode || "volume";
 
       const wrap = document.createElement("div");
@@ -820,6 +859,7 @@
 
         if (!frameLoopTimer) {
           // holdPulse 인스턴스(28.png)는 frame도 더 빠르게 순환
+          // holdLowRes 인스턴스(09.png)는 한 프레임뿐이라도 픽셀 모핑이 핵심
           const interval = holdPulse ? 90 : FRAME_INTERVAL_MS;
           frameLoopTimer = setInterval(() => {
             if (frames.length > 0) {
@@ -829,6 +869,10 @@
           }, interval);
         }
       }
+
+      // 09.png 저해상도 모핑용 오프스크린 캔버스 (재사용)
+      let lowResCanvas = null;
+      let lowResCtx = null;
 
       let volumeRoot = null;
       let volumeStage = null;
@@ -1374,6 +1418,185 @@
         decayCachedSilhouette = null;
       }
 
+      /* ─────────────────────────────────────────
+         Ripple(파동) 텍스트 — 09.png 전용 outro
+         글자들이 본래 위치에 자리잡되, 좌→우로 흐르는
+         사인파에 따라 위아래로 일렁이며 회전·알파 변화.
+         느리고 차분하게 영원히 흘러감.
+         ───────────────────────────────────────── */
+      let rippleRoot = null;
+      let rippleStage = null;
+      let rippleGlyphs = [];
+      let rippleRafId = 0;
+      let rippleStartTime = 0;
+
+      function buildRippleText(text) {
+        teardownRippleText();
+        if (!text || text.trim().length === 0) return;
+
+        rippleRoot = document.createElement("div");
+        rippleRoot.className = "text-ripple";
+        const r0 = wrap.getBoundingClientRect();
+        const cx0 = r0.left + r0.width / 2;
+        const cy0 = r0.top  + r0.height / 2;
+        rippleRoot.style.left = `${cx0}px`;
+        rippleRoot.style.top  = `${cy0}px`;
+        rippleRoot.style.width  = "0px";
+        rippleRoot.style.height = "0px";
+
+        rippleStage = document.createElement("div");
+        rippleStage.className = "text-ripple-stage";
+        rippleRoot.appendChild(rippleStage);
+        document.body.appendChild(rippleRoot);
+
+        // 글자 폭 측정
+        const measure = document.createElement("span");
+        measure.className = "text-ripple-glyph";
+        measure.style.position = "fixed";
+        measure.style.visibility = "hidden";
+        measure.style.left = "-9999px";
+        document.body.appendChild(measure);
+
+        const charWidths = [];
+        for (const ch of text) {
+          measure.textContent = ch === " " ? " " : ch;
+          charWidths.push(measure.getBoundingClientRect().width);
+        }
+        document.body.removeChild(measure);
+
+        // 단어 단위 줄바꿈 (한 줄 폭 ~ 360px)
+        const LINE_WIDTH  = 360;
+        const LINE_HEIGHT = 18;
+
+        // 단어 인덱스 추출
+        const words = [];
+        {
+          let i = 0;
+          while (i < text.length) {
+            while (i < text.length && /\s/.test(text[i])) i++;
+            if (i >= text.length) break;
+            const startIdx = i;
+            while (i < text.length && !/\s/.test(text[i])) i++;
+            words.push({ startIdx, endIdx: i });
+          }
+        }
+
+        const layout = []; // [{ch, lineX, lineY}]
+        let curX = 0;
+        let curY = 0;
+        for (let w = 0; w < words.length; w++) {
+          const word = words[w];
+          let wordWidth = 0;
+          for (let i = word.startIdx; i < word.endIdx; i++) {
+            wordWidth += charWidths[i];
+          }
+          const spaceW = (w === 0) ? 0 : (charWidths[word.startIdx - 1] || 4);
+          if (curX + spaceW + wordWidth > LINE_WIDTH && curX > 0) {
+            curX = 0;
+            curY += LINE_HEIGHT;
+          } else if (w > 0) {
+            curX += spaceW;
+          }
+          for (let i = word.startIdx; i < word.endIdx; i++) {
+            layout.push({ ch: text[i], lineX: curX, lineY: curY });
+            curX += charWidths[i];
+          }
+        }
+
+        const totalH = curY + LINE_HEIGHT;
+        const offsetX = -LINE_WIDTH / 2;
+        const offsetY = -totalH / 2;
+
+        rippleGlyphs = [];
+        for (let i = 0; i < layout.length; i++) {
+          const it = layout[i];
+          const el = document.createElement("span");
+          el.className = "text-ripple-glyph";
+          el.textContent = it.ch;
+          rippleStage.appendChild(el);
+
+          const baseX = it.lineX + offsetX;
+          const baseY = it.lineY + offsetY;
+
+          rippleGlyphs.push({
+            el,
+            baseX, baseY,
+            // 위치 기반 위상 — 좌→우로 진행하는 파동
+            phaseX: (it.lineX / LINE_WIDTH) * Math.PI * 2,
+            phaseY: (it.lineY / LINE_HEIGHT) * 0.7,
+            jitter: Math.random() * 0.3,
+            jitterSeed: Math.random() * 1000,
+          });
+        }
+
+        rippleStartTime = performance.now();
+        const tickRipple = (now) => {
+          if (!rippleRoot) return;
+          updateRipple(now);
+          rippleRafId = requestAnimationFrame(tickRipple);
+        };
+        rippleRafId = requestAnimationFrame(tickRipple);
+      }
+
+      function updateRipple(now) {
+        const t = (now - rippleStartTime) / 1000;
+
+        // 따라다니기
+        const r = wrap.getBoundingClientRect();
+        const cx0 = r.left + r.width / 2;
+        const cy0 = r.top  + r.height / 2;
+        rippleRoot.style.left = `${cx0}px`;
+        rippleRoot.style.top  = `${cy0}px`;
+
+        // 인트로 — 1.2초 동안 부드럽게 떠오름
+        const intro = Math.min(1, t / 1.2);
+        const introEased = 1 - Math.pow(1 - intro, 3);
+
+        // 좌→우로 흐르는 파동
+        const waveSpeed = 1.6;     // 라디안/초
+        const waveAmpY  = 7;       // 위아래 진폭 (px)
+        const waveAmpX  = 2.5;     // 좌우 미세 흔들림
+        const rotAmp    = 0.18;    // 회전 진폭 (rad)
+
+        for (const g of rippleGlyphs) {
+          // 메인 파동 — 위상이 글자 x 위치에 따라 다름
+          const wave = Math.sin(t * waveSpeed - g.phaseX * 1.4 + g.phaseY);
+          // 보조 파동 — 약간 다른 주파수로 더해 단조로움 회피
+          const wave2 = Math.sin(t * waveSpeed * 0.55 - g.phaseX * 0.7 + g.jitterSeed * 0.001);
+
+          const dy = wave * waveAmpY * introEased
+                   + wave2 * waveAmpY * 0.35 * introEased;
+          const dx = Math.cos(t * waveSpeed * 0.7 - g.phaseX) * waveAmpX * introEased;
+          const rot = wave * rotAmp * 0.6 + wave2 * rotAmp * 0.4;
+
+          const x = g.baseX + dx;
+          const y = g.baseY + dy;
+
+          // 알파 — 파동의 마루(꼭대기)에서 살짝 더 또렷, 골에서 옅음
+          const alphaWave = 0.78 + wave * 0.18 + wave2 * 0.06;
+          const opacity = Math.max(0.25, Math.min(1, alphaWave)) * introEased;
+
+          // 스케일 — 마루에서 살짝 커짐
+          const scale = 0.94 + wave * 0.06;
+
+          g.el.style.transform =
+            `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) ` +
+            `rotate(${rot.toFixed(3)}rad) ` +
+            `scale(${scale.toFixed(3)})`;
+          g.el.style.opacity = opacity.toFixed(3);
+        }
+      }
+
+      function teardownRippleText() {
+        if (rippleRafId) { cancelAnimationFrame(rippleRafId); rippleRafId = 0; }
+        if (rippleRoot && rippleRoot.parentNode) {
+          rippleRoot.parentNode.removeChild(rippleRoot);
+        }
+        rippleRoot = null;
+        rippleStage = null;
+        rippleGlyphs = [];
+      }
+
       function stopHold() {
         if (!isHolding) return;
         isHolding = false;
@@ -1386,6 +1609,8 @@
           trail.length = 0;
           if (outroMode === "decay") {
             buildDecayText(fullText);
+          } else if (outroMode === "ripple") {
+            buildRippleText(fullText);
           } else {
             buildVolumeText(fullText);
           }
@@ -1524,7 +1749,43 @@
             ctx.fill();
           }
           ctx.globalCompositeOperation = "source-in";
-          ctx.drawImage(frameImg, 0, 0, W, H);
+          // 09.png 전용: hold 중 저해상도 모핑 루프
+          if (holdLowRes && isHolding) {
+            const elapsedHoldLR = performance.now() - holdStartTime;
+            const phaseLR = (elapsedHoldLR % HOLD_LOWRES_PERIOD_MS) / HOLD_LOWRES_PERIOD_MS;
+            // 한 사이클 동안: 고해상 → 저해상 → 고해상 (코사인 보간)
+            const tLR = (1 - Math.cos(phaseLR * Math.PI * 2)) / 2; // 0..1..0
+            // 비선형 보간으로 저해상 구간이 더 인상적으로 머무름
+            const eased = Math.pow(tLR, 1.6);
+            const pixSize = Math.max(2, Math.round(
+              HOLD_LOWRES_MAX_PX - (HOLD_LOWRES_MAX_PX - HOLD_LOWRES_MIN_PX) * eased
+            ));
+
+            if (!lowResCanvas) {
+              lowResCanvas = document.createElement("canvas");
+              lowResCtx = lowResCanvas.getContext("2d");
+            }
+            // 이미지 종횡비 유지 — 짧은 변을 pixSize 로
+            const iw = frameImg.naturalWidth || pixSize;
+            const ih = frameImg.naturalHeight || pixSize;
+            const ratio = iw / ih;
+            let lw, lh;
+            if (ratio >= 1) { lw = pixSize; lh = Math.max(2, Math.round(pixSize / ratio)); }
+            else            { lh = pixSize; lw = Math.max(2, Math.round(pixSize * ratio)); }
+
+            lowResCanvas.width  = lw;
+            lowResCanvas.height = lh;
+            lowResCtx.imageSmoothingEnabled = true;
+            lowResCtx.clearRect(0, 0, lw, lh);
+            lowResCtx.drawImage(frameImg, 0, 0, lw, lh);
+
+            const prevSmoothing = ctx.imageSmoothingEnabled;
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(lowResCanvas, 0, 0, W, H);
+            ctx.imageSmoothingEnabled = prevSmoothing;
+          } else {
+            ctx.drawImage(frameImg, 0, 0, W, H);
+          }
           ctx.globalCompositeOperation = "source-over";
         }
 
@@ -1576,10 +1837,21 @@
       holdPulse: true,
       outroMode: "decay",
     });
+    /* 09.png 인스턴스 — hold 시 저해상도 모핑 루프, 떼면 ripple(파동) 텍스트 모션 */
+    const inst09 = createRevealInstance({
+      leftPct: 75, topPct: 70, size: 150,
+      sheetRow: 10,
+      name: "09",
+      root,
+      framesCount: 1,
+      holdLowRes: true,
+      outroMode: "ripple",
+    });
     const allInstances = [
       { inst: inst79, row: 80 },
       { inst: inst10, row: 11 },
       { inst: inst28, row: 29 },
+      { inst: inst09, row: 10 },
     ];
 
     /* ─────────────────────────────────────────────
@@ -1742,6 +2014,7 @@
           let fb = "79.png";
           if (row === 11) fb = "10.png";
           else if (row === 29) fb = "28.png";
+          else if (row === 10) fb = "09.png";
           inst.loadFrameSeries(fb);
           inst.setText("");
           if (inst.expandable && inst.setExpandData) inst.setExpandData(fb, "");
@@ -1750,6 +2023,7 @@
         let defaultFile = "79.png";
         if (row === 11) defaultFile = "10.png";
         else if (row === 29) defaultFile = "28.png";
+        else if (row === 10) defaultFile = "09.png";
         const filename = item[SHEET_TARGET_COL_NAME] || defaultFile;
         inst.loadFrameSeries(filename);
         // row 11 (10.png) 은 텍스트 없이 이미지만 — hold/expand 모두 비활성
@@ -1930,8 +2204,8 @@
         } catch (e) { /* tainted 등 무시 */ }
       }
 
-      // 2) 부피/decay 텍스트 글리프들
-      const glyphs = document.querySelectorAll(".text-volume-glyph, .text-decay-glyph");
+      // 2) 부피/decay/ripple 텍스트 글리프들
+      const glyphs = document.querySelectorAll(".text-volume-glyph, .text-decay-glyph, .text-ripple-glyph");
       octx.fillStyle = "#000000";
       const glyphFontPx = 13 * scale;
       octx.font = `${glyphFontPx}px Vivaldi, Eulyoo1945-Regular, serif`;
@@ -2036,6 +2310,10 @@
       inst28.loadFrameSeries("28.png");
       inst28.setText(
         "Without the ability to see the lost loved one or relive times with them, they do tend fade from mind quicker."
+      );
+      inst09.loadFrameSeries("09.png");
+      inst09.setText(
+        "Memory ripples back like water — the image dissolves, returns, and dissolves again."
       );
       console.info("[sheet] fallback (시트 미연결) — 임시 텍스트 사용");
     }
