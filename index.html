@@ -155,7 +155,7 @@
     .reveal-text-content {
       padding: 14px 16px;
       font-family: 'Vivaldi', 'Eulyoo1945-Regular', serif;
-      font-size: 13px;
+      font-size: 20px;
       line-height: 1.55;
       color: #000000;
       white-space: pre-wrap;
@@ -205,7 +205,7 @@
       left: 0;
       top:  0;
       font-family: 'Vivaldi', 'Eulyoo1945-Regular', serif;
-      font-size: 13px;
+      font-size: 20px;
       line-height: 1;
       color: #000000;
       white-space: pre;
@@ -244,7 +244,7 @@
       left: 0;
       top:  0;
       font-family: 'Vivaldi', 'Eulyoo1945-Regular', serif;
-      font-size: 13px;
+      font-size: 20px;
       line-height: 1;
       color: #000000;
       white-space: pre;
@@ -276,7 +276,7 @@
       left: 0;
       top:  0;
       font-family: 'Vivaldi', 'Eulyoo1945-Regular', serif;
-      font-size: 13px;
+      font-size: 20px;
       line-height: 1;
       color: #000000;
       white-space: pre;
@@ -356,7 +356,7 @@
     .expanded-panel-text {
       padding: 12px 18px 50px 18px;
       font-family: 'Vivaldi', 'Eulyoo1945-Regular', serif;
-      font-size: 13px;
+      font-size: 20px;
       line-height: 1.7;
       color: #000000;
       white-space: pre-wrap;
@@ -1137,7 +1137,7 @@
 
         // 한 줄 너비를 잡아 줄바꿈 처리: 박스 폭 ~ 360px
         const LINE_WIDTH = 360;
-        const LINE_HEIGHT = 18;
+        const LINE_HEIGHT = 28;
 
         // 글자별 폭 미리 계산
         const charWidths = [];
@@ -1466,7 +1466,7 @@
 
         // 단어 단위 줄바꿈 (한 줄 폭 ~ 360px)
         const LINE_WIDTH  = 360;
-        const LINE_HEIGHT = 18;
+        const LINE_HEIGHT = 28;
 
         // 단어 인덱스 추출
         const words = [];
@@ -2119,7 +2119,7 @@
       }
 
       if (pendingText && pathPts.length >= 2) {
-        const fontPx = 13 * scale;
+        const fontPx = 20 * scale;
         if (fontPx >= 4) {
           octx.fillStyle = "#000000";
           octx.font = `${fontPx}px Vivaldi, Eulyoo1945-Regular, serif`;
@@ -2208,7 +2208,7 @@
       // 2) 부피/decay/ripple 텍스트 글리프들
       const glyphs = document.querySelectorAll(".text-volume-glyph, .text-decay-glyph, .text-ripple-glyph");
       octx.fillStyle = "#000000";
-      const glyphFontPx = 13 * scale;
+      const glyphFontPx = 20 * scale;
       octx.font = `${glyphFontPx}px Vivaldi, Eulyoo1945-Regular, serif`;
       octx.textBaseline = "top";
       for (const g of glyphs) {
@@ -2224,7 +2224,7 @@
 
       // 3) reveal-text-content (타이프된 텍스트 박스)
       const textBlocks = document.querySelectorAll(".reveal-text-content");
-      const textBoxFontPx = 13 * scale;
+      const textBoxFontPx = 20 * scale;
       octx.font = `${textBoxFontPx}px Vivaldi, Eulyoo1945-Regular, serif`;
       for (const tb of textBlocks) {
         const txt = tb.textContent;
