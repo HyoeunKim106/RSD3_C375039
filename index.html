@@ -1825,26 +1825,19 @@
       framesCount: 4,
       root,
     });
-    const inst10 = createRevealInstance({
-      leftPct: 28, topPct: 65, size: REVEAL_SIZE,
-      sheetRow: 11,
-      name: "10",
-      interactive: false,
-      framesCount: 1,
-      root,
-    });
-    /* 28.png 인스턴스 — hold 시 페이드 루프, 떼면 붕괴 텍스트 모션 */
+    /* 28.png 인스턴스 — 단일 프레임. hold 시 알파 페이드 펄스, 떼면 하트(decay) 텍스트 모션 */
     const inst28 = createRevealInstance({
-      leftPct: 18, topPct: 22, size: REVEAL_SIZE,
+      leftPct: 20, topPct: 30, size: REVEAL_SIZE,
       sheetRow: 29,
       name: "28",
       root,
+      framesCount: 1,
       holdPulse: true,
       outroMode: "decay",
     });
     /* 09.png 인스턴스 — hold 시 저해상도 모핑 루프, 떼면 ripple(파동) 텍스트 모션 */
     const inst09 = createRevealInstance({
-      leftPct: 75, topPct: 70, size: REVEAL_SIZE,
+      leftPct: 70, topPct: 65, size: REVEAL_SIZE,
       sheetRow: 10,
       name: "09",
       root,
@@ -1854,7 +1847,6 @@
     });
     const allInstances = [
       { inst: inst79, row: 80 },
-      { inst: inst10, row: 11 },
       { inst: inst28, row: 29 },
       { inst: inst09, row: 10 },
     ];
@@ -2017,8 +2009,7 @@
         const item = pickRowFromSheet(rows, row);
         if (!item) {
           let fb = "79.png";
-          if (row === 11) fb = "10.png";
-          else if (row === 29) fb = "28.png";
+          if (row === 29) fb = "28.png";
           else if (row === 10) fb = "09.png";
           inst.loadFrameSeries(fb);
           inst.setText("");
@@ -2026,17 +2017,11 @@
           continue;
         }
         let defaultFile = "79.png";
-        if (row === 11) defaultFile = "10.png";
-        else if (row === 29) defaultFile = "28.png";
+        if (row === 29) defaultFile = "28.png";
         else if (row === 10) defaultFile = "09.png";
         const filename = item[SHEET_TARGET_COL_NAME] || defaultFile;
         inst.loadFrameSeries(filename);
-        // row 11 (10.png) 은 텍스트 없이 이미지만 — hold/expand 모두 비활성
-        if (row === 11) {
-          inst.setText("");
-        } else {
-          inst.setText(item["당사자의 직접 설명"] || "");
-        }
+        inst.setText(item["당사자의 직접 설명"] || "");
         if (inst.expandable && inst.setExpandData) {
           inst.setExpandData(filename, item["About"] || "");
         }
@@ -2310,8 +2295,6 @@
         "I can imagine an apple in front of me. " +
         "I know where the skin is. I know how big it is. I can't see it."
       );
-      inst10.loadFrameSeries("10.png");
-      inst10.setText("");
       inst28.loadFrameSeries("28.png");
       inst28.setText(
         "Without the ability to see the lost loved one or relive times with them, they do tend fade from mind quicker."
