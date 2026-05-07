@@ -367,9 +367,7 @@
 </head>
 <body>
 
-  <!-- 카메라 변환을 받는 월드 컨테이너 -->
   <div id="world">
-    <!-- reveal 인스턴스들은 JS가 동적으로 생성해 #reveal-root 안에 추가 -->
     <div id="reveal-root"></div>
   </div>
 
@@ -378,7 +376,6 @@
     <span class="row">POSITION X:<span class="num after-colon" id="num-pos-x">000</span> Y:<span class="num after-colon" id="num-pos-y">000</span></span>
   </div>
 
-  <!-- 우상단 캡처 버튼 -->
   <button id="capture-btn" type="button" aria-label="Capture trajectory"></button>
 
   <script>
@@ -1279,7 +1276,7 @@
 
           const x = g.flatX * (1 - localMorph) + sx * localMorph;
           const y = g.flatY * (1 - localMorph) + sy * localMorph;
-          const z =                          0 * (1 - localMorph) + sz * localMorph;
+          const z =                  0 * (1 - localMorph) + sz * localMorph;
 
           const rotYRad = rotY * Math.PI / 180;
           const effectiveZ = z * Math.cos(rotYRad) + x * Math.sin(rotYRad);
@@ -2030,7 +2027,7 @@
 
           // 트레일 → 마스크 캔버스 그리기
           // boxW, boxH: 그릴 박스 크기. offsetX, offsetY: 트레일 좌표(imgArea 기준)를
-          //              이 박스 좌표계로 옮길 평행이동 값.
+          //             이 박스 좌표계로 옮길 평행이동 값.
           function buildMask(boxW, boxH, offsetX, offsetY) {
             if (maskCanvas.width !== Math.round(boxW * dprForMask) ||
                 maskCanvas.height !== Math.round(boxH * dprForMask)) {
@@ -2230,7 +2227,7 @@
        가장자리가 흰 바탕으로 완전히 뭉개져 직사각형 형태가 보이지 않음.
        떼면 하트(decay) 텍스트 모션. */
     const inst28 = createRevealInstance({
-      leftPct: 20, topPct: 30, size: REVEAL_SIZE,
+      leftPct: 20, topPct: 30, size: 240,
       sheetRow: 29,
       name: "28",
       root,
