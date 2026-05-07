@@ -880,6 +880,8 @@
       const holdPulse   = config.holdPulse === true;
       /* hold 중에 저해상도 모핑 루프(픽셀화) 적용 (09.png 전용) */
       const holdLowRes  = config.holdLowRes === true;
+      /* base 이미지에 원형 비네팅 적용 (가장자리가 흰 바탕으로 부드럽게 페이드) */
+      const baseVignette = config.baseVignette === true;
       /* 떼면 보여줄 outro 모션 종류: "volume" (기본) | "decay" | "ripple" */
       const outroMode   = config.outroMode || "volume";
 
@@ -2041,7 +2043,9 @@
           }
 
           // 한 레이어를 마스크와 source-in 으로 합성해 본 캔버스에 그리는 헬퍼
-          function compositeLayer(layerImg, layerAlpha, useLowRes) {
+          // vignette: true 이면 합성 후 가장자리 알파를 원형 그라데이션으로 깎아내
+          //           본 캔버스에 그릴 때 자연스럽게 흰 바탕으로 페이드되어 보이게 함
+          function compositeLayer(layerImg, layerAlpha, useLowRes, vignette) {
             if (!layerImg || layerImg._broken || !layerImg.complete || layerImg.naturalWidth === 0) return;
             // 합성 캔버스 초기화 → 마스크 그리기 → source-in 으로 이미지 합성
             compCtx.save();
@@ -2082,6 +2086,25 @@
             } else {
               compCtx.drawImage(layerImg, 0, 0, W, H);
             }
+
+            // 비네팅 — 합성된 레이어의 알파를 가장자리에서 부드럽게 깎아낸다.
+            // destination-in 으로 원형 그라데이션(중앙 불투명 → 가장자리 투명)을 곱함.
+            if (vignette) {
+              const cx = W / 2, cy = H / 2;
+              // 안쪽 반경(완전 또렷): 캔버스 짧은 변의 ~32%
+              // 바깥 반경(완전 투명): 캔버스 짧은 변의 ~52%
+              const minSide = Math.min(W, H);
+              const innerR = minSide * 0.32;
+              const outerR = minSide * 0.52;
+              const vg = compCtx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+              vg.addColorStop(0,   "rgba(0,0,0,1)");
+              vg.addColorStop(0.6, "rgba(0,0,0,0.55)");
+              vg.addColorStop(1,   "rgba(0,0,0,0)");
+              compCtx.globalCompositeOperation = "destination-in";
+              compCtx.fillStyle = vg;
+              compCtx.fillRect(0, 0, W, H);
+            }
+
             compCtx.restore();
 
             // 본 캔버스에 합성된 레이어를 layerAlpha 로 올림
@@ -2092,11 +2115,12 @@
           }
 
           // base 레이어 — 항상 알파 1, holdPulse 영향 받지 않음
-          compositeLayer(frameImg, 1, holdLowRes && isHolding);
-          // overlay 레이어 — 있으면 base 위에 올라감. holdPulse 적용.
+          // baseVignette 옵션이 켜져 있으면 흰 바탕으로 자연스럽게 페이드되도록 비네팅 적용
+          compositeLayer(frameImg, 1, holdLowRes && isHolding, baseVignette);
+          // overlay 레이어 — 있으면 base 위에 올라감. holdPulse 적용. 비네팅 없음(또렷하게)
           if (overlayImg) {
             const overlayAlpha = (holdPulse && isHolding) ? holdAlpha : 1;
-            compositeLayer(overlayImg, overlayAlpha, false);
+            compositeLayer(overlayImg, overlayAlpha, false, false);
           } else if (holdPulse && isHolding) {
             // overlayImg가 없는데 holdPulse만 켜져 있다면(예전 동작 호환):
             // base에도 펄스가 적용되도록 한 번 더 알파 곱해 그려준다.
@@ -2141,6 +2165,7 @@
     /* 28.png 인스턴스 — 단일 프레임 베이스 + 28-1.png 오버레이.
        hold 시 알파 페이드 펄스는 오버레이(28-1.png)에만 적용,
        베이스(28.png)는 그대로 같은 마스크로 함께 reveal됨.
+       베이스에는 원형 비네팅을 적용해 가장자리가 흰 바탕으로 자연스럽게 페이드.
        떼면 하트(decay) 텍스트 모션. */
     const inst28 = createRevealInstance({
       leftPct: 20, topPct: 30, size: REVEAL_SIZE,
@@ -2149,6 +2174,7 @@
       root,
       framesCount: 1,
       overlayFilename: "28-1.png",
+      baseVignette: true,
       holdPulse: true,
       outroMode: "decay",
     });
