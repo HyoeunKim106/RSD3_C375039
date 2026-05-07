@@ -773,10 +773,12 @@
       const ctx = canvas.getContext("2d");
 
       function resizeCanvas() {
-        const rect = imgArea.getBoundingClientRect();
+        // 캔버스 백킹 픽셀은 항상 줌 영향 안 받는 본래 크기(size) 기준으로 잡는다.
+        // 이렇게 해야 #world의 transform: scale() 이 캔버스 element를 비례적으로
+        // 늘려줄 때 안의 이미지도 잘리지 않고 같이 커진다.
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        canvas.width  = Math.round(rect.width  * dpr);
-        canvas.height = Math.round(rect.height * dpr);
+        canvas.width  = Math.round(size * dpr);
+        canvas.height = Math.round(size * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
       resizeCanvas();
@@ -1683,12 +1685,18 @@
         }
         wasInInfluence = inInfluence;
 
+        // rect는 줌된 화면상 크기. 캔버스 백킹은 본래 size 기준이라
+        // 마우스 좌표를 그리기 좌표계(본래 size)로 환산해야 함.
+        const drawW = size, drawH = size;
+        const sx = rect.width  > 0 ? drawW / rect.width  : 1;
+        const sy = rect.height > 0 ? drawH / rect.height : 1;
+
         if (inInfluence) {
-          const lx = mouseX - rect.left;
-          const ly = mouseY - rect.top;
+          const lx = (mouseX - rect.left) * sx;
+          const ly = (mouseY - rect.top)  * sy;
           if (prevMX > -9000) {
-            const plx = prevMX - rect.left;
-            const ply = prevMY - rect.top;
+            const plx = (prevMX - rect.left) * sx;
+            const ply = (prevMY - rect.top)  * sy;
             pushTrailPoints(plx, ply, lx, ly);
           } else {
             pushTrailPoints(lx, ly, lx, ly);
@@ -1698,7 +1706,7 @@
           prevMX = -9999; prevMY = -9999;
         }
 
-        const W = rect.width, H = rect.height;
+        const W = drawW, H = drawH;
         ctx.clearRect(0, 0, W, H);
 
         const frameImg = frames[currentFrame];
