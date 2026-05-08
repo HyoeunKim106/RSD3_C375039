@@ -254,7 +254,12 @@
       will-change: transform, opacity;
     }
 
-    /* ───────── 문장 단위 호흡 텍스트 (hold 중에만 표시) ───────── */
+    /* ───────── 문장 단위 호흡 텍스트 (hold 중에만 표시) ─────────
+       alightworld.online 의 시적·명상적 호흡감 참고.
+       문장이 한 덩어리로 떠오르고, 한참 머물며 미세하게 일렁이고,
+       다음 문장으로 부드럽게 페이드. 흑백 미니멀, 자간 본래대로.
+       문장(블록) 단위라 글자가 따로 흩어지지 않음.
+    */
     .text-sentence {
       position: fixed;
       pointer-events: none;
@@ -381,7 +386,7 @@
 
   <script>
     /* ─────────────────────────────────────────────
-       상태값 및 유틸
+       상태값
        ───────────────────────────────────────────── */
     let distance = 100;
     let posX = 0;
@@ -405,7 +410,8 @@
       numPosX.textContent = fmt3(posX);
       numPosY.textContent = fmt3(posY);
       const scale = distance / 100;
-      worldEl.style.transform = `translate(${posX}px, ${posY}px) scale(${scale.toFixed(4)})`;
+      worldEl.style.transform =
+        `translate(${posX}px, ${posY}px) scale(${scale.toFixed(4)})`;
     }
     renderHUD();
 
@@ -420,19 +426,22 @@
     }
 
     /* ─────────────────────────────────────────────
-       조작 (드래그, 휠, 터치)
+       1) 마우스 드래그 → Position
        ───────────────────────────────────────────── */
     let isDragging = false;
     let dragLastX = 0, dragLastY = 0;
+
     const revealInstances = [];
     let activeHoldInstance = null;
 
     window.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;
+
       if (currentPanel) {
         if (e.target.closest && e.target.closest(".expanded-panel")) return;
         closeExpandedPanel();
       }
+
       for (const inst of revealInstances) {
         if (inst.isInside(e.clientX, e.clientY)) {
           if (inst.expandable) {
@@ -445,8 +454,10 @@
           return;
         }
       }
+
       isDragging = true;
-      dragLastX = e.clientX; dragLastY = e.clientY;
+      dragLastX = e.clientX;
+      dragLastY = e.clientY;
       document.body.style.cursor = "grabbing";
     });
 
@@ -454,17 +465,32 @@
       if (!isDragging) return;
       posX += (e.clientX - dragLastX);
       posY += (e.clientY - dragLastY);
-      dragLastX = e.clientX; dragLastY = e.clientY;
+      dragLastX = e.clientX;
+      dragLastY = e.clientY;
       renderHUD();
     });
 
     window.addEventListener("mouseup", () => {
-      if (activeHoldInstance) { activeHoldInstance.stopHold(); activeHoldInstance = null; }
+      if (activeHoldInstance) {
+        activeHoldInstance.stopHold();
+        activeHoldInstance = null;
+      }
+
       if (!isDragging) return;
       isDragging = false;
       document.body.style.cursor = "grab";
     });
 
+    window.addEventListener("blur", () => {
+      if (activeHoldInstance) {
+        activeHoldInstance.stopHold();
+        activeHoldInstance = null;
+      }
+    });
+
+    /* ─────────────────────────────────────────────
+       2) wheel 이벤트 분기
+       ───────────────────────────────────────────── */
     function applyZoomAt(clientX, clientY, factor) {
       const cx = window.innerWidth / 2;
       const cy = window.innerHeight / 2;
@@ -480,34 +506,163 @@
 
     window.addEventListener("wheel", (e) => {
       e.preventDefault();
+
       if (e.ctrlKey) {
-        applyZoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.01));
+        const factor = Math.exp(-e.deltaY * 0.01);
+        applyZoomAt(e.clientX, e.clientY, factor);
       } else {
-        const isTrackpadPan = Math.abs(e.deltaX) > 0 || (e.deltaMode === 0 && Math.abs(e.deltaY) < 50);
+        const isTrackpadPan =
+          Math.abs(e.deltaX) > 0 ||
+          (e.deltaMode === 0 && Math.abs(e.deltaY) < 50);
+
         if (isTrackpadPan) {
-          posX -= e.deltaX; posY -= e.deltaY;
+          posX -= e.deltaX;
+          posY -= e.deltaY;
         } else {
-          applyZoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.001));
+          const factor = Math.exp(-e.deltaY * 0.001);
+          applyZoomAt(e.clientX, e.clientY, factor);
         }
       }
       renderHUD();
     }, { passive: false });
 
     /* ─────────────────────────────────────────────
+       3) 터치
+       ───────────────────────────────────────────── */
+    let touchMode = null;
+    let lastTouchX = 0, lastTouchY = 0;
+    let pinchStartDist = 0;
+    let pinchStartDistance = 100;
+
+    function touchDistance(t1, t2) {
+      const dx = t1.clientX - t2.clientX;
+      const dy = t1.clientY - t2.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    window.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 1) {
+        touchMode = "pan";
+        lastTouchX = e.touches[0].clientX;
+        lastTouchY = e.touches[0].clientY;
+      } else if (e.touches.length === 2) {
+        touchMode = "pinch";
+        pinchStartDist = touchDistance(e.touches[0], e.touches[1]);
+        pinchStartDistance = distance;
+      }
+    }, { passive: false });
+
+    window.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      if (touchMode === "pan" && e.touches.length === 1) {
+        const t = e.touches[0];
+        posX += (t.clientX - lastTouchX);
+        posY += (t.clientY - lastTouchY);
+        lastTouchX = t.clientX;
+        lastTouchY = t.clientY;
+        renderHUD();
+      } else if (touchMode === "pinch" && e.touches.length === 2) {
+        const d = touchDistance(e.touches[0], e.touches[1]);
+        if (pinchStartDist > 0) {
+          const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+          const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+          const targetDistance = Math.max(5, pinchStartDistance * (d / pinchStartDist));
+          const factor = targetDistance / distance;
+          applyZoomAt(midX, midY, factor);
+          renderHUD();
+        }
+      }
+    }, { passive: false });
+
+    window.addEventListener("touchend", (e) => {
+      if (e.touches.length === 0) touchMode = null;
+      else if (e.touches.length === 1) {
+        touchMode = "pan";
+        lastTouchX = e.touches[0].clientX;
+        lastTouchY = e.touches[0].clientY;
+      }
+    });
+
+    window.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    /* ─────────────────────────────────────────────
+       5) Google Sheet 연동
+       ───────────────────────────────────────────── */
+    const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1pintIO8VNpryzS56eqXaNjqzx5f3EeAV/gviz/tq?tqx=out:csv&gid=0";
+
+    const SHEET_TARGET_ROW = 80;
+    const SHEET_TARGET_COL_NAME = "기억 주제";
+
+    const IMAGE_BASE_PATH = "./assets/";
+
+    function parseCSV(text) {
+      const rows = [];
+      let row = [];
+      let cell = "";
+      let inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (inQuotes) {
+          if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+          else if (ch === '"') { inQuotes = false; }
+          else { cell += ch; }
+        } else {
+          if (ch === '"') { inQuotes = true; }
+          else if (ch === ",") { row.push(cell); cell = ""; }
+          else if (ch === "\n") { row.push(cell); cell = ""; rows.push(row); row = []; }
+          else if (ch === "\r") { /* 무시 */ }
+          else { cell += ch; }
+        }
+      }
+      if (cell.length > 0 || row.length > 0) {
+        row.push(cell);
+        rows.push(row);
+      }
+      return rows;
+    }
+
+    function pickRowFromSheet(rows, targetRow) {
+      if (!rows || rows.length === 0) return null;
+      const header = rows[0];
+      const dataRow = rows[targetRow - 1];
+      if (!dataRow) {
+        console.warn(`[sheet] ${targetRow}행이 비어 있습니다.`);
+        return null;
+      }
+      const obj = {};
+      for (let i = 0; i < header.length; i++) {
+        const key = (header[i] || "").trim();
+        if (!key) continue;
+        obj[key] = (dataRow[i] || "").trim();
+      }
+      return obj;
+    }
+
+    /* ─────────────────────────────────────────────
        Reveal 인스턴스 시스템
        ───────────────────────────────────────────── */
-    const REVEAL_SIZE = 150; // 일괄 확대
-    const IMAGE_BASE_PATH = "./assets/";
+
+    const REVEAL_SIZE = 120; // 190에서 120으로 크기 일괄 축소
+
+    const FRAME_COUNT = 8;
+    const FRAME_INTERVAL_MS = 280;
+    const TYPE_INTERVAL_MS  = 50;
+    const TEXT_BOX_W = 280;
+    const TEXT_BOX_H = 200;
+    const REVEAL_INFLUENCE = 90;
     const POINT_LIFE = 140;
     const POINT_RADIUS = 75;
-    const REVEAL_INFLUENCE = 90;
-    const TYPE_INTERVAL_MS = 50;
+
     const HOLD_PULSE_PERIOD_MS = 700;
     const HOLD_LOWRES_PERIOD_MS = 1400;
     const HOLD_LOWRES_MIN_PX = 6;
     const HOLD_LOWRES_MAX_PX = 90;
 
     let mouseX = -9999, mouseY = -9999;
+
+    /* ─────────────────────────────────────────────
+       텍스트 궤적 시스템 (캡처용)
+       ───────────────────────────────────────────── */
     const pathPts = [];
     let totalArcLen = 0;
     let lastPathScreenX = -9999, lastPathScreenY = -9999;
@@ -516,59 +671,121 @@
     function addPathPoint(clientX, clientY) {
       let segLen = 0;
       if (lastPathScreenX > -9000) {
-        segLen = Math.hypot(clientX - lastPathScreenX, clientY - lastPathScreenY);
+        const dx = clientX - lastPathScreenX;
+        const dy = clientY - lastPathScreenY;
+        segLen = Math.hypot(dx, dy);
         if (segLen < 1.5) return;
       }
       totalArcLen += segLen;
       const w = screenToWorld(clientX, clientY);
       pathPts.push({ worldX: w.x, worldY: w.y, sScreen: totalArcLen });
-      lastPathScreenX = clientX; lastPathScreenY = clientY;
+      lastPathScreenX = clientX;
+      lastPathScreenY = clientY;
+    }
+
+    function feedFromInstance(inst) {
+      const text = (inst.getText && inst.getText()) || "";
+      if (!text) return;
+      const norm = text.replace(/\s+/g, " ").trim();
+      if (pendingText.length > 0) pendingText += "  ";
+      pendingText += norm;
     }
 
     window.addEventListener("mousemove", (e) => {
-      mouseX = e.clientX; mouseY = e.clientY;
+      mouseX = e.clientX;
+      mouseY = e.clientY;
       addPathPoint(e.clientX, e.clientY);
     });
 
     function createRevealInstance(config) {
       const { leftPct, topPct, size, sheetRow, root } = config;
       const interactive = config.interactive !== false;
-      const expandable = config.expandable === true;
-      const framesCount = config.framesCount || 1;
-      const holdPulse = config.holdPulse === true;
-      const holdLowRes = config.holdLowRes === true;
+      const expandable  = config.expandable === true;
+      const framesCount = (config.framesCount != null) ? config.framesCount : FRAME_COUNT;
+      const holdPulse   = config.holdPulse === true;
+      const holdLowRes  = config.holdLowRes === true;
       const holdSentence = config.holdSentence === true;
       const baseVignette = config.baseVignette === true;
-      const outroMode = config.outroMode || "volume";
+      const outroMode   = config.outroMode || "volume";
 
       const wrap = document.createElement("div");
       wrap.className = "reveal";
-      wrap.style.left = `${leftPct}%`;
-      wrap.style.top = `${topPct}%`;
-      wrap.style.width = `${size}px`;
+      wrap.style.left   = `${leftPct}%`;
+      wrap.style.top    = `${topPct}%`;
+      wrap.style.width  = `${size}px`;
       wrap.style.height = `${size}px`;
 
       const textBox = document.createElement("div");
       textBox.className = "reveal-text-box";
+      textBox.style.zIndex = "1";
       const textInner = document.createElement("div");
       textInner.className = "reveal-text-content";
       textBox.appendChild(textInner);
 
       const imgArea = document.createElement("div");
       imgArea.className = "reveal-img-area";
+      imgArea.style.zIndex = "2";
       const canvas = document.createElement("canvas");
       imgArea.appendChild(canvas);
-      const ctx = canvas.getContext("2d");
+
+      const baseScale = (typeof config.baseScale === "number" && config.baseScale > 0)
+        ? config.baseScale : 1;
+      const baseSize = Math.round(size * baseScale);
+      let baseCanvas = null;
+      let baseCtx = null;
+      let baseArea = null;
+      if (baseScale !== 1) {
+        baseArea = document.createElement("div");
+        baseArea.className = "reveal-base-area";
+        baseArea.style.position = "absolute";
+        baseArea.style.left = `${(size - baseSize) / 2}px`;
+        baseArea.style.top  = `${(size - baseSize) / 2}px`;
+        baseArea.style.width  = `${baseSize}px`;
+        baseArea.style.height = `${baseSize}px`;
+        baseArea.style.pointerEvents = "none";
+        baseArea.style.zIndex = "1";
+        baseCanvas = document.createElement("canvas");
+        baseCanvas.style.position = "absolute";
+        baseCanvas.style.inset = "0";
+        baseCanvas.style.width  = "100%";
+        baseCanvas.style.height = "100%";
+        baseArea.appendChild(baseCanvas);
+        baseCtx = baseCanvas.getContext("2d");
+      }
 
       wrap.appendChild(textBox);
+      if (baseArea) wrap.appendChild(baseArea);
       wrap.appendChild(imgArea);
+      wrap.style.overflow = "visible";
       root.appendChild(wrap);
+
+      const ctx = canvas.getContext("2d");
+
+      let overlayImg = null;
+      const overlayFilename = config.overlayFilename || null;
+      if (overlayFilename) {
+        const oi = new Image();
+        try { oi.crossOrigin = "anonymous"; } catch(e) {}
+        oi.onerror = () => { oi._broken = true; };
+        oi.src = IMAGE_BASE_PATH + overlayFilename;
+        overlayImg = oi;
+      }
+
+      let maskCanvas = null;
+      let maskCtx = null;
+      let compCanvas = null;
+      let compCtx = null;
 
       function resizeCanvas() {
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        canvas.width = Math.round(size * dpr);
+        canvas.width  = Math.round(size * dpr);
         canvas.height = Math.round(size * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        if (baseCanvas && baseCtx) {
+          baseCanvas.width  = Math.round(baseSize * dpr);
+          baseCanvas.height = Math.round(baseSize * dpr);
+          baseCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
       }
       resizeCanvas();
       window.addEventListener("resize", resizeCanvas);
@@ -580,28 +797,64 @@
       function loadFrameSeries(baseFilename) {
         const dot = baseFilename.lastIndexOf(".");
         const name = dot === -1 ? baseFilename : baseFilename.slice(0, dot);
-        const ext = dot === -1 ? "" : baseFilename.slice(dot);
+        const ext  = dot === -1 ? ""           : baseFilename.slice(dot);
         frames.length = 0;
         for (let i = 0; i < framesCount; i++) {
           const fname = (i === 0) ? `${name}${ext}` : `${name}-${i}${ext}`;
           const img = new Image();
-          img.crossOrigin = "anonymous";
+          try { img.crossOrigin = "anonymous"; } catch(e) {}
+          img.onerror = () => { img._broken = true; };
           img.src = IMAGE_BASE_PATH + fname;
           frames.push(img);
         }
+        currentFrame = 0;
+        console.info(`[reveal] frames for "${baseFilename}":`,
+                     frames.map(im => im.src));
+      }
+
+      function nextValidFrame(from) {
+        const n = frames.length;
+        if (n === 0) return -1;
+        for (let i = 1; i <= n; i++) {
+          const idx = (from + i) % n;
+          const im = frames[idx];
+          if (!im._broken && im.complete && im.naturalWidth > 0) return idx;
+          if (!im._broken && !im.complete) return idx;
+        }
+        const base = frames[0];
+        if (base && !base._broken) return 0;
+        return -1;
       }
 
       let fullText = "";
       let typedLen = 0;
       let typeTimer = null;
-      function setText(text) { fullText = text || ""; typedLen = 0; renderTypedText(); }
+
+      function setText(text) {
+        fullText = text || "";
+        typedLen = 0;
+        renderTypedText();
+      }
       function renderTypedText() {
-        textInner.textContent = fullText.slice(0, typedLen);
+        const visible = fullText.slice(0, typedLen);
+        textInner.textContent = visible;
         if (typedLen < fullText.length || isHolding) {
           const caret = document.createElement("span");
           caret.className = "caret";
           textInner.appendChild(caret);
         }
+      }
+      function startTyping() {
+        if (typeTimer) return;
+        typeTimer = setInterval(() => {
+          if (typedLen < fullText.length) {
+            typedLen++;
+            renderTypedText();
+          }
+        }, TYPE_INTERVAL_MS);
+      }
+      function stopTyping() {
+        if (typeTimer) { clearInterval(typeTimer); typeTimer = null; }
       }
 
       let isHolding = false;
@@ -609,138 +862,1650 @@
       let holdStartTime = 0;
 
       function startHold() {
-        if (!interactive || isHolding || isVolumeMode) return;
+        if (!interactive) return;
+        if (isHolding) return;
+        if (isVolumeMode) return;
         isHolding = true;
         holdStartTime = performance.now();
-        if (holdSentence) buildSentenceText(fullText);
+
+        if (!frameLoopTimer && framesCount > 1) {
+          const interval = holdPulse ? 90 : FRAME_INTERVAL_MS;
+          frameLoopTimer = setInterval(() => {
+            if (frames.length > 0) {
+              const next = nextValidFrame(currentFrame);
+              if (next !== -1) currentFrame = next;
+            }
+          }, interval);
+        }
+
+        if (holdSentence) {
+          buildSentenceText(fullText);
+        }
       }
 
-      // --- Outro Systems (Volume, Decay, Ripple) ---
-      let volumeRafId = 0, volumeRoot = null, volumeGlyphs = [];
+      let lowResCanvas = null;
+      let lowResCtx = null;
+
+      let volumeRoot = null;
+      let volumeStage = null;
+      let volumeGlyphs = [];
+      let volumeStartTime = 0;
+      let volumeRafId = 0;
+      let volX = 0, volY = 0;
+
       function buildVolumeText(text) {
-        if (!text) return;
+        teardownVolumeText();
+        if (!text || text.trim().length === 0) return;
+
         volumeRoot = document.createElement("div");
         volumeRoot.className = "text-volume";
         const r = wrap.getBoundingClientRect();
-        volumeRoot.style.left = `${r.left + r.width / 2}px`;
-        volumeRoot.style.top = `${r.top + r.height / 2}px`;
-        const stage = document.createElement("div");
-        stage.className = "text-volume-stage";
-        volumeRoot.appendChild(stage);
+        volX = r.left + r.width / 2;
+        volY = r.top  + r.height / 2;
+        volumeRoot.style.left = `${volX}px`;
+        volumeRoot.style.top  = `${volY}px`;
+        volumeRoot.style.width  = "0px";
+        volumeRoot.style.height = "0px";
+
+        volumeStage = document.createElement("div");
+        volumeStage.className = "text-volume-stage";
+        volumeRoot.appendChild(volumeStage);
         document.body.appendChild(volumeRoot);
 
+        const measure = document.createElement("span");
+        measure.className = "text-volume-glyph";
+        measure.style.position = "fixed";
+        measure.style.visibility = "hidden";
+        measure.style.left = "-9999px";
+        document.body.appendChild(measure);
+
+        let runningX = 0;
+        const charWidths = [];
         for (const ch of text) {
+          measure.textContent = ch;
+          const w = measure.getBoundingClientRect().width;
+          charWidths.push(w);
+        }
+        document.body.removeChild(measure);
+        const totalW = charWidths.reduce((a, b) => a + b, 0);
+        const startX = -totalW / 2;
+
+        volumeGlyphs = [];
+        let cx = startX;
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i];
           const el = document.createElement("span");
           el.className = "text-volume-glyph";
           el.textContent = ch;
-          stage.appendChild(el);
-          volumeGlyphs.push({ el, x: (Math.random()-0.5)*100, y: (Math.random()-0.5)*100, z: (Math.random()-0.5)*100 });
+          volumeStage.appendChild(el);
+
+          const flatX = cx;
+          const flatY = 0;
+          cx += charWidths[i];
+
+          const u = Math.random();
+          const v = Math.random();
+          const theta = 2 * Math.PI * u;
+          const phi   = Math.acos(2 * v - 1);
+          const baseR = 80;
+          const radiusMod = 1 + Math.sin(phi - 0.3) * 0.15
+                              + Math.cos(theta * 2) * 0.06;
+          const R = baseR * radiusMod;
+          const sx = R * Math.sin(phi) * Math.cos(theta);
+          const sy = R * Math.cos(phi) - 8;
+          const sz = R * Math.sin(phi) * Math.sin(theta);
+
+          volumeGlyphs.push({
+            el,
+            flatX, flatY,
+            sphereX: sx, sphereY: sy, sphereZ: sz,
+            phase: Math.random() * Math.PI * 2,
+            flowSeed: Math.random() * 1000,
+          });
         }
-        const tick = () => { updateVolume(); volumeRafId = requestAnimationFrame(tick); };
-        volumeRafId = requestAnimationFrame(tick);
-      }
-      function updateVolume() {
-        const t = (performance.now() - holdStartTime) / 1000;
-        volumeGlyphs.forEach(g => {
-          g.el.style.transform = `translate3d(${g.x}px, ${g.y + Math.sin(t*2)*10}px, ${g.z}px)`;
-        });
+
+        volumeStartTime = performance.now();
+        const tickVol = (now) => {
+          if (!volumeRoot) return;
+          updateVolume(now);
+          volumeRafId = requestAnimationFrame(tickVol);
+        };
+        volumeRafId = requestAnimationFrame(tickVol);
       }
 
-      // --- Decay 및 Ripple은 기존 로직과 동일하게 유지하되 단순화 처리 ---
-      function buildDecayText(text) { buildVolumeText(text); } // 시각적 구분은 생략
-      function buildRippleText(text) { buildVolumeText(text); }
+      function updateVolume(now) {
+        const t = (now - volumeStartTime) / 1000;
 
-      // --- Sentence Breathing (holdSentence) ---
-      let sentenceRafId = 0, sentenceRoot = null, sentenceBlocks = [];
+        const r = wrap.getBoundingClientRect();
+        volX = r.left + r.width / 2;
+        volY = r.top  + r.height / 2;
+        volumeRoot.style.left = `${volX}px`;
+        volumeRoot.style.top  = `${volY}px`;
+
+        const rotY = t * 12;
+        const rotX = Math.sin(t * 0.15) * 8;
+        volumeStage.style.transform =
+          `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+
+        const morphCycle = (Math.sin(t * (Math.PI * 2 / 8)) + 1) / 2;
+        const intro = Math.min(1, t / 1.5);
+        const morph = morphCycle * intro;
+
+        for (const g of volumeGlyphs) {
+          const localMorph = Math.max(0, Math.min(1,
+            morph + Math.sin(t * 0.5 + g.phase) * 0.15
+          ));
+
+          const flow = Math.sin(t * 0.3 + g.flowSeed) * 4;
+          const sx = g.sphereX + Math.cos(g.flowSeed) * flow;
+          const sy = g.sphereY + Math.sin(g.flowSeed * 1.3) * flow * 0.8;
+          const sz = g.sphereZ + Math.cos(g.flowSeed * 0.7) * flow;
+
+          const x = g.flatX * (1 - localMorph) + sx * localMorph;
+          const y = g.flatY * (1 - localMorph) + sy * localMorph;
+          const z =                  0 * (1 - localMorph) + sz * localMorph;
+
+          const rotYRad = rotY * Math.PI / 180;
+          const effectiveZ = z * Math.cos(rotYRad) + x * Math.sin(rotYRad);
+          const depthN = (effectiveZ + 80) / 160;
+          const opacity = 0.35 + Math.max(0, Math.min(1, depthN)) * 0.65;
+          const scale   = 0.85 + Math.max(0, Math.min(1, depthN)) * 0.30;
+
+          g.el.style.transform =
+            `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, ${z.toFixed(2)}px) ` +
+            `scale(${scale.toFixed(3)})`;
+          g.el.style.opacity = opacity.toFixed(3);
+        }
+      }
+
+      function teardownVolumeText() {
+        if (volumeRafId) { cancelAnimationFrame(volumeRafId); volumeRafId = 0; }
+        if (volumeRoot && volumeRoot.parentNode) {
+          volumeRoot.parentNode.removeChild(volumeRoot);
+        }
+        volumeRoot = null;
+        volumeStage = null;
+        volumeGlyphs = [];
+      }
+
+      let decayRoot = null;
+      let decayStage = null;
+      let decayGlyphs = [];
+      let decayWords = [];
+      let decayRafId = 0;
+      let decayStartTime = 0;
+      let decayLoopCount = 0;
+      let decayLoopStart = 0;
+      let decayCycleDuration = 0;
+
+      function generateSilhouettePoints(count, variant) {
+        const points = [];
+        const baseScale = 4.2;
+
+        const outlineCount = Math.floor(count * 0.50);
+        const fillCount = count - outlineCount;
+
+        for (let i = 0; i < outlineCount; i++) {
+          const t = i / outlineCount;
+          const a = t * Math.PI * 2;
+          const sx = 16 * Math.pow(Math.sin(a), 3);
+          const sy = -(13 * Math.cos(a)
+                      - 5  * Math.cos(2 * a)
+                      - 2  * Math.cos(3 * a)
+                      - 1  * Math.cos(4 * a));
+          const x = sx * baseScale;
+          const y = sy * baseScale - 5;
+          const z = (Math.random() - 0.5) * 10;
+          points.push({ x, y, z });
+        }
+
+        let placed = 0;
+        let safety = 0;
+        while (placed < fillCount && safety < fillCount * 30) {
+          safety++;
+          const rx = (Math.random() - 0.5) * 2;
+          const ry = (Math.random() - 0.5) * 2;
+          const X = rx;
+          const Y = -ry;
+          const lhs = Math.pow(X * X + Y * Y - 1, 3) - X * X * Y * Y * Y;
+          if (lhs <= 0) {
+            const x = rx * 65;
+            const y = ry * 60 - 5;
+            const z = (Math.random() - 0.5) * 14;
+            points.push({ x, y, z });
+            placed++;
+          }
+        }
+        while (placed < fillCount) {
+          const a = Math.random() * Math.PI * 2;
+          const sx = 16 * Math.pow(Math.sin(a), 3);
+          const sy = -(13 * Math.cos(a) - 5 * Math.cos(2*a) - 2 * Math.cos(3*a) - Math.cos(4*a));
+          points.push({ x: sx * baseScale, y: sy * baseScale - 5, z: 0 });
+          placed++;
+        }
+
+        return points;
+      }
+
+      function buildDecayText(text) {
+        teardownDecayText();
+        if (!text || text.trim().length === 0) return;
+
+        decayRoot = document.createElement("div");
+        decayRoot.className = "text-decay";
+        const r = wrap.getBoundingClientRect();
+        const cx0 = r.left + r.width / 2;
+        const cy0 = r.top  + r.height / 2;
+        decayRoot.style.left = `${cx0}px`;
+        decayRoot.style.top  = `${cy0}px`;
+        decayRoot.style.width  = "0px";
+        decayRoot.style.height = "0px";
+
+        decayStage = document.createElement("div");
+        decayStage.className = "text-decay-stage";
+        decayRoot.appendChild(decayStage);
+        document.body.appendChild(decayRoot);
+
+        const CORE_WORDS = new Set([
+          "see", "lost", "loved", "one", "relive", "quicker"
+        ]);
+
+        decayWords = [];
+        {
+          let i = 0;
+          while (i < text.length) {
+            while (i < text.length && /\s/.test(text[i])) i++;
+            if (i >= text.length) break;
+            const startIdx = i;
+            while (i < text.length && !/\s/.test(text[i])) i++;
+            const endIdx = i;
+            const wordRaw = text.slice(startIdx, endIdx);
+            const wordKey = wordRaw.replace(/[^A-Za-z]/g, "").toLowerCase();
+            const isCore = CORE_WORDS.has(wordKey);
+            decayWords.push({ startIdx, endIdx, isCore });
+          }
+        }
+
+        const measure = document.createElement("span");
+        measure.className = "text-decay-glyph";
+        measure.style.position = "fixed";
+        measure.style.visibility = "hidden";
+        measure.style.left = "-9999px";
+        document.body.appendChild(measure);
+
+        const LINE_WIDTH = 360;
+        const LINE_HEIGHT = 24;
+
+        const charWidths = [];
+        for (const ch of text) {
+          measure.textContent = ch === " " ? "\u00a0" : ch;
+          charWidths.push(measure.getBoundingClientRect().width);
+        }
+        document.body.removeChild(measure);
+
+        const layout = [];
+        let curX = 0;
+        let curY = 0;
+        for (let w = 0; w < decayWords.length; w++) {
+          const word = decayWords[w];
+          let wordWidth = 0;
+          for (let i = word.startIdx; i < word.endIdx; i++) {
+            wordWidth += charWidths[i];
+          }
+          const spaceCh = (w === 0) ? "" : " ";
+          const spaceW = (w === 0) ? 0 : charWidths[word.startIdx - 1] || 4;
+          if (curX + spaceW + wordWidth > LINE_WIDTH && curX > 0) {
+            curX = 0;
+            curY += LINE_HEIGHT;
+          } else if (w > 0) {
+            layout.push({
+              ch: " ", lineX: curX, lineY: curY,
+              isSpace: true, wordIdx: -1, isCore: false,
+            });
+            curX += spaceW;
+          }
+          for (let i = word.startIdx; i < word.endIdx; i++) {
+            layout.push({
+              ch: text[i], lineX: curX, lineY: curY,
+              isSpace: false, wordIdx: w, isCore: word.isCore,
+            });
+            curX += charWidths[i];
+          }
+        }
+
+        const totalH = curY + LINE_HEIGHT;
+        const offsetX = -LINE_WIDTH / 2;
+        const offsetY = -totalH / 2;
+
+        decayGlyphs = [];
+        for (let i = 0; i < layout.length; i++) {
+          const it = layout[i];
+          if (it.isSpace) continue;
+
+          const el = document.createElement("span");
+          el.className = "text-decay-glyph";
+          el.textContent = it.ch;
+          decayStage.appendChild(el);
+
+          const baseX = it.lineX + offsetX;
+          const baseY = it.lineY + offsetY;
+
+          const scatterTheta = Math.random() * Math.PI * 2;
+          const scatterPhi = Math.acos(2 * Math.random() - 1);
+          const scatterDist = 140 + Math.random() * 100;
+          const scatterX = scatterDist * Math.sin(scatterPhi) * Math.cos(scatterTheta);
+          const scatterY = scatterDist * Math.cos(scatterPhi) * 0.6;
+          const scatterZ = scatterDist * Math.sin(scatterPhi) * Math.sin(scatterTheta) * 0.6;
+
+          const curveSeed = Math.random() * Math.PI * 2;
+          const curveAmt = 30 + Math.random() * 40;
+
+          decayGlyphs.push({
+            el, ch: it.ch, wordIdx: it.wordIdx, isCore: it.isCore,
+            baseX, baseY,
+            scatterX, scatterY, scatterZ,
+            curveSeed, curveAmt,
+            phase: Math.random() * Math.PI * 2,
+            wordIdxRand: Math.random(),
+            arrivalDelay: Math.random() * 0.4,
+          });
+        }
+
+        decayStartTime = performance.now();
+        decayLoopStart = decayStartTime;
+        decayLoopCount = 0;
+        decayCycleDuration = 8500;
+
+        const tickDecay = (now) => {
+          if (!decayRoot) return;
+          updateDecay(now);
+          decayRafId = requestAnimationFrame(tickDecay);
+        };
+        decayRafId = requestAnimationFrame(tickDecay);
+      }
+
+      let decayCachedSilhouette = null;
+      let decayCachedVariant = -1;
+
+      function updateDecay(now) {
+        const r = wrap.getBoundingClientRect();
+        const cx0 = r.left + r.width / 2;
+        const cy0 = r.top  + r.height / 2;
+        decayRoot.style.left = `${cx0}px`;
+        decayRoot.style.top  = `${cy0}px`;
+
+        const elapsed = now - decayLoopStart;
+        let cycleT = elapsed / decayCycleDuration;
+        if (cycleT >= 1) {
+          decayLoopCount++;
+          decayCycleDuration = Math.max(6500, 8500 * Math.pow(0.93, decayLoopCount));
+          decayLoopStart = now;
+          decayCachedSilhouette = null;
+          cycleT = 0;
+        }
+
+        const formingEnd = 0.45;
+        const breathingEnd = 0.85;
+
+        if (!decayCachedSilhouette) {
+          const variant = decayLoopCount % 3;
+          decayCachedVariant = variant;
+          decayCachedSilhouette = generateSilhouettePoints(decayGlyphs.length, variant);
+          const idxs = decayGlyphs.map((_, i) => i);
+          for (let i = idxs.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [idxs[i], idxs[j]] = [idxs[j], idxs[i]];
+          }
+          for (let i = 0; i < decayGlyphs.length; i++) {
+            const sp = decayCachedSilhouette[idxs[i]];
+            decayGlyphs[i].silX = sp.x;
+            decayGlyphs[i].silY = sp.y;
+            decayGlyphs[i].silZ = sp.z || 0;
+          }
+        }
+
+        let formRotY = 0;
+        let formRotX = 0;
+        let breathScale = 1;
+
+        if (cycleT < formingEnd) {
+          const u = cycleT / formingEnd;
+          formRotY = u * 0.3;
+          formRotX = Math.sin(u * Math.PI) * 0.08;
+        } else if (cycleT < breathingEnd) {
+          const u = (cycleT - formingEnd) / (breathingEnd - formingEnd);
+          formRotY = 0.3 + u * Math.PI * 1.6;
+          formRotX = Math.sin(u * Math.PI) * 0.18;
+          breathScale = 1 + Math.sin(u * Math.PI * 2) * 0.05;
+        } else {
+          const u = (cycleT - breathingEnd) / (1 - breathingEnd);
+          formRotY = 0.3 + Math.PI * 1.6 + u * 0.15;
+          formRotX = (1 - u) * 0.10;
+        }
+
+        const cosY = Math.cos(formRotY), sinY = Math.sin(formRotY);
+        const cosX = Math.cos(formRotX), sinX = Math.sin(formRotX);
+
+        function applyRotation(sx, sy, sz) {
+          const ry  = sy * cosX - sz * sinX;
+          const rz1 = sy * sinX + sz * cosX;
+          const rx  = sx * cosY + rz1 * sinY;
+          const rz2 = -sx * sinY + rz1 * cosY;
+          return { x: rx, y: ry, z: rz2 };
+        }
+
+        for (const g of decayGlyphs) {
+          let x, y, z = 0, opacity;
+
+          if (cycleT < formingEnd) {
+            const rawU = cycleT / formingEnd;
+            const localU = Math.max(0, Math.min(1,
+              (rawU - g.arrivalDelay * 0.5) / (1 - g.arrivalDelay * 0.5)
+            ));
+            const eu = localU < 0.5
+              ? 4 * localU * localU * localU
+              : 1 - Math.pow(-2 * localU + 2, 3) / 2;
+
+            const lx = g.scatterX * (1 - eu) + g.silX * eu;
+            const ly = g.scatterY * (1 - eu) + g.silY * eu;
+            const lz = g.scatterZ * (1 - eu) + g.silZ * eu;
+
+            const curveBlend = Math.sin(eu * Math.PI);
+            const cx_off = Math.cos(g.curveSeed) * g.curveAmt * curveBlend;
+            const cy_off = Math.sin(g.curveSeed) * g.curveAmt * curveBlend * 0.7;
+            const cz_off = Math.cos(g.curveSeed * 1.7) * g.curveAmt * 0.5 * curveBlend;
+
+            const rotated = applyRotation(lx + cx_off, ly + cy_off, lz + cz_off);
+            x = rotated.x;
+            y = rotated.y;
+            z = rotated.z;
+
+            opacity = 0.05 + eu * 0.75;
+          } else if (cycleT < breathingEnd) {
+            const sx = g.silX * breathScale;
+            const sy = g.silY * breathScale;
+            const sz = g.silZ * breathScale;
+            const r = applyRotation(sx, sy, sz);
+            x = r.x; y = r.y; z = r.z;
+            const depthN = (z + 30) / 60;
+            opacity = 0.65 + Math.max(0, Math.min(1, depthN)) * 0.30;
+          } else {
+            const u = (cycleT - breathingEnd) / (1 - breathingEnd);
+            const r = applyRotation(g.silX, g.silY, g.silZ);
+            x = r.x; y = r.y; z = r.z;
+            const startOffset = g.wordIdxRand * 0.4;
+            const localU = Math.max(0, Math.min(1,
+              (u - startOffset * 0.5) / (1 - startOffset * 0.5)
+            ));
+            const fadeEu = 1 - Math.pow(1 - localU, 2.0);
+            const depthN = (z + 30) / 60;
+            const baseOp = 0.65 + Math.max(0, Math.min(1, depthN)) * 0.30;
+            opacity = baseOp * (1 - fadeEu);
+          }
+
+          const depthScaleN = Math.max(0, Math.min(1, (z + 40) / 80));
+          const scale = 0.85 + depthScaleN * 0.30;
+
+          g.el.style.transform =
+            `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, ${z.toFixed(2)}px) ` +
+            `scale(${scale.toFixed(3)})`;
+          g.el.style.opacity = opacity.toFixed(3);
+        }
+      }
+
+      function teardownDecayText() {
+        if (decayRafId) { cancelAnimationFrame(decayRafId); decayRafId = 0; }
+        if (decayRoot && decayRoot.parentNode) {
+          decayRoot.parentNode.removeChild(decayRoot);
+        }
+        decayRoot = null;
+        decayStage = null;
+        decayGlyphs = [];
+        decayWords = [];
+        decayCachedSilhouette = null;
+      }
+
+      let rippleRoot = null;
+      let rippleStage = null;
+      let rippleGlyphs = [];
+      let rippleRafId = 0;
+      let rippleStartTime = 0;
+
+      function buildRippleText(text) {
+        teardownRippleText();
+        if (!text || text.trim().length === 0) return;
+
+        rippleRoot = document.createElement("div");
+        rippleRoot.className = "text-ripple";
+        const r0 = wrap.getBoundingClientRect();
+        const cx0 = r0.left + r0.width / 2;
+        const cy0 = r0.top  + r0.height / 2;
+        rippleRoot.style.left = `${cx0}px`;
+        rippleRoot.style.top  = `${cy0}px`;
+        rippleRoot.style.width  = "0px";
+        rippleRoot.style.height = "0px";
+
+        rippleStage = document.createElement("div");
+        rippleStage.className = "text-ripple-stage";
+        rippleRoot.appendChild(rippleStage);
+        document.body.appendChild(rippleRoot);
+
+        const measure = document.createElement("span");
+        measure.className = "text-ripple-glyph";
+        measure.style.position = "fixed";
+        measure.style.visibility = "hidden";
+        measure.style.left = "-9999px";
+        document.body.appendChild(measure);
+
+        const charWidths = [];
+        for (const ch of text) {
+          measure.textContent = ch === " " ? " " : ch;
+          charWidths.push(measure.getBoundingClientRect().width);
+        }
+        document.body.removeChild(measure);
+
+        const LINE_WIDTH  = 360;
+        const LINE_HEIGHT = 24;
+
+        const words = [];
+        {
+          let i = 0;
+          while (i < text.length) {
+            while (i < text.length && /\s/.test(text[i])) i++;
+            if (i >= text.length) break;
+            const startIdx = i;
+            while (i < text.length && !/\s/.test(text[i])) i++;
+            words.push({ startIdx, endIdx: i });
+          }
+        }
+
+        const layout = [];
+        let curX = 0;
+        let curY = 0;
+        for (let w = 0; w < words.length; w++) {
+          const word = words[w];
+          let wordWidth = 0;
+          for (let i = word.startIdx; i < word.endIdx; i++) {
+            wordWidth += charWidths[i];
+          }
+          const spaceW = (w === 0) ? 0 : (charWidths[word.startIdx - 1] || 4);
+          if (curX + spaceW + wordWidth > LINE_WIDTH && curX > 0) {
+            curX = 0;
+            curY += LINE_HEIGHT;
+          } else if (w > 0) {
+            curX += spaceW;
+          }
+          for (let i = word.startIdx; i < word.endIdx; i++) {
+            layout.push({ ch: text[i], lineX: curX, lineY: curY });
+            curX += charWidths[i];
+          }
+        }
+
+        const totalH = curY + LINE_HEIGHT;
+        const offsetX = -LINE_WIDTH / 2;
+        const offsetY = -totalH / 2;
+
+        rippleGlyphs = [];
+        for (let i = 0; i < layout.length; i++) {
+          const it = layout[i];
+          const el = document.createElement("span");
+          el.className = "text-ripple-glyph";
+          el.textContent = it.ch;
+          rippleStage.appendChild(el);
+
+          const baseX = it.lineX + offsetX;
+          const baseY = it.lineY + offsetY;
+
+          rippleGlyphs.push({
+            el,
+            baseX, baseY,
+            phaseX: (it.lineX / LINE_WIDTH) * Math.PI * 2,
+            phaseY: (it.lineY / LINE_HEIGHT) * 0.7,
+            jitter: Math.random() * 0.3,
+            jitterSeed: Math.random() * 1000,
+          });
+        }
+
+        rippleStartTime = performance.now();
+        const tickRipple = (now) => {
+          if (!rippleRoot) return;
+          updateRipple(now);
+          rippleRafId = requestAnimationFrame(tickRipple);
+        };
+        rippleRafId = requestAnimationFrame(tickRipple);
+      }
+
+      function updateRipple(now) {
+        const t = (now - rippleStartTime) / 1000;
+
+        const r = wrap.getBoundingClientRect();
+        const cx0 = r.left + r.width / 2;
+        const cy0 = r.top  + r.height / 2;
+        rippleRoot.style.left = `${cx0}px`;
+        rippleRoot.style.top  = `${cy0}px`;
+
+        const intro = Math.min(1, t / 1.2);
+        const introEased = 1 - Math.pow(1 - intro, 3);
+
+        const waveSpeed = 1.6;
+        const waveAmpY  = 7;
+        const waveAmpX  = 2.5;
+        const rotAmp    = 0.18;
+
+        for (const g of rippleGlyphs) {
+          const wave = Math.sin(t * waveSpeed - g.phaseX * 1.4 + g.phaseY);
+          const wave2 = Math.sin(t * waveSpeed * 0.55 - g.phaseX * 0.7 + g.jitterSeed * 0.001);
+
+          const dy = wave * waveAmpY * introEased
+                   + wave2 * waveAmpY * 0.35 * introEased;
+          const dx = Math.cos(t * waveSpeed * 0.7 - g.phaseX) * waveAmpX * introEased;
+          const rot = wave * rotAmp * 0.6 + wave2 * rotAmp * 0.4;
+
+          const x = g.baseX + dx;
+          const y = g.baseY + dy;
+
+          const alphaWave = 0.78 + wave * 0.18 + wave2 * 0.06;
+          const opacity = Math.max(0.25, Math.min(1, alphaWave)) * introEased;
+
+          const scale = 0.94 + wave * 0.06;
+
+          g.el.style.transform =
+            `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) ` +
+            `rotate(${rot.toFixed(3)}rad) ` +
+            `scale(${scale.toFixed(3)})`;
+          g.el.style.opacity = opacity.toFixed(3);
+        }
+      }
+
+      function teardownRippleText() {
+        if (rippleRafId) { cancelAnimationFrame(rippleRafId); rippleRafId = 0; }
+        if (rippleRoot && rippleRoot.parentNode) {
+          rippleRoot.parentNode.removeChild(rippleRoot);
+        }
+        rippleRoot = null;
+        rippleStage = null;
+        rippleGlyphs = [];
+      }
+
+      let sentenceRoot = null;
+      let sentenceStage = null;
+      let sentenceList = [];
+      let sentenceBlocks = [];
+      let sentenceRafId = 0;
+      let sentenceStartTime = 0;
+      let sentenceCurIdx = 0;
+      let sentenceCurStart = 0;
+
+      const SENT_FADE_IN  = 1200;
+      const SENT_HOLD     = 2600;
+      const SENT_FADE_OUT = 1300;
+      const SENT_TOTAL    = SENT_FADE_IN + SENT_HOLD + SENT_FADE_OUT;
+      const SENT_OVERLAP  = 700;
+
+      function splitSentences(text) {
+        if (!text) return [];
+        const raw = text.replace(/\s+/g, " ").trim();
+        if (!raw) return [];
+        const parts = raw.match(/[^.!?\n]+[.!?]?/g) || [raw];
+        return parts.map(s => s.trim()).filter(s => s.length > 0);
+      }
+
       function buildSentenceText(text) {
+        teardownSentenceText();
+        sentenceList = splitSentences(text);
+        if (sentenceList.length === 0) return;
+
         sentenceRoot = document.createElement("div");
         sentenceRoot.className = "text-sentence";
         const r = wrap.getBoundingClientRect();
-        sentenceRoot.style.left = `${r.left + r.width/2}px`;
-        sentenceRoot.style.top = `${r.top + r.height/2}px`;
-        const stage = document.createElement("div");
-        stage.className = "text-sentence-stage";
-        sentenceRoot.appendChild(stage);
+        sentenceRoot.style.left = `${r.left + r.width / 2}px`;
+        sentenceRoot.style.top  = `${r.top  + r.height / 2}px`;
+        sentenceRoot.style.width  = "0px";
+        sentenceRoot.style.height = "0px";
+
+        sentenceStage = document.createElement("div");
+        sentenceStage.className = "text-sentence-stage";
+        sentenceRoot.appendChild(sentenceStage);
         document.body.appendChild(sentenceRoot);
 
-        const block = document.createElement("div");
-        block.className = "text-sentence-block";
-        block.textContent = text;
-        block.style.width = "300px";
-        block.style.marginLeft = "-150px";
-        stage.appendChild(block);
-        sentenceBlocks.push({ el: block });
+        sentenceBlocks = [];
+        sentenceCurIdx = 0;
+        sentenceCurStart = performance.now();
+        sentenceStartTime = sentenceCurStart;
 
-        const tick = () => {
-          const t = performance.now() * 0.002;
-          block.style.opacity = 0.5 + Math.sin(t)*0.5;
-          block.style.transform = `translateY(${Math.sin(t*0.5)*10}px)`;
+        spawnSentenceBlock(sentenceCurStart, sentenceList[0], 0);
+
+        const tick = (now) => {
+          if (!sentenceRoot) return;
+          updateSentence(now);
           sentenceRafId = requestAnimationFrame(tick);
         };
         sentenceRafId = requestAnimationFrame(tick);
       }
 
+      function spawnSentenceBlock(startTime, text, idxInLoop) {
+        const el = document.createElement("div");
+        el.className = "text-sentence-block";
+        el.textContent = text;
+        el.style.width = "320px";
+        el.style.marginLeft = "-160px";
+        el.style.opacity = "0";
+        const phase = Math.random() * Math.PI * 2;
+        sentenceStage.appendChild(el);
+        sentenceBlocks.push({
+          el, text, startTime, phase,
+          settleY: -8 + (Math.random() - 0.5) * 6,
+          enterY: 32 + Math.random() * 8,
+          exitY: -22 - Math.random() * 8,
+          swayAmp: 3 + Math.random() * 2,
+          swaySpeed: 0.7 + Math.random() * 0.4,
+          settleScale: 0.99 + Math.random() * 0.04,
+        });
+      }
+
+      function easeOutCubic(t) {
+        return 1 - Math.pow(1 - t, 3);
+      }
+      function easeInCubic(t) {
+        return t * t * t;
+      }
+
+      function updateSentence(now) {
+        const r = wrap.getBoundingClientRect();
+        sentenceRoot.style.left = `${r.left + r.width / 2}px`;
+        sentenceRoot.style.top  = `${r.top  + r.height / 2}px`;
+
+        const sinceCurStart = now - sentenceCurStart;
+        const fadeOutStart = SENT_FADE_IN + SENT_HOLD;
+        if (sinceCurStart >= fadeOutStart - SENT_OVERLAP) {
+          const lastBlock = sentenceBlocks[sentenceBlocks.length - 1];
+          const expectedNextStart = sentenceCurStart + (fadeOutStart - SENT_OVERLAP);
+          const lastIsCurrent = lastBlock && Math.abs(lastBlock.startTime - sentenceCurStart) < 1;
+          if (lastIsCurrent) {
+            const nextIdx = (sentenceCurIdx + 1) % sentenceList.length;
+            spawnSentenceBlock(expectedNextStart, sentenceList[nextIdx], nextIdx);
+          }
+        }
+        if (sinceCurStart >= SENT_TOTAL) {
+          sentenceCurIdx = (sentenceCurIdx + 1) % sentenceList.length;
+          sentenceCurStart = sentenceCurStart + (SENT_TOTAL - SENT_OVERLAP);
+        }
+
+        for (let i = sentenceBlocks.length - 1; i >= 0; i--) {
+          const b = sentenceBlocks[i];
+          const t = now - b.startTime;
+          if (t < 0) {
+            b.el.style.opacity = "0";
+            continue;
+          }
+          if (t >= SENT_TOTAL) {
+            if (b.el.parentNode) b.el.parentNode.removeChild(b.el);
+            sentenceBlocks.splice(i, 1);
+            continue;
+          }
+
+          let opacity, y, scale, blur;
+          if (t < SENT_FADE_IN) {
+            const u = t / SENT_FADE_IN;
+            const eu = easeOutCubic(u);
+            opacity = eu;
+            y = b.enterY * (1 - eu) + b.settleY * eu;
+            scale = 0.97 + 0.02 * eu + (b.settleScale - 0.99) * eu;
+            blur = (1 - eu) * 1.5;
+          } else if (t < SENT_FADE_IN + SENT_HOLD) {
+            const local = (t - SENT_FADE_IN) / SENT_HOLD;
+            opacity = 0.92 + Math.sin(t * 0.0018 + b.phase) * 0.08;
+            y = b.settleY + Math.sin(t * 0.0011 + b.phase) * 0.8;
+            scale = b.settleScale + Math.sin(t * 0.0009 + b.phase) * 0.005;
+            blur = 0;
+          } else {
+            const u = (t - SENT_FADE_IN - SENT_HOLD) / SENT_FADE_OUT;
+            const eu = easeInCubic(u);
+            opacity = 1 - eu;
+            y = b.settleY * (1 - eu) + b.exitY * eu;
+            scale = b.settleScale * (1 - eu * 0.04);
+            blur = eu * 1.8;
+          }
+
+          const sec = t / 1000;
+          const swayX = Math.sin(sec * b.swaySpeed + b.phase) * b.swayAmp;
+
+          b.el.style.opacity = opacity.toFixed(3);
+          b.el.style.transform =
+            `translate(${swayX.toFixed(2)}px, ${y.toFixed(2)}px) ` +
+            `scale(${scale.toFixed(4)})`;
+          b.el.style.filter = blur > 0.01 ? `blur(${blur.toFixed(2)}px)` : "none";
+        }
+      }
+
+      function teardownSentenceText() {
+        if (sentenceRafId) { cancelAnimationFrame(sentenceRafId); sentenceRafId = 0; }
+        if (sentenceRoot && sentenceRoot.parentNode) {
+          sentenceRoot.parentNode.removeChild(sentenceRoot);
+        }
+        sentenceRoot = null;
+        sentenceStage = null;
+        sentenceBlocks = [];
+        sentenceList = [];
+      }
+
       function stopHold() {
         if (!isHolding) return;
         isHolding = false;
-        if (sentenceRoot) { sentenceRoot.remove(); cancelAnimationFrame(sentenceRafId); }
-        isVolumeMode = true;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (outroMode === "decay") buildDecayText(fullText);
-        else if (outroMode === "ripple") buildRippleText(fullText);
-        else buildVolumeText(fullText);
+
+        if (frameLoopTimer) { clearInterval(frameLoopTimer); frameLoopTimer = null; }
+
+        if (holdSentence) {
+          teardownSentenceText();
+        }
+
+        if (fullText && fullText.trim().length > 0) {
+          isVolumeMode = true;
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          if (baseCtx && baseCanvas) {
+            baseCtx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+          }
+          trail.length = 0;
+          if (outroMode === "decay") {
+            buildDecayText(fullText);
+          } else if (outroMode === "ripple") {
+            buildRippleText(fullText);
+          } else {
+            buildVolumeText(fullText);
+          }
+        }
+      }
+
+      function isInside(x, y) {
+        if (!interactive && !expandable) return false;
+        const r = imgArea.getBoundingClientRect();
+        return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+      }
+
+      let expandImageFile = "";
+      let expandText = "";
+      function setExpandData(filename, text) {
+        expandImageFile = filename || "";
+        expandText = text || "";
+      }
+      function getExpandData() {
+        return { filename: expandImageFile, text: expandText };
       }
 
       const trail = [];
-      function tick() {
-        if (isVolumeMode) { requestAnimationFrame(tick); return; }
-        const r = imgArea.getBoundingClientRect();
-        const inInf = Math.hypot(Math.max(r.left-mouseX, 0, mouseX-r.right), Math.max(r.top-mouseY, 0, mouseY-r.bottom)) <= REVEAL_INFLUENCE;
-        
-        ctx.clearRect(0, 0, size, size);
-        const img = frames[currentFrame];
-        if (img && img.complete && inInf) {
-          ctx.globalAlpha = holdPulse && isHolding ? 0.5 + 0.5*Math.cos(performance.now()/100) : 1;
-          ctx.drawImage(img, 0, 0, size, size);
+      let prevMX = -9999, prevMY = -9999;
+
+      function pushTrailPoints(fromX, fromY, toX, toY) {
+        const dx = toX - fromX, dy = toY - fromY;
+        const dist = Math.hypot(dx, dy);
+        const steps = Math.max(1, Math.ceil(dist / 6));
+        for (let i = 1; i <= steps; i++) {
+          const t = i / steps;
+          trail.push({
+            x: fromX + dx * t,
+            y: fromY + dy * t,
+            age: 0,
+            maxAge: POINT_LIFE + (Math.random() - 0.5) * 40,
+            radius: POINT_RADIUS + (Math.random() - 0.5) * 22,
+            driftSeed: Math.random() * Math.PI * 2,
+            driftAmt:  6 + Math.random() * 8,
+          });
         }
+        if (trail.length > 700) trail.splice(0, trail.length - 700);
+      }
+
+      let wasInInfluence = false;
+      let onInfluenceEnter = null;
+
+      function tick() {
+        if (isVolumeMode) {
+          requestAnimationFrame(tick);
+          return;
+        }
+
+        const rect = imgArea.getBoundingClientRect();
+
+        const dx = Math.max(rect.left - mouseX, 0, mouseX - rect.right);
+        const dy = Math.max(rect.top  - mouseY, 0, mouseY - rect.bottom);
+        const distOutside = Math.hypot(dx, dy);
+        const inInfluence = distOutside <= REVEAL_INFLUENCE;
+
+        if (inInfluence && !wasInInfluence) {
+          if (typeof onInfluenceEnter === "function") {
+            onInfluenceEnter(instance);
+          }
+        }
+        wasInInfluence = inInfluence;
+
+        const drawW = size, drawH = size;
+        const sx = rect.width  > 0 ? drawW / rect.width  : 1;
+        const sy = rect.height > 0 ? drawH / rect.height : 1;
+
+        if (inInfluence) {
+          const lx = (mouseX - rect.left) * sx;
+          const ly = (mouseY - rect.top)  * sy;
+          if (prevMX > -9000) {
+            const plx = (prevMX - rect.left) * sx;
+            const ply = (prevMY - rect.top)  * sy;
+            pushTrailPoints(plx, ply, lx, ly);
+          } else {
+            pushTrailPoints(lx, ly, lx, ly);
+          }
+          prevMX = mouseX; prevMY = mouseY;
+        } else {
+          prevMX = -9999; prevMY = -9999;
+        }
+
+        const W = drawW, H = drawH;
+        ctx.clearRect(0, 0, W, H);
+        if (baseCtx) baseCtx.clearRect(0, 0, baseSize, baseSize);
+
+        const frameImg = frames[currentFrame];
+        const frameReady = frameImg && frameImg.complete && frameImg.naturalWidth > 0;
+
+        let holdAlpha = 1;
+        if (holdPulse && isHolding) {
+          const elapsedHold = performance.now() - holdStartTime;
+          const phase = (elapsedHold % HOLD_PULSE_PERIOD_MS) / HOLD_PULSE_PERIOD_MS;
+          holdAlpha = 0.5 + 0.5 * Math.cos(phase * Math.PI * 2);
+        }
+
+        if (frameReady && trail.length > 0) {
+          const dprForMask = Math.min(window.devicePixelRatio || 1, 2);
+
+          if (!maskCanvas) {
+            maskCanvas = document.createElement("canvas");
+            maskCtx = maskCanvas.getContext("2d");
+          }
+          if (!compCanvas) {
+            compCanvas = document.createElement("canvas");
+            compCtx = compCanvas.getContext("2d");
+          }
+
+          function buildMask(boxW, boxH, offsetX, offsetY) {
+            if (maskCanvas.width !== Math.round(boxW * dprForMask) ||
+                maskCanvas.height !== Math.round(boxH * dprForMask)) {
+              maskCanvas.width  = Math.round(boxW * dprForMask);
+              maskCanvas.height = Math.round(boxH * dprForMask);
+            }
+            maskCtx.setTransform(dprForMask, 0, 0, dprForMask, 0, 0);
+            maskCtx.clearRect(0, 0, boxW, boxH);
+
+            for (const p of trail) {
+              const life = p.age / p.maxAge;
+              let alpha;
+              if (life < 0.35) {
+                const t = life / 0.35;
+                const eased = t * t * t * (t * (t * 6 - 15) + 10);
+                alpha = eased * 0.7;
+              } else {
+                const t = (life - 0.35) / 0.65;
+                alpha = Math.pow(1 - t, 2.2) * 0.7;
+              }
+              if (alpha < 0.005) continue;
+              const drift  = p.driftAmt * Math.sin(p.driftSeed + p.age * 0.025);
+              const drift2 = p.driftAmt * Math.cos(p.driftSeed * 1.3 + p.age * 0.02);
+              const px = p.x + drift  * 0.6 + offsetX;
+              const py = p.y + drift2 * 0.6 + offsetY;
+              const r  = p.radius;
+              const grad = maskCtx.createRadialGradient(px, py, 0, px, py, r);
+              grad.addColorStop(0,    `rgba(0,0,0,${alpha})`);
+              grad.addColorStop(0.18, `rgba(0,0,0,${alpha * 0.92})`);
+              grad.addColorStop(0.40, `rgba(0,0,0,${alpha * 0.65})`);
+              grad.addColorStop(0.65, `rgba(0,0,0,${alpha * 0.30})`);
+              grad.addColorStop(0.85, `rgba(0,0,0,${alpha * 0.08})`);
+              grad.addColorStop(1,    `rgba(0,0,0,0)`);
+              maskCtx.fillStyle = grad;
+              maskCtx.beginPath();
+              maskCtx.arc(px, py, r, 0, Math.PI * 2);
+              maskCtx.fill();
+            }
+          }
+
+          for (let i = trail.length - 1; i >= 0; i--) {
+            const p = trail[i];
+            p.age++;
+            if (p.age >= p.maxAge) trail.splice(i, 1);
+          }
+
+          function drawContain(target, img, boxW, boxH, srcW, srcH) {
+            const iw = srcW || img.naturalWidth || 1;
+            const ih = srcH || img.naturalHeight || 1;
+            const s = Math.min(boxW / iw, boxH / ih);
+            const dw = iw * s;
+            const dh = ih * s;
+            const dx = (boxW - dw) / 2;
+            const dy = (boxH - dh) / 2;
+            target.drawImage(img, dx, dy, dw, dh);
+          }
+
+          function compositeLayer(targetCtx, layerImg, boxW, boxH, layerAlpha, useLowRes, vignetteStrength) {
+            if (!layerImg || layerImg._broken || !layerImg.complete || layerImg.naturalWidth === 0) return;
+            if (compCanvas.width !== Math.round(boxW * dprForMask) ||
+                compCanvas.height !== Math.round(boxH * dprForMask)) {
+              compCanvas.width  = Math.round(boxW * dprForMask);
+              compCanvas.height = Math.round(boxH * dprForMask);
+            }
+            compCtx.setTransform(dprForMask, 0, 0, dprForMask, 0, 0);
+            compCtx.clearRect(0, 0, boxW, boxH);
+            compCtx.globalCompositeOperation = "source-over";
+            compCtx.drawImage(maskCanvas, 0, 0, boxW, boxH);
+            compCtx.globalCompositeOperation = "source-in";
+
+            if (useLowRes) {
+              const elapsedHoldLR = performance.now() - holdStartTime;
+              const phaseLR = (elapsedHoldLR % HOLD_LOWRES_PERIOD_MS) / HOLD_LOWRES_PERIOD_MS;
+              const tLR = (1 - Math.cos(phaseLR * Math.PI * 2)) / 2;
+              const eased = Math.pow(tLR, 1.6);
+              const pixSize = Math.max(2, Math.round(
+                HOLD_LOWRES_MAX_PX - (HOLD_LOWRES_MAX_PX - HOLD_LOWRES_MIN_PX) * eased
+              ));
+              if (!lowResCanvas) {
+                lowResCanvas = document.createElement("canvas");
+                lowResCtx = lowResCanvas.getContext("2d");
+              }
+              const iw = layerImg.naturalWidth || pixSize;
+              const ih = layerImg.naturalHeight || pixSize;
+              const ratio = iw / ih;
+              let lw, lh;
+              if (ratio >= 1) { lh = pixSize; lw = Math.max(2, Math.round(pixSize * ratio)); }
+              else            { lw = pixSize; lh = Math.max(2, Math.round(pixSize / ratio)); }
+              lowResCanvas.width  = lw;
+              lowResCanvas.height = lh;
+              lowResCtx.imageSmoothingEnabled = true;
+              lowResCtx.clearRect(0, 0, lw, lh);
+              lowResCtx.drawImage(layerImg, 0, 0, lw, lh);
+              const prevSmoothing = compCtx.imageSmoothingEnabled;
+              compCtx.imageSmoothingEnabled = false;
+              drawContain(compCtx, lowResCanvas, boxW, boxH, lw, lh);
+              compCtx.imageSmoothingEnabled = prevSmoothing;
+            } else {
+              drawContain(compCtx, layerImg, boxW, boxH);
+            }
+
+            if (vignetteStrength && vignetteStrength > 0) {
+              const cx = boxW / 2, cy = boxH / 2;
+              const minSide = Math.min(boxW, boxH);
+              const innerR = minSide * Math.max(0.05, 0.32 - 0.18 * Math.min(1.5, vignetteStrength - 1));
+              const outerR = minSide * Math.min(0.55, 0.52);
+              const vg = compCtx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+              vg.addColorStop(0,   "rgba(0,0,0,1)");
+              const midAlpha = vignetteStrength >= 2 ? 0.30 : 0.55;
+              vg.addColorStop(0.6, `rgba(0,0,0,${midAlpha})`);
+              vg.addColorStop(1,   "rgba(0,0,0,0)");
+              compCtx.globalCompositeOperation = "destination-in";
+              compCtx.fillStyle = vg;
+              compCtx.fillRect(0, 0, boxW, boxH);
+            }
+
+            const prevAlpha = targetCtx.globalAlpha;
+            targetCtx.globalAlpha = Math.max(0, Math.min(1, layerAlpha));
+            targetCtx.drawImage(compCanvas, 0, 0, boxW, boxH);
+            targetCtx.globalAlpha = prevAlpha;
+          }
+
+          const baseTargetCtx = baseCtx || ctx;
+          const baseBoxW = baseCtx ? baseSize : W;
+          const baseBoxH = baseCtx ? baseSize : H;
+          const baseOff  = baseCtx ? (baseSize - size) / 2 : 0;
+          buildMask(baseBoxW, baseBoxH, baseOff, baseOff);
+          const vignStr = baseVignette ? (baseCtx ? 2.2 : 1) : 0;
+          compositeLayer(baseTargetCtx, frameImg, baseBoxW, baseBoxH,
+                         1, holdLowRes && isHolding, vignStr);
+
+          if (overlayImg) {
+            buildMask(W, H, 0, 0);
+            const overlayAlpha = (holdPulse && isHolding) ? holdAlpha : 1;
+            compositeLayer(ctx, overlayImg, W, H, overlayAlpha, false, 0);
+          }
+        }
+
         requestAnimationFrame(tick);
       }
       requestAnimationFrame(tick);
 
       const instance = {
-        loadFrameSeries, setText, getText: () => fullText,
-        isInside: (x, y) => {
-          const r = imgArea.getBoundingClientRect();
-          return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
-        },
-        startHold, stopHold, name: config.name
+        loadFrameSeries,
+        setText,
+        getText: () => fullText,
+        isInside,
+        startHold,
+        stopHold,
+        expandable,
+        setExpandData,
+        getExpandData,
+        name: config.name || "",
+        setOnInfluenceEnter: (fn) => { onInfluenceEnter = fn; },
       };
       revealInstances.push(instance);
       return instance;
     }
 
     /* ─────────────────────────────────────────────
-       인스턴스 생성 및 데이터 로드
+       시트 데이터 → 인스턴스에 적용
        ───────────────────────────────────────────── */
     const root = document.getElementById("reveal-root");
 
-    const inst79 = createRevealInstance({ leftPct: 60, topPct: 35, size: REVEAL_SIZE, name: "79", root, holdSentence: true });
-    const inst28 = createRevealInstance({ leftPct: 20, topPct: 30, size: REVEAL_SIZE, name: "28", root, holdSentence: true, outroMode: "decay" });
-    const inst09 = createRevealInstance({ leftPct: 70, topPct: 65, size: REVEAL_SIZE, name: "09", root, holdLowRes: true, outroMode: "ripple" });
+    const inst79 = createRevealInstance({
+      leftPct: 60, topPct: 35, size: REVEAL_SIZE,
+      sheetRow: 80,
+      name: "79",
+      framesCount: 1,
+      holdSentence: true,
+      outroMode: "volume",
+      root,
+    });
 
-    function applyFallback() {
-      inst79.loadFrameSeries("79.png"); inst79.setText("I can imagine an apple... I can't see it.");
-      inst28.loadFrameSeries("28.png"); inst28.setText("Without the ability to see lost ones... they fade quicker.");
-      inst09.loadFrameSeries("09.png"); inst09.setText("Memory ripples back like water.");
+    const inst28 = createRevealInstance({
+      leftPct: 20, topPct: 30, size: REVEAL_SIZE,
+      sheetRow: 29,
+      name: "28",
+      root,
+      framesCount: 1,
+      baseVignette: true,
+      holdSentence: true,
+      outroMode: "decay",
+    });
+
+    const inst09 = createRevealInstance({
+      leftPct: 70, topPct: 65, size: REVEAL_SIZE,
+      sheetRow: 10,
+      name: "09",
+      root,
+      framesCount: 1,
+      holdLowRes: true,
+      outroMode: "ripple",
+    });
+
+    const allInstances = [
+      { inst: inst79, row: 80 },
+      { inst: inst28, row: 29 },
+      { inst: inst09, row: 10 },
+    ];
+
+    /* ─────────────────────────────────────────────
+       확장 패널 시스템
+       ───────────────────────────────────────────── */
+    let currentPanel = null;
+
+    function showExpandedPanel(filename, text, originX, originY) {
+      if (currentPanel) closeExpandedPanel();
+
+      const dot = filename.lastIndexOf(".");
+      const name = dot === -1 ? filename : filename.slice(0, dot);
+      const ext  = dot === -1 ? ""       : filename.slice(dot);
+      const expandedFilename = `${name}-1${ext}`;
+
+      const panel = document.createElement("div");
+      panel.className = "expanded-panel";
+
+      const img = document.createElement("img");
+      img.className = "expanded-panel-image";
+      img.alt = "";
+      img.draggable = false;
+      img.src = IMAGE_BASE_PATH + expandedFilename;
+
+      const spotlight = document.createElement("div");
+      spotlight.className = "expanded-panel-spotlight";
+
+      const textWrap = document.createElement("div");
+      textWrap.className = "expanded-panel-text-wrap";
+      const txt = document.createElement("div");
+      txt.className = "expanded-panel-text";
+      txt.textContent = text || "";
+      textWrap.appendChild(txt);
+
+      panel.appendChild(img);
+      panel.appendChild(spotlight);
+      panel.appendChild(textWrap);
+      document.body.appendChild(panel);
+
+      let spotTargetX = 50, spotTargetY = 50;
+      let spotCurrX   = 50, spotCurrY   = 50;
+      const updateSpotlightTarget = (e) => {
+        const r = panel.getBoundingClientRect();
+        spotTargetX = ((e.clientX - r.left) / r.width)  * 100;
+        spotTargetY = ((e.clientY - r.top)  / r.height) * 100;
+      };
+      panel.addEventListener("mousemove", updateSpotlightTarget);
+
+      let spotRafId = 0;
+      const tickSpotlight = () => {
+        spotCurrX += (spotTargetX - spotCurrX) * 0.18;
+        spotCurrY += (spotTargetY - spotCurrY) * 0.18;
+        spotlight.style.backgroundImage =
+          `radial-gradient(circle 280px at ${spotCurrX.toFixed(2)}% ${spotCurrY.toFixed(2)}%, ` +
+          `rgba(255,255,255,0.85) 0%, ` +
+          `rgba(255,255,255,0.55) 25%, ` +
+          `rgba(255,255,255,0.25) 55%, ` +
+          `rgba(255,255,255,0.05) 80%, ` +
+          `rgba(255,255,255,0) 100%)`;
+        spotRafId = requestAnimationFrame(tickSpotlight);
+      };
+      spotRafId = requestAnimationFrame(tickSpotlight);
+
+      const positionPanel = () => {
+        const naturalW = img.naturalWidth  || 800;
+        const naturalH = img.naturalHeight || 600;
+        const maxW = window.innerWidth  * 0.55;
+        const maxH = window.innerHeight * 0.65;
+        const ratio = Math.min(maxW / naturalW, maxH / naturalH, 1);
+        const w = naturalW * ratio;
+        const h = naturalH * ratio;
+        panel.style.width  = `${w}px`;
+        panel.style.height = `${h}px`;
+
+        let px = (originX || window.innerWidth  / 2) - w / 2;
+        let py = (originY || window.innerHeight / 2) - h / 2;
+        px = Math.max(8, Math.min(window.innerWidth  - w - 8, px));
+        py = Math.max(8, Math.min(window.innerHeight - h - 8, py));
+        panel.style.left = `${px}px`;
+        panel.style.top  = `${py}px`;
+      };
+
+      if (img.complete && img.naturalWidth > 0) {
+        positionPanel();
+      } else {
+        img.addEventListener("load", positionPanel);
+        img.addEventListener("error", positionPanel);
+      }
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => panel.classList.add("is-visible"));
+      });
+
+      let dragging = false;
+      let dragOffsetX = 0, dragOffsetY = 0;
+      panel.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        if (textWrap.contains(e.target)) {
+          e.stopPropagation();
+          return;
+        }
+        dragging = true;
+        const r = panel.getBoundingClientRect();
+        dragOffsetX = e.clientX - r.left;
+        dragOffsetY = e.clientY - r.top;
+        panel.classList.add("is-dragging");
+        e.stopPropagation();
+        e.preventDefault();
+      });
+      const onMove = (e) => {
+        if (!dragging) return;
+        const w = panel.offsetWidth;
+        const h = panel.offsetHeight;
+        let nx = e.clientX - dragOffsetX;
+        let ny = e.clientY - dragOffsetY;
+        nx = Math.max(80 - w, Math.min(window.innerWidth  - 80, nx));
+        ny = Math.max(0,      Math.min(window.innerHeight - 40, ny));
+        panel.style.left = `${nx}px`;
+        panel.style.top  = `${ny}px`;
+      };
+      const onUp = () => {
+        if (!dragging) return;
+        dragging = false;
+        panel.classList.remove("is-dragging");
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+
+      panel.addEventListener("wheel", (e) => e.stopPropagation());
+
+      currentPanel = {
+        el: panel,
+        cleanup: () => {
+          window.removeEventListener("mousemove", onMove);
+          window.removeEventListener("mouseup", onUp);
+          if (spotRafId) cancelAnimationFrame(spotRafId);
+        },
+      };
     }
-    applyFallback();
+
+    function closeExpandedPanel() {
+      if (!currentPanel) return;
+      const { el, cleanup } = currentPanel;
+      el.classList.remove("is-visible");
+      cleanup();
+      currentPanel = null;
+      setTimeout(() => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }, 600);
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeExpandedPanel();
+    });
+
+    function applyRowsToInstances(rows) {
+      for (const { inst, row } of allInstances) {
+        const item = pickRowFromSheet(rows, row);
+        if (!item) {
+          let fb = "79.png";
+          if (row === 29) fb = "28.png";
+          else if (row === 10) fb = "09.png";
+          inst.loadFrameSeries(fb);
+          inst.setText("");
+          if (inst.expandable && inst.setExpandData) inst.setExpandData(fb, "");
+          continue;
+        }
+        let defaultFile = "79.png";
+        if (row === 29) defaultFile = "28.png";
+        else if (row === 10) defaultFile = "09.png";
+        const filename = item[SHEET_TARGET_COL_NAME] || defaultFile;
+        inst.loadFrameSeries(filename);
+        inst.setText(item["당사자의 직접 설명"] || "");
+        if (inst.expandable && inst.setExpandData) {
+          inst.setExpandData(filename, item["About"] || "");
+        }
+        console.info(`[sheet] row ${row} →`, item);
+      }
+    }
+
+    /* ─────────────────────────────────────────────
+       궤적 추적
+       ───────────────────────────────────────────── */
+    const trajectory = [];
+    let lastTrajectoryName = null;
+
+    function recordTrajectory(inst) {
+      const text = inst.getText ? inst.getText() : "";
+      if (lastTrajectoryName === inst.name) return;
+      lastTrajectoryName = inst.name;
+      trajectory.push({ name: inst.name, text, t: Date.now() });
+      feedFromInstance(inst);
+      console.info(`[trajectory] entered ${inst.name}, total ${trajectory.length}`);
+    }
+
+    for (const inst of revealInstances) {
+      if (inst.setOnInfluenceEnter) {
+        inst.setOnInfluenceEnter(recordTrajectory);
+      }
+    }
+
+    setInterval(() => {
+      let anyIn = false;
+      for (const inst of revealInstances) {
+        if (inst.isInside && inst.isInside(mouseX, mouseY)) {
+          anyIn = true; break;
+        }
+      }
+      if (!anyIn) lastTrajectoryName = null;
+    }, 200);
 
     /* ─────────────────────────────────────────────
        캡처 시스템
        ───────────────────────────────────────────── */
-    document.getElementById("capture-btn").addEventListener("click", () => {
-      alert("캡처 기능이 준비되었습니다.");
+    const captureBtn = document.getElementById("capture-btn");
+
+    async function captureScreen() {
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const SF = Math.max(2, dpr * 2);
+
+      const out = document.createElement("canvas");
+      out.width = Math.round(W * SF);
+      out.height = Math.round(H * SF);
+      const octx = out.getContext("2d");
+      octx.scale(SF, SF);
+      octx.fillStyle = "#ffffff";
+      octx.fillRect(0, 0, W, H);
+
+      const scale = distance / 100;
+      const cx_view = W / 2;
+      const cy_view = H / 2;
+
+      function worldToScreen(wx, wy) {
+        return {
+          x: (wx - cx_view) * scale + cx_view + posX,
+          y: (wy - cy_view) * scale + cy_view + posY,
+        };
+      }
+
+      if (pendingText && pathPts.length >= 2) {
+        const fontPx = 16 * scale;
+        if (fontPx >= 4) {
+          octx.font = `${fontPx}px Vivaldi, Eulyoo1945-Regular, serif`;
+          octx.textBaseline = "middle";
+          octx.textAlign = "left";
+
+          function sampleAt(s) {
+            if (s <= pathPts[0].sScreen) {
+              const p0 = pathPts[0];
+              const p1 = pathPts[1] || p0;
+              const a = worldToScreen(p0.worldX, p0.worldY);
+              const b = worldToScreen(p1.worldX, p1.worldY);
+              return { x: a.x, y: a.y, ang: Math.atan2(b.y - a.y, b.x - a.x) };
+            }
+            for (let i = 1; i < pathPts.length; i++) {
+              if (pathPts[i].sScreen >= s) {
+                const p0 = pathPts[i - 1];
+                const p1 = pathPts[i];
+                const span = p1.sScreen - p0.sScreen;
+                const t = span > 0 ? (s - p0.sScreen) / span : 0;
+                const a = worldToScreen(p0.worldX, p0.worldY);
+                const b = worldToScreen(p1.worldX, p1.worldY);
+                return {
+                  x: a.x + (b.x - a.x) * t,
+                  y: a.y + (b.y - a.y) * t,
+                  ang: Math.atan2(b.y - a.y, b.x - a.x),
+                };
+              }
+            }
+            const last = pathPts[pathPts.length - 1];
+            const prev = pathPts[pathPts.length - 2] || last;
+            const a = worldToScreen(prev.worldX, prev.worldY);
+            const b = worldToScreen(last.worldX, last.worldY);
+            return { x: b.x, y: b.y, ang: Math.atan2(b.y - a.y, b.x - a.x) };
+          }
+
+          const pathScreenLen = pathPts[pathPts.length - 1].sScreen;
+
+          if (pendingText.length > 0) {
+            const loop = pendingText + "  ";
+            let s = 0;
+            let i = 0;
+            let safety = 0;
+            const safetyMax = 50000;
+            while (s <= pathScreenLen && safety < safetyMax) {
+              safety++;
+              const ch = loop[i % loop.length];
+              const chW = octx.measureText(ch).width || 4;
+              if (ch !== " ") {
+                const sample = sampleAt(s);
+                octx.fillStyle = "#000000";
+                octx.save();
+                octx.translate(sample.x, sample.y);
+                octx.rotate(sample.ang);
+                octx.fillText(ch, 0, 0);
+                octx.restore();
+              }
+              s += chW;
+              i++;
+            }
+          }
+
+          octx.textAlign = "start";
+          octx.textBaseline = "top";
+        }
+      }
+
+      const revealCanvases = document.querySelectorAll(
+        ".reveal-base-area canvas, .reveal-img-area canvas"
+      );
+      for (const c of revealCanvases) {
+        const r = c.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) continue;
+        try {
+          octx.drawImage(c, r.left, r.top, r.width, r.height);
+        } catch (e) {}
+      }
+
+      const glyphs = document.querySelectorAll(
+        ".text-volume-glyph, .text-decay-glyph, .text-ripple-glyph"
+      );
+      const glyphFontPx = 16 * scale;
+      octx.font = `${glyphFontPx}px Vivaldi, Eulyoo1945-Regular, serif`;
+      octx.textBaseline = "top";
+      for (const g of glyphs) {
+        const r = g.getBoundingClientRect();
+        const cs = window.getComputedStyle(g);
+        const op = parseFloat(cs.opacity);
+        if (!isFinite(op) || op <= 0.01) continue;
+        if (r.left > W || r.right < 0 || r.top > H || r.bottom < 0) continue;
+        octx.globalAlpha = op;
+        octx.fillStyle = cs.color || "#000000";
+        octx.fillText(g.textContent, r.left, r.top);
+      }
+
+      const sentBlocks = document.querySelectorAll(".text-sentence-block");
+      const sentFontPx = 17 * scale;
+      octx.font = `${sentFontPx}px Vivaldi, Eulyoo1945-Regular, serif`;
+      for (const sb of sentBlocks) {
+        const cs = window.getComputedStyle(sb);
+        const op = parseFloat(cs.opacity);
+        if (!isFinite(op) || op <= 0.01) continue;
+        const r = sb.getBoundingClientRect();
+        if (r.left > W || r.right < 0 || r.top > H || r.bottom < 0) continue;
+        const txt = sb.textContent;
+        if (!txt) continue;
+        octx.globalAlpha = op;
+        octx.fillStyle = cs.color || "#000000";
+        const lineHeight = sentFontPx * 1.55;
+        const maxWidth = r.width;
+        const words = txt.split(/(\s+)/);
+        let line = "";
+        let y = r.top;
+        for (const w of words) {
+          const testLine = line + w;
+          const m = octx.measureText(testLine);
+          if (m.width > maxWidth && line.length > 0) {
+            const lineWidth = octx.measureText(line).width;
+            octx.fillText(line, r.left + (r.width - lineWidth) / 2, y);
+            y += lineHeight;
+            line = w.replace(/^\s+/, "");
+          } else {
+            line = testLine;
+          }
+        }
+        if (line) {
+          const lineWidth = octx.measureText(line).width;
+          octx.fillText(line, r.left + (r.width - lineWidth) / 2, y);
+        }
+      }
+      octx.globalAlpha = 1;
+
+      const textBlocks = document.querySelectorAll(".reveal-text-content");
+      const textBoxFontPx = 16 * scale;
+      octx.font = `${textBoxFontPx}px Vivaldi, Eulyoo1945-Regular, serif`;
+      for (const tb of textBlocks) {
+        const txt = tb.textContent;
+        if (!txt) continue;
+        const r = tb.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) continue;
+        const lineHeight = textBoxFontPx * 1.55;
+        const maxWidth = r.width - 32 * scale;
+        const words = txt.split(/(\s+)/);
+        let line = "";
+        let y = r.top + 14 * scale;
+        for (const w of words) {
+          const testLine = line + w;
+          const m = octx.measureText(testLine);
+          if (m.width > maxWidth && line.length > 0) {
+            octx.fillText(line, r.left + 16 * scale, y);
+            y += lineHeight;
+            line = w.replace(/^\s+/, "");
+          } else {
+            line = testLine;
+          }
+        }
+        if (line) octx.fillText(line, r.left + 16 * scale, y);
+      }
+
+      const hudEl = document.getElementById("hud");
+      octx.font = "15px GravesendSansLight, sans-serif";
+      octx.fillStyle = "#000000";
+      const lines = hudEl.innerText.split("\n");
+      let hy = H - 14 - (lines.length - 1) * 18 - 4;
+      for (const ln of lines) {
+        octx.fillText(ln.toUpperCase(), 16, hy);
+        hy += 18;
+      }
+
+      return out;
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    captureBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (captureBtn.classList.contains("is-busy")) return;
+      captureBtn.classList.add("is-busy");
+
+      try {
+        const canvas = await captureScreen();
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        await new Promise((resolve) => {
+          canvas.toBlob((blob) => {
+            if (blob) downloadBlob(blob, `trajectory-${stamp}.png`);
+            resolve();
+          }, "image/png");
+        });
+      } catch (err) {
+        console.error("[capture] failed:", err);
+      } finally {
+        captureBtn.classList.remove("is-busy");
+      }
     });
+
+    captureBtn.addEventListener("mousedown", (e) => e.stopPropagation());
+
+    function applyFallbackAll() {
+      inst79.loadFrameSeries("79.png");
+      inst79.setText(
+        "I can imagine an apple in front of me. " +
+        "I know where the skin is. I know how big it is. I can't see it."
+      );
+      inst28.loadFrameSeries("28.png");
+      inst28.setText(
+        "Without the ability to see the lost loved one or relive times with them, they do tend fade from mind quicker."
+      );
+      inst09.loadFrameSeries("09.png");
+      inst09.setText(
+        "Memory ripples back like water — the image dissolves, returns, and dissolves again."
+      );
+      console.info("[sheet] fallback (시트 미연결) — 임시 텍스트 사용");
+    }
+
+    if (!SHEET_CSV_URL) {
+      applyFallbackAll();
+    } else {
+      fetch(SHEET_CSV_URL)
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.text();
+        })
+        .then(text => {
+          const rows = parseCSV(text);
+          applyRowsToInstances(rows);
+        })
+        .catch(err => {
+          console.warn("[sheet] fetch 실패 — fallback:", err);
+          applyFallbackAll();
+        });
+    }
   </script>
+
 </body>
 </html>
