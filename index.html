@@ -2307,17 +2307,17 @@
        좌표는 흩뿌려진 별자리처럼 비대칭 배치 (수평/수직 일렬 회피).
        leftPct/topPct: 화면 좌상단 기준 백분율 (CSS 좌표).
 
-         06 (18%, 18%)            79 (50%, 24%)
-                                              07 (70%, 42%)
-         08 (22%, 48%)
-                       09 (48%, 60%)
-                                              28 (75%, 65%)
+         06 (12%, 14%)               79 (55%, 18%)
+                                                       07 (78%, 45%)
+         08 (14%, 50%)
+                          09 (42%, 65%)
+                                              28 (70%, 70%)
 
        각 reveal의 sentence 스타일과 outroMode가 모두 다르게 조합됨.
        ───────────────────────────────────────────── */
 
     const inst06 = createRevealInstance({
-      leftPct: 18, topPct: 18, size: REVEAL_SIZE,
+      leftPct: 12, topPct: 14, size: REVEAL_SIZE,
       sheetRow: 7,
       name: "06",
       framesCount: 1,
@@ -2328,7 +2328,7 @@
     });
 
     const inst79 = createRevealInstance({
-      leftPct: 50, topPct: 24, size: REVEAL_SIZE,
+      leftPct: 55, topPct: 18, size: REVEAL_SIZE,
       sheetRow: 80,
       name: "79",
       framesCount: 1,
@@ -2339,7 +2339,7 @@
     });
 
     const inst07 = createRevealInstance({
-      leftPct: 70, topPct: 42, size: REVEAL_SIZE,
+      leftPct: 78, topPct: 45, size: REVEAL_SIZE,
       sheetRow: 8,
       name: "07",
       framesCount: 1,
@@ -2350,7 +2350,7 @@
     });
 
     const inst08 = createRevealInstance({
-      leftPct: 22, topPct: 48, size: REVEAL_SIZE,
+      leftPct: 14, topPct: 50, size: REVEAL_SIZE,
       sheetRow: 9,
       name: "08",
       framesCount: 1,
@@ -2361,7 +2361,7 @@
     });
 
     const inst09 = createRevealInstance({
-      leftPct: 48, topPct: 60, size: REVEAL_SIZE,
+      leftPct: 42, topPct: 65, size: REVEAL_SIZE,
       sheetRow: 10,
       name: "09",
       framesCount: 1,
@@ -2372,7 +2372,7 @@
     });
 
     const inst28 = createRevealInstance({
-      leftPct: 75, topPct: 65, size: REVEAL_SIZE,
+      leftPct: 70, topPct: 70, size: REVEAL_SIZE,
       sheetRow: 29,
       name: "28",
       framesCount: 1,
