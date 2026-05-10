@@ -1750,6 +1750,12 @@
             sentTempCtx.drawImage(canvas,
               0, 0, canvas.width, canvas.height,
               0, 0, sentTempCanvas.width, sentTempCanvas.height);
+            // 수채화 느낌 강화: 같은 이미지를 multiply로 한 번 더 그려 색을 진하게
+            // → 이후 color-burn 단계에서 더 풍부한 톤 변화
+            sentTempCtx.globalCompositeOperation = "multiply";
+            sentTempCtx.drawImage(canvas,
+              0, 0, canvas.width, canvas.height,
+              0, 0, sentTempCanvas.width, sentTempCanvas.height);
             sentTempCtx.restore();
           }
 
