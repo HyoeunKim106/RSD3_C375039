@@ -778,23 +778,37 @@
       let compCtx = null;
 
       // 이미지의 실제 픽셀 해상도를 캔버스에 그대로 사용 → 화질 보존
+      // (단, 너무 큰 이미지는 성능 보호를 위해 상한선 적용)
       let nativeImgW = 0;
       let nativeImgH = 0;
+      const NATIVE_MAX = 1024; // 캔버스 픽셀 최대 크기 (성능 보호)
+
+      function resolveCanvasPixelSize() {
+        const dpr = window.devicePixelRatio || 1;
+        if (nativeImgW <= 0 || nativeImgH <= 0) {
+          return { w: Math.round(size * dpr), h: Math.round(size * dpr) };
+        }
+        // 자연 해상도 사용. 단 너무 크면 비율 유지하면서 NATIVE_MAX로 다운
+        const longEdge = Math.max(nativeImgW, nativeImgH);
+        if (longEdge <= NATIVE_MAX) {
+          return { w: nativeImgW, h: nativeImgH };
+        }
+        const k = NATIVE_MAX / longEdge;
+        return { w: Math.round(nativeImgW * k), h: Math.round(nativeImgH * k) };
+      }
 
       function resizeCanvas() {
-        const dpr = window.devicePixelRatio || 1;
-        // 이미지 자연 해상도가 있으면 그것 사용, 없으면 size*dpr 사용
-        const targetW = nativeImgW > 0 ? nativeImgW : Math.round(size * dpr);
-        const targetH = nativeImgH > 0 ? nativeImgH : Math.round(size * dpr);
-        canvas.width  = targetW;
-        canvas.height = targetH;
+        const px = resolveCanvasPixelSize();
+        canvas.width  = px.w;
+        canvas.height = px.h;
         // 그리기 좌표계는 size 기준 (스타일 크기)으로 매핑
-        ctx.setTransform(targetW / size, 0, 0, targetH / size, 0, 0);
+        ctx.setTransform(px.w / size, 0, 0, px.h / size, 0, 0);
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
         if (baseCanvas && baseCtx) {
-          const baseTW = nativeImgW > 0 ? nativeImgW : Math.round(baseSize * dpr);
-          const baseTH = nativeImgH > 0 ? nativeImgH : Math.round(baseSize * dpr);
+          // base 영역은 size 대비 baseSize 비율로 동일 픽셀 밀도 적용
+          const baseTW = Math.round(px.w * (baseSize / size));
+          const baseTH = Math.round(px.h * (baseSize / size));
           baseCanvas.width  = baseTW;
           baseCanvas.height = baseTH;
           baseCtx.setTransform(baseTW / baseSize, 0, 0, baseTH / baseSize, 0, 0);
@@ -1806,10 +1820,10 @@
         }
 
         if (frameReady && trail.length > 0) {
-          // 마스크/합성 캔버스 픽셀 밀도: 자연 해상도가 있으면 그 비율, 없으면 dpr
-          const dprForMask = nativeImgW > 0
-            ? (nativeImgW / size)
-            : (window.devicePixelRatio || 1);
+          // 마스크/합성 캔버스 픽셀 밀도: 메인 캔버스 픽셀 비율과 동일
+          // (NATIVE_MAX 상한선이 자동 적용됨)
+          const px = resolveCanvasPixelSize();
+          const dprForMask = px.w / size;
 
           if (!maskCanvas) {
             maskCanvas = document.createElement("canvas");
