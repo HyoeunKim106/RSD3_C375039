@@ -55,7 +55,10 @@
     }
     #reveal-root {
       position: absolute;
-      inset: 0;
+      left: 0;
+      top: 0;
+      width: 12000px;
+      height: 7000px;
       pointer-events: none;
     }
 
@@ -366,8 +369,12 @@
        상태값
        ───────────────────────────────────────────── */
     let distance = 100;
-    let posX = 0;
-    let posY = 0;
+    // 가상공간 시작 위치: (6000, 6500) — 데이터 영역 중앙 아래쪽
+    // (이 좌표가 화면 중앙에 오도록 posX/posY 초기화)
+    const START_WORLD_X = 6000;
+    const START_WORLD_Y = 6500;
+    let posX = window.innerWidth / 2 - START_WORLD_X;
+    let posY = window.innerHeight / 2 - START_WORLD_Y;
 
     const numDistance = document.getElementById("num-distance");
     const numPosX     = document.getElementById("num-pos-x");
@@ -657,7 +664,13 @@
     });
 
     function createRevealInstance(config) {
-      const { leftPct, topPct, size, sheetRow, root } = config;
+      const { size, sheetRow, root } = config;
+      // 위치: leftPx/topPx (px) 우선, 없으면 leftPct/topPct (%) 폴백
+      const leftPx = config.leftPx;
+      const topPx  = config.topPx;
+      const leftPct = config.leftPct;
+      const topPct  = config.topPct;
+      const usePx = (typeof leftPx === "number" && typeof topPx === "number");
       const interactive = config.interactive !== false;
       const expandable  = config.expandable === true;
       const framesCount = (config.framesCount != null) ? config.framesCount : FRAME_COUNT;
@@ -671,8 +684,13 @@
 
       const wrap = document.createElement("div");
       wrap.className = "reveal";
-      wrap.style.left   = `${leftPct}%`;
-      wrap.style.top    = `${topPct}%`;
+      if (usePx) {
+        wrap.style.left = `${leftPx}px`;
+        wrap.style.top  = `${topPx}px`;
+      } else {
+        wrap.style.left = `${leftPct}%`;
+        wrap.style.top  = `${topPct}%`;
+      }
       wrap.style.width  = `${size}px`;
       wrap.style.height = `${size}px`;
 
@@ -899,8 +917,13 @@
         volumeRoot = document.createElement("div");
         volumeRoot.className = "text-volume";
         // wrap과 같은 위치(world 좌표계의 wrap 중심)에 둠
-        volumeRoot.style.left = `calc(${leftPct}% + ${size / 2}px)`;
-        volumeRoot.style.top  = `calc(${topPct}% + ${size / 2}px)`;
+        if (usePx) {
+          volumeRoot.style.left = `${leftPx + size / 2}px`;
+          volumeRoot.style.top  = `${topPx  + size / 2}px`;
+        } else {
+          volumeRoot.style.left = `calc(${leftPct}% + ${size / 2}px)`;
+          volumeRoot.style.top  = `calc(${topPct}% + ${size / 2}px)`;
+        }
         volumeRoot.style.width  = "0px";
         volumeRoot.style.height = "0px";
 
@@ -1124,8 +1147,13 @@
 
         decayRoot = document.createElement("div");
         decayRoot.className = "text-decay";
-        decayRoot.style.left = `calc(${leftPct}% + ${size / 2}px)`;
-        decayRoot.style.top  = `calc(${topPct}% + ${size / 2}px)`;
+        if (usePx) {
+          decayRoot.style.left = `${leftPx + size / 2}px`;
+          decayRoot.style.top  = `${topPx  + size / 2}px`;
+        } else {
+          decayRoot.style.left = `calc(${leftPct}% + ${size / 2}px)`;
+          decayRoot.style.top  = `calc(${topPct}% + ${size / 2}px)`;
+        }
         decayRoot.style.width  = "0px";
         decayRoot.style.height = "0px";
 
@@ -1850,8 +1878,13 @@
 
         rippleRoot = document.createElement("div");
         rippleRoot.className = "text-ripple";
-        rippleRoot.style.left = `calc(${leftPct}% + ${size / 2}px)`;
-        rippleRoot.style.top  = `calc(${topPct}% + ${size / 2}px)`;
+        if (usePx) {
+          rippleRoot.style.left = `${leftPx + size / 2}px`;
+          rippleRoot.style.top  = `${topPx  + size / 2}px`;
+        } else {
+          rippleRoot.style.left = `calc(${leftPct}% + ${size / 2}px)`;
+          rippleRoot.style.top  = `calc(${topPct}% + ${size / 2}px)`;
+        }
         rippleRoot.style.width  = "0px";
         rippleRoot.style.height = "0px";
 
@@ -2031,8 +2064,13 @@
         sentenceRoot = document.createElement("div");
         sentenceRoot.className = "text-sentence";
         // reveal 이미지와 정확히 같은 위치에 배치
-        sentenceRoot.style.left = `${leftPct}%`;
-        sentenceRoot.style.top  = `${topPct}%`;
+        if (usePx) {
+          sentenceRoot.style.left = `${leftPx}px`;
+          sentenceRoot.style.top  = `${topPx}px`;
+        } else {
+          sentenceRoot.style.left = `${leftPct}%`;
+          sentenceRoot.style.top  = `${topPct}%`;
+        }
         sentenceRoot.style.width  = `${size}px`;
         sentenceRoot.style.height = `${size}px`;
 
@@ -2948,143 +2986,232 @@
     const root = document.getElementById("reveal-root");
 
     /* ─────────────────────────────────────────────
-       인스턴스 좌표 & 모션 매핑 (10개 reveal)
+       인스턴스 모션 매핑 (10개 reveal)
        ─────────────────────────────────────────────
-       4-3-3 비대칭 배치 (수평/수직 일렬 회피).
-       leftPct/topPct: 화면 좌상단 기준 백분율 (CSS 좌표).
-
-       위쪽 줄 :  03 (8, 8)    04 (32, 12)   05 (56, 8)    79 (80, 14)
-       중간 줄 :  06 (14, 38)  09 (44, 36)   07 (75, 40)
-       아래 줄 :  10 (18, 64)  08 (50, 65)   28 (78, 62)
-
-       각 reveal에 다른 sentence 모션 + outroMode 매핑 (한눈에 다름).
+       각 reveal 이미지마다 sentence 모션 + outroMode 매핑.
+       위치(leftPx, topPx)는 시트의 J(작성일자), K(작성시간) 컬럼으로
+       자동 계산되어 채워짐. 시트 미연결 시 fallback 좌표 사용.
        ───────────────────────────────────────────── */
 
-    const inst03 = createRevealInstance({
-      leftPct: 8, topPct: 8, size: REVEAL_SIZE,
-      sheetRow: 4,
-      name: "03",
-      framesCount: 1,
-      holdSentence: true,
-      holdSentenceStyle: "unfold",     // 가운데 압축 → 펼쳐지며 자리잡음
-      outroMode: "decay",              // 4단계 형상 순환
-      root,
-    });
+    // 가상공간: 12000 × 7000
+    // 데이터 영역: x 1000~11000, y 800~6200
+    const WORLD_W = 12000;
+    const WORLD_H = 7000;
+    const DATA_X_MIN = 1000, DATA_X_MAX = 11000;
+    const DATA_Y_MIN = 800,  DATA_Y_MAX = 6200;
 
-    const inst04 = createRevealInstance({
-      leftPct: 32, topPct: 12, size: REVEAL_SIZE,
-      sheetRow: 5,
-      name: "04",
-      framesCount: 1,
-      holdSentence: true,
-      holdSentenceStyle: "typewriter", // 한 글자씩 타이핑되며 나타남
-      outroMode: "coordinates",  // 별자리/좌표계
-      root,
-    });
-
-    const inst05 = createRevealInstance({
-      leftPct: 56, topPct: 8, size: REVEAL_SIZE,
-      sheetRow: 6,
-      name: "05",
-      framesCount: 1,
-      holdSentence: true,
-      holdSentenceStyle: "assemble",   // 사방에서 날아와 모임, 흩어졌다 다시 모임
-      outroMode: "outline",      // 사과 윤곽 (안은 비어있음)
-      root,
-    });
-
-    const inst79 = createRevealInstance({
-      leftPct: 80, topPct: 14, size: REVEAL_SIZE,
-      sheetRow: 80,
-      name: "79",
-      framesCount: 1,
-      holdSentence: true,
-      holdSentenceStyle: "breathe",    // 안개 → 응결 → 호흡 → 안개 (전체 호흡)
-      outroMode: "volume",
-      root,
-    });
-
-    const inst06 = createRevealInstance({
-      leftPct: 14, topPct: 38, size: REVEAL_SIZE,
-      sheetRow: 7,
-      name: "06",
-      framesCount: 1,
-      holdSentence: true,
-      holdSentenceStyle: "cascade",    // 위에서 하나씩 떨어져 안착
-      outroMode: "ripple",
-      root,
-    });
-
-    const inst09 = createRevealInstance({
-      leftPct: 44, topPct: 36, size: REVEAL_SIZE,
-      sheetRow: 10,
-      name: "09",
-      framesCount: 1,
-      holdSentence: true,
-      holdSentenceStyle: "flicker",    // 점멸 (불빛 같은)
-      outroMode: "gravity",      // 중력 빨림
-      root,
-    });
-
-    const inst07 = createRevealInstance({
-      leftPct: 75, topPct: 40, size: REVEAL_SIZE,
-      sheetRow: 8,
-      name: "07",
-      framesCount: 1,
-      holdSentence: true,
-      holdSentenceStyle: "swirl",      // 회전하며 안쪽으로 빨려들어와 모임
-      outroMode: "decay",
-      root,
-    });
-
-    const inst10 = createRevealInstance({
-      leftPct: 18, topPct: 64, size: REVEAL_SIZE,
-      sheetRow: 11,
-      name: "10",
-      framesCount: 1,
-      holdSentence: true,
-      holdSentenceStyle: "slide",      // 좌우 양쪽에서 슬라이드되며 모임
-      outroMode: "ripple",
-      root,
-    });
-
-    const inst08 = createRevealInstance({
-      leftPct: 50, topPct: 65, size: REVEAL_SIZE,
-      sheetRow: 9,
-      name: "08",
-      framesCount: 1,
-      holdSentence: true,
-      holdSentenceStyle: "materialize",// 안개에서 응결되며 또렷해짐
-      outroMode: "volume",
-      root,
-    });
-
-    const inst28 = createRevealInstance({
-      leftPct: 78, topPct: 62, size: REVEAL_SIZE,
-      sheetRow: 29,
-      name: "28",
-      framesCount: 1,
-      baseVignette: true,
-      holdSentence: true,
-      holdSentenceStyle: "tumble",     // 회전하며 위에서 굴러떨어짐
-      outroMode: "residue",      // 잔상
-      root,
-    });
-
-    // sheetRow ↔ 기본 이미지 파일 매핑 (시트 비어있을 때 폴백)
-    // 패턴: 파일번호 + 1 = sheetRow
-    const allInstances = [
-      { inst: inst03, row: 4,  fallback: "03.png" },
-      { inst: inst04, row: 5,  fallback: "04.png" },
-      { inst: inst05, row: 6,  fallback: "05.png" },
-      { inst: inst06, row: 7,  fallback: "06.png" },
-      { inst: inst07, row: 8,  fallback: "07.png" },
-      { inst: inst08, row: 9,  fallback: "08.png" },
-      { inst: inst09, row: 10, fallback: "09.png" },
-      { inst: inst10, row: 11, fallback: "10.png" },
-      { inst: inst28, row: 29, fallback: "28.png" },
-      { inst: inst79, row: 80, fallback: "79.png" },
+    // 모션 매핑 (이미지 파일명 기준)
+    // 시트 데이터 도착 후 각 인스턴스 생성 시 사용
+    const INSTANCE_CONFIGS = [
+      {
+        name: "03", sheetRow: 4, fallback: "03.png",
+        framesCount: 1,
+        holdSentence: true,
+        holdSentenceStyle: "unfold",
+        outroMode: "decay",
+        // 시트가 없을 때 임시 위치 (px)
+        fallbackLeftPx: 800,  fallbackTopPx: 600,
+      },
+      {
+        name: "04", sheetRow: 5, fallback: "04.png",
+        framesCount: 1,
+        holdSentence: true,
+        holdSentenceStyle: "typewriter",
+        outroMode: "coordinates",
+        fallbackLeftPx: 3200, fallbackTopPx: 1200,
+      },
+      {
+        name: "05", sheetRow: 6, fallback: "05.png",
+        framesCount: 1,
+        holdSentence: true,
+        holdSentenceStyle: "assemble",
+        outroMode: "outline",
+        fallbackLeftPx: 5600, fallbackTopPx: 800,
+      },
+      {
+        name: "79", sheetRow: 80, fallback: "79.png",
+        framesCount: 1,
+        holdSentence: true,
+        holdSentenceStyle: "breathe",
+        outroMode: "volume",
+        fallbackLeftPx: 8000, fallbackTopPx: 1400,
+      },
+      {
+        name: "06", sheetRow: 7, fallback: "06.png",
+        framesCount: 1,
+        holdSentence: true,
+        holdSentenceStyle: "cascade",
+        outroMode: "ripple",
+        fallbackLeftPx: 1400, fallbackTopPx: 3800,
+      },
+      {
+        name: "09", sheetRow: 10, fallback: "09.png",
+        framesCount: 1,
+        holdSentence: true,
+        holdSentenceStyle: "flicker",
+        outroMode: "gravity",
+        fallbackLeftPx: 4400, fallbackTopPx: 3600,
+      },
+      {
+        name: "07", sheetRow: 8, fallback: "07.png",
+        framesCount: 1,
+        holdSentence: true,
+        holdSentenceStyle: "swirl",
+        outroMode: "decay",
+        fallbackLeftPx: 7500, fallbackTopPx: 4000,
+      },
+      {
+        name: "10", sheetRow: 11, fallback: "10.png",
+        framesCount: 1,
+        holdSentence: true,
+        holdSentenceStyle: "slide",
+        outroMode: "ripple",
+        fallbackLeftPx: 1800, fallbackTopPx: 6400,
+      },
+      {
+        name: "08", sheetRow: 9, fallback: "08.png",
+        framesCount: 1,
+        holdSentence: true,
+        holdSentenceStyle: "materialize",
+        outroMode: "volume",
+        fallbackLeftPx: 5000, fallbackTopPx: 6500,
+      },
+      {
+        name: "28", sheetRow: 29, fallback: "28.png",
+        framesCount: 1,
+        baseVignette: true,
+        holdSentence: true,
+        holdSentenceStyle: "tumble",
+        outroMode: "residue",
+        fallbackLeftPx: 7800, fallbackTopPx: 6200,
+      },
     ];
+
+    // 시드 기반 deterministic random (rowIndex로 일관된 jitter)
+    function seededRandom(seed) {
+      const s = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+      return s - Math.floor(s);  // 0~1
+    }
+
+    // 작성일자 파싱 (다양한 형식 허용: "2024-01-15", "2024/1/15", "2024.01.15")
+    function parseSheetDate(str) {
+      if (!str) return null;
+      const cleaned = String(str).trim().replace(/[./]/g, "-");
+      const d = new Date(cleaned);
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    // 작성시간 파싱 ("14:30" → 14.5 시간 단위 0~24, "14:30:00"도 OK)
+    function parseSheetTime(str) {
+      if (!str) return null;
+      const m = String(str).trim().match(/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+      if (!m) return null;
+      const h = parseInt(m[1], 10);
+      const min = parseInt(m[2], 10);
+      const s = m[3] ? parseInt(m[3], 10) : 0;
+      return h + min / 60 + s / 3600;  // 0~24
+    }
+
+    // map 함수: value를 [inMin, inMax]에서 [outMin, outMax]로 매핑
+    function mapRange(v, inMin, inMax, outMin, outMax) {
+      if (inMax === inMin) return (outMin + outMax) / 2;
+      const t = (v - inMin) / (inMax - inMin);
+      return outMin + t * (outMax - outMin);
+    }
+
+    // 인스턴스들이 채워질 객체 (이름 → instance)
+    const instanceByName = {};
+    const allInstances = [];  // 기존 코드 호환 ({inst, row, fallback})
+
+    // 시트 row들에서 작성일자/시간을 읽어 min/max 계산 + 각 인스턴스 위치 계산
+    function computePositionsFromSheet(rows) {
+      // 시트의 J/K 컬럼에서 모든 valid 작성일자/시간 수집
+      // header 인덱스로 컬럼 찾되, J/K 위치(0-indexed: 9, 10)도 폴백으로 사용
+      const header = rows[0] || [];
+      let dateColIdx = -1, timeColIdx = -1;
+      for (let i = 0; i < header.length; i++) {
+        const h = (header[i] || "").trim();
+        if (h === "작성 일자" || h === "작성일자") dateColIdx = i;
+        if (h === "작성 시간" || h === "작성시간") timeColIdx = i;
+      }
+      // 헤더에서 못 찾으면 J/K (인덱스 9, 10) 사용
+      if (dateColIdx < 0) dateColIdx = 9;
+      if (timeColIdx < 0) timeColIdx = 10;
+
+      // 모든 valid 날짜의 timestamp 수집 (min/max 위해)
+      const allDates = [];
+      for (let r = 1; r < rows.length; r++) {
+        const d = parseSheetDate(rows[r][dateColIdx]);
+        if (d) allDates.push(d.getTime());
+      }
+      const minDate = allDates.length > 0 ? Math.min(...allDates) : 0;
+      const maxDate = allDates.length > 0 ? Math.max(...allDates) : 1;
+
+      console.info(`[positions] date range: ${new Date(minDate).toISOString().slice(0,10)} ~ ${new Date(maxDate).toISOString().slice(0,10)}`);
+
+      // 각 인스턴스 config에 대해 해당 row 찾아 좌표 계산
+      const positions = {};
+      INSTANCE_CONFIGS.forEach((cfg, idx) => {
+        const dataRow = rows[cfg.sheetRow - 1];
+        if (!dataRow) {
+          positions[cfg.name] = { leftPx: cfg.fallbackLeftPx, topPx: cfg.fallbackTopPx };
+          return;
+        }
+        const date = parseSheetDate(dataRow[dateColIdx]);
+        const time = parseSheetTime(dataRow[timeColIdx]);
+        let x, y;
+        if (date) {
+          x = mapRange(date.getTime(), minDate, maxDate, DATA_X_MIN, DATA_X_MAX);
+        } else {
+          x = cfg.fallbackLeftPx;
+        }
+        if (time !== null) {
+          // 0~24 시간 → 800~6200 y
+          y = mapRange(time, 0, 24, DATA_Y_MIN, DATA_Y_MAX);
+        } else {
+          y = cfg.fallbackTopPx;
+        }
+        // jitter (rowIndex 기반 deterministic)
+        const jx = (seededRandom(cfg.sheetRow) - 0.5) * 240;       // ±120
+        const jy = (seededRandom(cfg.sheetRow + 999) - 0.5) * 320; // ±160
+        x += jx;
+        y += jy;
+        // 영역 안으로 클램프
+        x = Math.max(DATA_X_MIN, Math.min(DATA_X_MAX, x));
+        y = Math.max(DATA_Y_MIN, Math.min(DATA_Y_MAX, y));
+        // size 만큼 좌상단 보정 (위치를 중심점으로 받았으니 좌상단으로)
+        positions[cfg.name] = {
+          leftPx: x - REVEAL_SIZE / 2,
+          topPx:  y - REVEAL_SIZE / 2,
+        };
+      });
+      return positions;
+    }
+
+    // 인스턴스 생성: 시트 위치 또는 fallback 위치 사용
+    function buildInstances(positions) {
+      INSTANCE_CONFIGS.forEach((cfg) => {
+        const pos = positions[cfg.name] || {
+          leftPx: cfg.fallbackLeftPx - REVEAL_SIZE / 2,
+          topPx:  cfg.fallbackTopPx - REVEAL_SIZE / 2,
+        };
+        const inst = createRevealInstance({
+          leftPx: pos.leftPx,
+          topPx:  pos.topPx,
+          size: REVEAL_SIZE,
+          sheetRow: cfg.sheetRow,
+          name: cfg.name,
+          framesCount: cfg.framesCount,
+          baseVignette: cfg.baseVignette,
+          holdSentence: cfg.holdSentence,
+          holdSentenceStyle: cfg.holdSentenceStyle,
+          outroMode: cfg.outroMode,
+          root,
+        });
+        instanceByName[cfg.name] = inst;
+        allInstances.push({ inst, row: cfg.sheetRow, fallback: cfg.fallback });
+      });
+    }
 
     /* ─────────────────────────────────────────────
        확장 패널 시스템
@@ -3508,7 +3635,7 @@
     captureBtn.addEventListener("mousedown", (e) => e.stopPropagation());
 
     function applyFallbackAll() {
-      // 시트 연결 안 됐을 때 임시 텍스트
+      // 시트 연결 안 됐을 때: fallback 위치로 인스턴스 생성 + 임시 텍스트
       const fallbackTexts = {
         "03": "Words come first, then a vague after-image. The picture I want never quite arrives.",
         "04": "I am told a face is unforgettable, yet I cannot summon it. The name remains.",
@@ -3521,6 +3648,8 @@
         "28": "Without the ability to see the lost loved one or relive times with them, they do tend fade from mind quicker.",
         "79": "I can imagine an apple in front of me. I know where the skin is. I know how big it is. I can't see it.",
       };
+      // fallback 위치로 인스턴스 생성
+      buildInstances({});  // 빈 객체 → 모두 fallbackLeftPx/topPx 사용
       for (const { inst, fallback } of allInstances) {
         inst.loadFrameSeries(fallback);
         const key = fallback.replace(".png", "");
@@ -3539,6 +3668,11 @@
         })
         .then(text => {
           const rows = parseCSV(text);
+          // 1) 시트의 작성일자/시간으로 좌표 계산
+          const positions = computePositionsFromSheet(rows);
+          // 2) 계산된 위치로 인스턴스 생성
+          buildInstances(positions);
+          // 3) 텍스트와 이미지 적용
           applyRowsToInstances(rows);
         })
         .catch(err => {
