@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+\<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
@@ -970,39 +970,78 @@
       }
 
       function updateVolume(now) {
-        const t = (now - volumeStartTime) / 1000;
+        // alightworld 스타일: 한 줄 문장의 글자들이 본 위치(flatX) 주변에서
+        //  - 인트로: 흩어진 위치(sphere)에서 본 위치로 부드럽게 모이며 페이드인
+        //  - 그 후 무한 루프:
+        //     - 각 낱자가 wave + 미세 회전 + alpha 호흡
+        //     - 문장 라인 자체가 sin 곡선으로 살짝 휘어짐 (시간에 따라 변형)
+        //     - 문장 전체도 천천히 표류
 
-        const rotY = t * 12;
-        const rotX = Math.sin(t * 0.15) * 8;
+        const elapsed = (now - volumeStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+
+        // 인트로 동안 stage가 살짝 회전했다가 정상 위치로 (alightworld는 정적이지만 부드러운 인트로 효과)
+        const introRotY = (1 - introEased) * 6;       // 6deg → 0deg
+        const introRotX = Math.sin(introT * Math.PI) * 3;
         volumeStage.style.transform =
-          `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+          `rotateX(${introRotX.toFixed(2)}deg) rotateY(${introRotY.toFixed(2)}deg)`;
 
-        const morphCycle = (Math.sin(t * (Math.PI * 2 / 8)) + 1) / 2;
-        const intro = Math.min(1, t / 1.5);
-        const morph = morphCycle * intro;
+        // 문장 라인이 곡선으로 살짝 휘는 정도 (시간에 따라 변형)
+        // → 글자 인덱스에 비례한 sin → 문장 전체가 부드러운 곡선
+        const curveAmpY = 6 + Math.sin(elapsed * 0.25) * 3;  // 곡률 진폭 천천히 변동
+        const curveFreq = 1.2 + Math.sin(elapsed * 0.18) * 0.3; // 곡선 주기도 변동
 
-        for (const g of volumeGlyphs) {
-          const localMorph = Math.max(0, Math.min(1,
-            morph + Math.sin(t * 0.5 + g.phase) * 0.15
+        // 문장 전체 표류
+        const driftX = Math.sin(elapsed * 0.16) * 4 + Math.sin(elapsed * 0.07) * 2;
+        const driftY = Math.cos(elapsed * 0.21) * 3 + Math.sin(elapsed * 0.10) * 1.5;
+
+        const totalGlyphs = volumeGlyphs.length;
+        for (let idx = 0; idx < totalGlyphs; idx++) {
+          const g = volumeGlyphs[idx];
+
+          // 글자별 위치 비율 (0~1)
+          const posRatio = totalGlyphs > 1 ? idx / (totalGlyphs - 1) : 0.5;
+          // 곡선 휘어짐: posRatio * 2π * curveFreq → 문장 전체에 sin 곡선
+          const curveY = Math.sin(posRatio * Math.PI * 2 * curveFreq + elapsed * 0.4) * curveAmpY;
+
+          // 글자별 phase
+          const wavePhase = posRatio * Math.PI * 2;
+          const personalPhase = g.phase;
+
+          // 글자별 wave (decay보다 살짝 큰 진폭 — volume은 더 공간적)
+          const dy = Math.sin(elapsed * 1.5 - wavePhase * 1.2 + personalPhase) * 2.0
+                   + Math.sin(elapsed * 0.55 + personalPhase * 1.8) * 1.0;
+          const dx = Math.cos(elapsed * 0.95 - wavePhase * 0.7 + personalPhase) * 1.4
+                   + Math.sin(elapsed * 0.4 + personalPhase) * 0.7;
+
+          // 글자별 미세 회전
+          const rot = Math.sin(elapsed * 0.8 - wavePhase * 0.5 + personalPhase) * 0.03;
+
+          // alpha 호흡
+          const alphaBreath = 0.80 + Math.sin(elapsed * 0.95 - wavePhase * 0.6 + personalPhase * 1.4) * 0.20;
+          const opacity = introEased * alphaBreath;
+
+          // 인트로: 흩어진 sphere 위치 → 본 위치(flatX, flatY)로 모임
+          // 이 때 sphere 위치를 너무 강하게 안 쓰고 30% 정도만 (alightworld는 미묘하게)
+          const arrivalDelay = (g.flowSeed % 1) * 0.4;
+          const arrival = Math.max(0, Math.min(1,
+            (introT - arrivalDelay) / Math.max(0.01, 1 - arrivalDelay)
           ));
+          const arrivalEased = 1 - Math.pow(1 - arrival, 3);
+          const startOffsetX = (g.sphereX * 0.3) * (1 - arrivalEased);
+          const startOffsetY = (g.sphereY * 0.3) * (1 - arrivalEased);
 
-          const flow = Math.sin(t * 0.3 + g.flowSeed) * 4;
-          const sx = g.sphereX + Math.cos(g.flowSeed) * flow;
-          const sy = g.sphereY + Math.sin(g.flowSeed * 1.3) * flow * 0.8;
-          const sz = g.sphereZ + Math.cos(g.flowSeed * 0.7) * flow;
+          // 최종 위치
+          const x = g.flatX + dx + driftX + startOffsetX;
+          const y = g.flatY + dy + curveY + driftY + startOffsetY;
 
-          const x = g.flatX * (1 - localMorph) + sx * localMorph;
-          const y = g.flatY * (1 - localMorph) + sy * localMorph;
-          const z =                  0 * (1 - localMorph) + sz * localMorph;
-
-          const rotYRad = rotY * Math.PI / 180;
-          const effectiveZ = z * Math.cos(rotYRad) + x * Math.sin(rotYRad);
-          const depthN = (effectiveZ + 80) / 160;
-          const opacity = 0.35 + Math.max(0, Math.min(1, depthN)) * 0.65;
-          const scale   = 0.85 + Math.max(0, Math.min(1, depthN)) * 0.30;
+          // 미세 스케일 호흡
+          const scale = 0.96 + Math.sin(elapsed * 0.65 + personalPhase) * 0.035;
 
           g.el.style.transform =
-            `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, ${z.toFixed(2)}px) ` +
+            `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) ` +
+            `rotate(${rot.toFixed(4)}rad) ` +
             `scale(${scale.toFixed(3)})`;
           g.el.style.opacity = opacity.toFixed(3);
         }
