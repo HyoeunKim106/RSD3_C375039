@@ -2301,8 +2301,34 @@
        ───────────────────────────────────────────── */
     const root = document.getElementById("reveal-root");
 
+    /* ─────────────────────────────────────────────
+       인스턴스 좌표 & 모션 매핑 (6개 reveal)
+       ─────────────────────────────────────────────
+       좌표는 흩뿌려진 별자리처럼 비대칭 배치 (수평/수직 일렬 회피).
+       leftPct/topPct: 화면 좌상단 기준 백분율 (CSS 좌표).
+
+         06 (18%, 18%)            79 (50%, 24%)
+                                              07 (70%, 42%)
+         08 (22%, 48%)
+                       09 (48%, 60%)
+                                              28 (75%, 65%)
+
+       각 reveal의 sentence 스타일과 outroMode가 모두 다르게 조합됨.
+       ───────────────────────────────────────────── */
+
+    const inst06 = createRevealInstance({
+      leftPct: 18, topPct: 18, size: REVEAL_SIZE,
+      sheetRow: 7,
+      name: "06",
+      framesCount: 1,
+      holdSentence: true,
+      holdSentenceStyle: "wave",    // 좌→우 흐르는 호흡
+      outroMode: "ripple",
+      root,
+    });
+
     const inst79 = createRevealInstance({
-      leftPct: 60, topPct: 35, size: REVEAL_SIZE,
+      leftPct: 50, topPct: 24, size: REVEAL_SIZE,
       sheetRow: 80,
       name: "79",
       framesCount: 1,
@@ -2312,32 +2338,60 @@
       root,
     });
 
-    const inst28 = createRevealInstance({
-      leftPct: 20, topPct: 30, size: REVEAL_SIZE,
-      sheetRow: 29,
-      name: "28",
-      root,
+    const inst07 = createRevealInstance({
+      leftPct: 70, topPct: 42, size: REVEAL_SIZE,
+      sheetRow: 8,
+      name: "07",
       framesCount: 1,
-      baseVignette: true,
       holdSentence: true,
-      holdSentenceStyle: "drift",   // 글자별 자유 표류 (가벼움)
+      holdSentenceStyle: "breath",
       outroMode: "decay",
+      root,
+    });
+
+    const inst08 = createRevealInstance({
+      leftPct: 22, topPct: 48, size: REVEAL_SIZE,
+      sheetRow: 9,
+      name: "08",
+      framesCount: 1,
+      holdSentence: true,
+      holdSentenceStyle: "drift",
+      outroMode: "volume",
+      root,
     });
 
     const inst09 = createRevealInstance({
-      leftPct: 70, topPct: 65, size: REVEAL_SIZE,
+      leftPct: 48, topPct: 60, size: REVEAL_SIZE,
       sheetRow: 10,
       name: "09",
-      root,
       framesCount: 1,
-      holdLowRes: true,
+      holdSentence: true,
+      holdSentenceStyle: "wave",
       outroMode: "ripple",
+      root,
     });
 
+    const inst28 = createRevealInstance({
+      leftPct: 75, topPct: 65, size: REVEAL_SIZE,
+      sheetRow: 29,
+      name: "28",
+      framesCount: 1,
+      baseVignette: true,
+      holdSentence: true,
+      holdSentenceStyle: "drift",   // 글자별 자유 표류
+      outroMode: "decay",
+      root,
+    });
+
+    // sheetRow ↔ 기본 이미지 파일 매핑 (시트가 비어있을 때 폴백용)
+    // 패턴: 파일번호 + 1 = sheetRow
     const allInstances = [
-      { inst: inst79, row: 80 },
-      { inst: inst28, row: 29 },
-      { inst: inst09, row: 10 },
+      { inst: inst06, row: 7,  fallback: "06.png" },
+      { inst: inst79, row: 80, fallback: "79.png" },
+      { inst: inst07, row: 8,  fallback: "07.png" },
+      { inst: inst08, row: 9,  fallback: "08.png" },
+      { inst: inst09, row: 10, fallback: "09.png" },
+      { inst: inst28, row: 29, fallback: "28.png" },
     ];
 
     /* ─────────────────────────────────────────────
@@ -2494,21 +2548,15 @@
     });
 
     function applyRowsToInstances(rows) {
-      for (const { inst, row } of allInstances) {
+      for (const { inst, row, fallback } of allInstances) {
         const item = pickRowFromSheet(rows, row);
         if (!item) {
-          let fb = "79.png";
-          if (row === 29) fb = "28.png";
-          else if (row === 10) fb = "09.png";
-          inst.loadFrameSeries(fb);
+          inst.loadFrameSeries(fallback);
           inst.setText("");
-          if (inst.expandable && inst.setExpandData) inst.setExpandData(fb, "");
+          if (inst.expandable && inst.setExpandData) inst.setExpandData(fallback, "");
           continue;
         }
-        let defaultFile = "79.png";
-        if (row === 29) defaultFile = "28.png";
-        else if (row === 10) defaultFile = "09.png";
-        const filename = item[SHEET_TARGET_COL_NAME] || defaultFile;
+        const filename = item[SHEET_TARGET_COL_NAME] || fallback;
         inst.loadFrameSeries(filename);
         inst.setText(item["당사자의 직접 설명"] || "");
         if (inst.expandable && inst.setExpandData) {
@@ -2768,19 +2816,20 @@
     captureBtn.addEventListener("mousedown", (e) => e.stopPropagation());
 
     function applyFallbackAll() {
-      inst79.loadFrameSeries("79.png");
-      inst79.setText(
-        "I can imagine an apple in front of me. " +
-        "I know where the skin is. I know how big it is. I can't see it."
-      );
-      inst28.loadFrameSeries("28.png");
-      inst28.setText(
-        "Without the ability to see the lost loved one or relive times with them, they do tend fade from mind quicker."
-      );
-      inst09.loadFrameSeries("09.png");
-      inst09.setText(
-        "Memory ripples back like water — the image dissolves, returns, and dissolves again."
-      );
+      // 시트 연결 안 됐을 때 임시 텍스트
+      const fallbackTexts = {
+        "06": "I close my eyes and the room is gone — there is no picture, only the knowing of where things are.",
+        "07": "When I try to remember her face, I find shape but no light, like a lamp turned off.",
+        "08": "Childhood comes back as facts, never as scenes. I lived it but cannot revisit.",
+        "09": "Memory ripples back like water — the image dissolves, returns, and dissolves again.",
+        "28": "Without the ability to see the lost loved one or relive times with them, they do tend fade from mind quicker.",
+        "79": "I can imagine an apple in front of me. I know where the skin is. I know how big it is. I can't see it.",
+      };
+      for (const { inst, fallback } of allInstances) {
+        inst.loadFrameSeries(fallback);
+        const key = fallback.replace(".png", "");
+        inst.setText(fallbackTexts[key] || "");
+      }
       console.info("[sheet] fallback (시트 미연결) — 임시 텍스트 사용");
     }
 
