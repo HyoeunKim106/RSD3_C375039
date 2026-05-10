@@ -259,49 +259,7 @@
       z-index: 4;
       will-change: transform;
     }
-    .text-sentence-stage {
-      position: absolute;
-      left: 50%;
-      top:  50%;
-      width: 0;
-      height: 0;
-      will-change: transform;
-    }
-    .text-sentence-block {
-      position: absolute;
-      left: 0;
-      top:  0;
-      font-family: 'Vicentino';
-      font-size: 17px;
-      line-height: 1.55;
-      color: var(--ink);
-      white-space: pre-wrap;
-      word-break: keep-all;
-      text-align: center;
-      transform-origin: 50% 50%;
-      will-change: transform, opacity, filter;
-      letter-spacing: normal;
-    }
-    /* 두 겹 글자 구조: base는 항상 보이고, dark는 이미지 위에서만 보여서 색이 진해짐 */
-    .sentence-layer {
-      display: block;
-      width: 100%;
-      white-space: pre-wrap;
-      word-break: keep-all;
-      text-align: center;
-    }
-    .sentence-base {
-      color: var(--ink);
-    }
-    .sentence-dark {
-      position: absolute;
-      left: 0;
-      top: 0;
-      color: var(--ink);          /* 베이스와 같은 색, color-burn으로 톤 변화 */
-      mix-blend-mode: color-burn;
-      opacity: 0;                  /* 기본 0, JS가 darkness 샘플링으로 동적 조절 */
-      pointer-events: none;
-    }
+    /* sentence는 캔버스 기반이라 stage/block CSS는 더 이상 필요 없음 */
 
     /* ───────── 확장 패널 ───────── */
     .expanded-panel {
@@ -1582,6 +1540,15 @@
         return parts.map(s => s.trim()).filter(s => s.length > 0);
       }
 
+      // ─────────────────────────────────────────────
+      //  캔버스 기반 sentence 시스템
+      //  - 별도의 sentence 캔버스를 reveal 캔버스 위에 깔고
+      //  - 글자를 캔버스에 직접 그린 후 reveal 이미지를 color-burn으로 합성
+      //  - 픽셀 단위 컬러번 블렌딩 (일러스트와 동일)
+      // ─────────────────────────────────────────────
+      let sentenceCanvas = null;
+      let sentenceCtx = null;
+
       function buildSentenceText(text) {
         teardownSentenceText();
         sentenceList = splitSentences(text);
@@ -1589,14 +1556,28 @@
 
         sentenceRoot = document.createElement("div");
         sentenceRoot.className = "text-sentence";
-        sentenceRoot.style.left = `calc(${leftPct}% + ${size / 2}px)`;
-        sentenceRoot.style.top  = `calc(${topPct}% + ${size / 2}px)`;
-        sentenceRoot.style.width  = "0px";
-        sentenceRoot.style.height = "0px";
+        // reveal 이미지와 정확히 같은 위치에 배치
+        sentenceRoot.style.left = `${leftPct}%`;
+        sentenceRoot.style.top  = `${topPct}%`;
+        sentenceRoot.style.width  = `${size}px`;
+        sentenceRoot.style.height = `${size}px`;
 
-        sentenceStage = document.createElement("div");
-        sentenceStage.className = "text-sentence-stage";
-        sentenceRoot.appendChild(sentenceStage);
+        // 캔버스 생성: reveal 캔버스와 동일한 픽셀 해상도
+        sentenceCanvas = document.createElement("canvas");
+        sentenceCanvas.style.position = "absolute";
+        sentenceCanvas.style.inset = "0";
+        sentenceCanvas.style.width = "100%";
+        sentenceCanvas.style.height = "100%";
+        sentenceCanvas.style.pointerEvents = "none";
+        const px = resolveCanvasPixelSize();
+        sentenceCanvas.width  = px.w;
+        sentenceCanvas.height = px.h;
+        sentenceCtx = sentenceCanvas.getContext("2d");
+        sentenceCtx.imageSmoothingEnabled = true;
+        sentenceCtx.imageSmoothingQuality = "high";
+        // 그리기 좌표계는 size 기준으로 매핑
+        sentenceCtx.setTransform(px.w / size, 0, 0, px.h / size, 0, 0);
+        sentenceRoot.appendChild(sentenceCanvas);
         root.appendChild(sentenceRoot);
 
         sentenceBlocks = [];
@@ -1615,28 +1596,9 @@
       }
 
       function spawnSentenceBlock(startTime, text, idxInLoop) {
-        const el = document.createElement("div");
-        el.className = "text-sentence-block";
-        el.style.width = "320px";
-        el.style.marginLeft = "-160px";
-        el.style.opacity = "0";
-
-        // 두 겹 구조: 베이스(옅은 색, 항상 보임) + 다크(이미지 위에서만 알파에 따라 진해짐)
-        const baseLayer = document.createElement("span");
-        baseLayer.className = "sentence-layer sentence-base";
-        baseLayer.textContent = text;
-
-        const darkLayer = document.createElement("span");
-        darkLayer.className = "sentence-layer sentence-dark";
-        darkLayer.textContent = text;
-
-        el.appendChild(baseLayer);
-        el.appendChild(darkLayer);
-
         const phase = Math.random() * Math.PI * 2;
-        sentenceStage.appendChild(el);
         sentenceBlocks.push({
-          el, baseLayer, darkLayer, text, startTime, phase,
+          text, startTime, phase,
           settleY: -8 + (Math.random() - 0.5) * 6,
           enterY: 32 + Math.random() * 8,
           exitY: -22 - Math.random() * 8,
@@ -1653,55 +1615,33 @@
         return t * t * t;
       }
 
-      // sentence-block 위치에서 reveal 캔버스의 "어두운 정도"를 샘플링
-      // 흰 픽셀 / 픽셀 없음 → 0 (다크 레이어 안 보임 → 베이스만 보임)
-      // 어두운/색있는 픽셀 → 1에 가까워짐 (다크 레이어 진해짐 → color-burn 효과)
-      function sampleCanvasDarknessAt(blockEl) {
-        if (!canvas) return 0;
-        const blockRect = blockEl.getBoundingClientRect();
-        const canvasRect = canvas.getBoundingClientRect();
-        if (canvasRect.width <= 0 || canvasRect.height <= 0) return 0;
-
-        const cw = canvas.width, ch = canvas.height;
-        let totalDarkness = 0;
-        let validSamples = 0;
-        try {
-          for (let yi = 0; yi < 3; yi++) {
-            for (let xi = 0; xi < 3; xi++) {
-              const sx = blockRect.left + (blockRect.width  * (xi + 0.5)) / 3;
-              const sy = blockRect.top  + (blockRect.height * (yi + 0.5)) / 3;
-              if (sx < canvasRect.left || sx > canvasRect.right ||
-                  sy < canvasRect.top  || sy > canvasRect.bottom) {
-                validSamples++;
-                continue; // 캔버스 밖 → darkness 0
-              }
-              const px = Math.floor(((sx - canvasRect.left) / canvasRect.width)  * cw);
-              const py = Math.floor(((sy - canvasRect.top)  / canvasRect.height) * ch);
-              if (px < 0 || py < 0 || px >= cw || py >= ch) {
-                validSamples++;
-                continue;
-              }
-              const data = ctx.getImageData(px, py, 1, 1).data;
-              const r = data[0], g = data[1], b = data[2], a = data[3] / 255;
-              if (a < 0.05) {
-                // 픽셀 없음 (트레일 안 닿은 곳) → darkness 0
-                validSamples++;
-                continue;
-              }
-              // 명도(luminance) 0~1 계산: 인간 시각 기준 가중치
-              const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-              // 흰색(lum=1) → darkness 0, 검정(lum=0) → darkness 1
-              // 알파도 곱해서 반투명 영역은 비례적으로 약하게
-              const darkness = (1 - lum) * a;
-              totalDarkness += darkness;
-              validSamples++;
-            }
+      // 캔버스에 한 줄/여러 줄 텍스트를 가운데 정렬로 그림 (자동 줄바꿈)
+      function drawWrappedText(c, text, cx, cy, maxWidth, fontPx, lineHeight) {
+        const words = text.split(/(\s+)/);
+        const lines = [];
+        let line = "";
+        for (const w of words) {
+          const test = line + w;
+          if (c.measureText(test).width > maxWidth && line.length > 0) {
+            lines.push(line.trimEnd());
+            line = w.replace(/^\s+/, "");
+          } else {
+            line = test;
           }
-        } catch (e) {
-          return 0;
         }
-        return validSamples > 0 ? totalDarkness / validSamples : 0;
+        if (line) lines.push(line);
+        const totalH = lines.length * lineHeight;
+        let y = cy - totalH / 2 + lineHeight / 2;
+        for (const ln of lines) {
+          const w = c.measureText(ln).width;
+          c.fillText(ln, cx - w / 2, y);
+          y += lineHeight;
+        }
       }
+
+      // 임시 작업용 오프스크린 캔버스 (sentence 합성용)
+      let sentTempCanvas = null;
+      let sentTempCtx = null;
 
       function updateSentence(now) {
         const sinceCurStart = now - sentenceCurStart;
@@ -1720,56 +1660,121 @@
           sentenceCurStart = sentenceCurStart + (SENT_TOTAL - SENT_OVERLAP);
         }
 
+        if (!sentenceCtx || !sentenceCanvas) return;
+
+        // 메인 sentence 캔버스 클리어
+        sentenceCtx.save();
+        sentenceCtx.setTransform(1, 0, 0, 1, 0, 0);
+        sentenceCtx.clearRect(0, 0, sentenceCanvas.width, sentenceCanvas.height);
+        sentenceCtx.restore();
+
+        // 임시 캔버스 준비 (sentence 캔버스와 같은 크기)
+        if (!sentTempCanvas) {
+          sentTempCanvas = document.createElement("canvas");
+          sentTempCtx = sentTempCanvas.getContext("2d");
+        }
+        if (sentTempCanvas.width !== sentenceCanvas.width ||
+            sentTempCanvas.height !== sentenceCanvas.height) {
+          sentTempCanvas.width  = sentenceCanvas.width;
+          sentTempCanvas.height = sentenceCanvas.height;
+        }
+        const px = resolveCanvasPixelSize();
+        sentTempCtx.setTransform(px.w / size, 0, 0, px.h / size, 0, 0);
+        sentTempCtx.imageSmoothingEnabled = true;
+        sentTempCtx.imageSmoothingQuality = "high";
+
+        const FONT_PX = 17;
+        const LINE_HEIGHT = FONT_PX * 1.55;
+        const MAX_WIDTH = size - 40;
+        const cx = size / 2;
+        const cyBase = size / 2;
+
         for (let i = sentenceBlocks.length - 1; i >= 0; i--) {
           const b = sentenceBlocks[i];
           const t = now - b.startTime;
-          if (t < 0) {
-            b.el.style.opacity = "0";
-            continue;
-          }
+          if (t < 0) continue;
           if (t >= SENT_TOTAL) {
-            if (b.el.parentNode) b.el.parentNode.removeChild(b.el);
             sentenceBlocks.splice(i, 1);
             continue;
           }
 
-          let opacity, y, scale, blur;
+          let opacity, y, scale;
           if (t < SENT_FADE_IN) {
             const u = t / SENT_FADE_IN;
             const eu = easeOutCubic(u);
             opacity = eu;
             y = b.enterY * (1 - eu) + b.settleY * eu;
             scale = 0.97 + 0.02 * eu + (b.settleScale - 0.99) * eu;
-            blur = (1 - eu) * 1.5;
           } else if (t < SENT_FADE_IN + SENT_HOLD) {
-            const local = (t - SENT_FADE_IN) / SENT_HOLD;
             opacity = 0.92 + Math.sin(t * 0.0018 + b.phase) * 0.08;
             y = b.settleY + Math.sin(t * 0.0011 + b.phase) * 0.8;
             scale = b.settleScale + Math.sin(t * 0.0009 + b.phase) * 0.005;
-            blur = 0;
           } else {
             const u = (t - SENT_FADE_IN - SENT_HOLD) / SENT_FADE_OUT;
             const eu = easeInCubic(u);
             opacity = 1 - eu;
             y = b.settleY * (1 - eu) + b.exitY * eu;
             scale = b.settleScale * (1 - eu * 0.04);
-            blur = eu * 1.8;
           }
 
           const sec = t / 1000;
           const swayX = Math.sin(sec * b.swaySpeed + b.phase) * b.swayAmp;
 
-          b.el.style.opacity = opacity.toFixed(3);
-          b.el.style.transform =
-            `translate(${swayX.toFixed(2)}px, ${y.toFixed(2)}px) ` +
-            `scale(${scale.toFixed(4)})`;
-          b.el.style.filter = blur > 0.01 ? `blur(${blur.toFixed(2)}px)` : "none";
+          // ─── 1단계: 임시 캔버스에 글자 모양 안에 reveal 이미지 클리핑 ───
+          // (a) 임시 캔버스 클리어
+          sentTempCtx.save();
+          sentTempCtx.setTransform(1, 0, 0, 1, 0, 0);
+          sentTempCtx.clearRect(0, 0, sentTempCanvas.width, sentTempCanvas.height);
+          sentTempCtx.restore();
 
-          // 다크 레이어 opacity 샘플링: 흰 부분/캔버스 밖 → 0, 색있는 부분 → 진해짐
-          if (b.darkLayer) {
-            const d = sampleCanvasDarknessAt(b.el);
-            b.darkLayer.style.opacity = d.toFixed(3);
+          // (b) 임시 캔버스에 글자를 #776c54로 그림 (마스크 역할)
+          sentTempCtx.save();
+          sentTempCtx.setTransform(px.w / size, 0, 0, px.h / size, 0, 0);
+          sentTempCtx.translate(cx + swayX, cyBase + y);
+          sentTempCtx.scale(scale, scale);
+          sentTempCtx.fillStyle = INK_COLOR;
+          sentTempCtx.font = `${FONT_PX}px Vicentino`;
+          sentTempCtx.textBaseline = "middle";
+          drawWrappedText(sentTempCtx, b.text, 0, 0, MAX_WIDTH, FONT_PX, LINE_HEIGHT);
+          sentTempCtx.restore();
+
+          // (c) 임시 캔버스에 reveal 이미지를 source-atop으로 합성
+          //     → 글자가 있는 픽셀에만 reveal 이미지 색이 묻음
+          //     → 흰 배경(reveal 이미지 영역 밖)이거나 트레일이 안 닿은 부분은 #776c54 글자 그대로
+          if (canvas && canvas.width > 0) {
+            sentTempCtx.save();
+            sentTempCtx.setTransform(1, 0, 0, 1, 0, 0);
+            sentTempCtx.globalCompositeOperation = "source-atop";
+            // reveal 캔버스를 sentence 캔버스 픽셀 크기에 맞춰 그림
+            sentTempCtx.drawImage(canvas,
+              0, 0, canvas.width, canvas.height,
+              0, 0, sentTempCanvas.width, sentTempCanvas.height);
+            sentTempCtx.restore();
           }
+
+          // (d) 임시 캔버스 결과(글자모양 안의 reveal 이미지)를 메인에 color-burn 합성
+          //     베이스 글자(#776c54)는 메인에 다음 단계에서 깔림
+          // → 일러스트의 색상번 효과: 베이스 글자 색에 글자모양 안 이미지가 burn됨
+          sentenceCtx.save();
+          sentenceCtx.setTransform(1, 0, 0, 1, 0, 0);
+          sentenceCtx.globalAlpha = opacity;
+
+          // 1) 베이스 글자 (#776c54) 그리기 — source-over
+          sentenceCtx.globalCompositeOperation = "source-over";
+          sentenceCtx.setTransform(px.w / size, 0, 0, px.h / size, 0, 0);
+          sentenceCtx.translate(cx + swayX, cyBase + y);
+          sentenceCtx.scale(scale, scale);
+          sentenceCtx.fillStyle = INK_COLOR;
+          sentenceCtx.font = `${FONT_PX}px Vicentino`;
+          sentenceCtx.textBaseline = "middle";
+          drawWrappedText(sentenceCtx, b.text, 0, 0, MAX_WIDTH, FONT_PX, LINE_HEIGHT);
+
+          // 2) 그 위에 임시 캔버스(글자모양 안 이미지)를 color-burn으로 덮음
+          //    → 픽셀 단위 컬러번 블렌딩 (일러스트와 동일)
+          sentenceCtx.setTransform(1, 0, 0, 1, 0, 0);
+          sentenceCtx.globalCompositeOperation = "color-burn";
+          sentenceCtx.drawImage(sentTempCanvas, 0, 0);
+          sentenceCtx.restore();
         }
       }
 
@@ -1780,6 +1785,8 @@
         }
         sentenceRoot = null;
         sentenceStage = null;
+        sentenceCanvas = null;
+        sentenceCtx = null;
         sentenceBlocks = [];
         sentenceList = [];
       }
@@ -2371,9 +2378,9 @@
         };
       }
 
-      // (2) reveal 이미지 캔버스 먼저 그리기
+      // (2) reveal 이미지 캔버스 + sentence 캔버스 그리기
       const revealCanvases = document.querySelectorAll(
-        ".reveal-base-area canvas, .reveal-img-area canvas"
+        ".reveal-base-area canvas, .reveal-img-area canvas, .text-sentence canvas"
       );
       for (const c of revealCanvases) {
         const r = c.getBoundingClientRect();
@@ -2473,43 +2480,7 @@
         octx.fillText(g.textContent, r.left, r.top);
       }
 
-      // 문장 블록 — Vicentino
-      const sentBlocks = document.querySelectorAll(".text-sentence-block");
-      const sentFontPx = 17 * scale;
-      octx.font = `${sentFontPx}px Vicentino`;
-      for (const sb of sentBlocks) {
-        const cs = window.getComputedStyle(sb);
-        const op = parseFloat(cs.opacity);
-        if (!isFinite(op) || op <= 0.01) continue;
-        const r = sb.getBoundingClientRect();
-        if (r.left > W || r.right < 0 || r.top > H || r.bottom < 0) continue;
-        const txt = sb.textContent;
-        if (!txt) continue;
-        octx.globalAlpha = op;
-        octx.fillStyle = cs.color || INK_COLOR;
-        const lineHeight = sentFontPx * 1.55;
-        const maxWidth = r.width;
-        const words = txt.split(/(\s+)/);
-        let line = "";
-        let y = r.top;
-        for (const w of words) {
-          const testLine = line + w;
-          const m = octx.measureText(testLine);
-          if (m.width > maxWidth && line.length > 0) {
-            const lineWidth = octx.measureText(line).width;
-            octx.fillText(line, r.left + (r.width - lineWidth) / 2, y);
-            y += lineHeight;
-            line = w.replace(/^\s+/, "");
-          } else {
-            line = testLine;
-          }
-        }
-        if (line) {
-          const lineWidth = octx.measureText(line).width;
-          octx.fillText(line, r.left + (r.width - lineWidth) / 2, y);
-        }
-      }
-      octx.globalAlpha = 1;
+      // 문장 블록은 sentence 캔버스 자체가 위 (2) 단계에서 그려졌으므로 별도 처리 불필요
 
       // multiply 종료
       octx.globalCompositeOperation = "source-over";
