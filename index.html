@@ -647,7 +647,7 @@
        Reveal 인스턴스 시스템
        ───────────────────────────────────────────── */
 
-    const REVEAL_SIZE = 150;
+    const REVEAL_SIZE = 350;
 
     const FRAME_COUNT = 8;
     const FRAME_INTERVAL_MS = 280;
@@ -991,9 +991,11 @@
         volumeRoot.style.left = `${volX}px`;
         volumeRoot.style.top  = `${volY}px`;
 
+        const worldScale = distance / 100;
         const rotY = t * 12;
         const rotX = Math.sin(t * 0.15) * 8;
         volumeStage.style.transform =
+          `scale(${worldScale.toFixed(4)}) ` +
           `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
 
         const morphCycle = (Math.sin(t * (Math.PI * 2 / 8)) + 1) / 2;
@@ -1243,6 +1245,8 @@
         decayRoot.style.left = `${cx0}px`;
         decayRoot.style.top  = `${cy0}px`;
 
+        const worldScale = distance / 100;
+
         const elapsed = now - decayLoopStart;
         let cycleT = elapsed / decayCycleDuration;
         if (cycleT >= 1) {
@@ -1302,6 +1306,8 @@
           const rz2 = -sx * sinY + rz1 * cosY;
           return { x: rx, y: ry, z: rz2 };
         }
+
+        decayStage.style.transform = `scale(${worldScale.toFixed(4)})`;
 
         for (const g of decayGlyphs) {
           let x, y, z = 0, opacity;
@@ -1493,6 +1499,9 @@
         rippleRoot.style.left = `${cx0}px`;
         rippleRoot.style.top  = `${cy0}px`;
 
+        const worldScale = distance / 100;
+        rippleStage.style.transform = `scale(${worldScale.toFixed(4)})`;
+
         const intro = Math.min(1, t / 1.2);
         const introEased = 1 - Math.pow(1 - intro, 3);
 
@@ -1623,6 +1632,9 @@
         const r = wrap.getBoundingClientRect();
         sentenceRoot.style.left = `${r.left + r.width / 2}px`;
         sentenceRoot.style.top  = `${r.top  + r.height / 2}px`;
+
+        const worldScale = distance / 100;
+        sentenceStage.style.transform = `scale(${worldScale.toFixed(4)})`;
 
         const sinceCurStart = now - sentenceCurStart;
         const fadeOutStart = SENT_FADE_IN + SENT_HOLD;
