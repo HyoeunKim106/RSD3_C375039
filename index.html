@@ -1244,8 +1244,6 @@
 
       function updateDecay(now) {
         const elapsed = now - decayLoopStart;
-
-        const elapsed = now - decayLoopStart;
         let cycleT = elapsed / decayCycleDuration;
         if (cycleT >= 1) {
           decayLoopCount++;
