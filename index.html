@@ -8,8 +8,8 @@
   <style>
     /* ───────── 로컬 폰트 ───────── */
     @font-face {
-      font-family: 'Binomic';
-      src: url('./assets/binomic-3.ttf') format('truetype');
+      font-family: 'CustomEnglish';
+      src: url('./09396f37d2e1d36176e7921cfed61a47.ttf') format('truetype');
       font-weight: 400;
       font-style: normal;
       font-display: swap;
@@ -17,20 +17,6 @@
     @font-face {
       font-family: 'Eulyoo1945-Regular';
       src: url('./assets/Eulyoo1945-Regular.otf') format('opentype');
-      font-weight: 400;
-      font-style: normal;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'Vivaldi';
-      src: url('./assets/vivaldi.ttf') format('truetype');
-      font-weight: 400;
-      font-style: normal;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'GravesendSansLight';
-      src: url('./assets/fonnts.com-Gravesend_Sans_Light.otf') format('opentype');
       font-weight: 400;
       font-style: normal;
       font-display: swap;
@@ -90,7 +76,7 @@
       z-index: 10;
       pointer-events: none;
       color: #000000;
-      font-family: 'GravesendSansLight', sans-serif;
+      font-family: 'CustomEnglish', sans-serif;
       font-weight: 400;
       font-size: 15px;
       line-height: 18px;
@@ -138,7 +124,7 @@
     }
     .reveal-text-content {
       padding: 14px 16px;
-      font-family: 'Vivaldi', 'Eulyoo1945-Regular', serif;
+      font-family: 'CustomEnglish', 'Eulyoo1945-Regular', serif;
       font-size: 16px;
       line-height: 1.55;
       color: #000000;
@@ -187,7 +173,7 @@
       position: absolute;
       left: 0;
       top:  0;
-      font-family: 'Vivaldi', 'Eulyoo1945-Regular', serif;
+      font-family: 'CustomEnglish', 'Eulyoo1945-Regular', serif;
       font-size: 16px;
       line-height: 1;
       color: #000000;
@@ -217,7 +203,7 @@
       position: absolute;
       left: 0;
       top:  0;
-      font-family: 'Vivaldi', 'Eulyoo1945-Regular', serif;
+      font-family: 'CustomEnglish', 'Eulyoo1945-Regular', serif;
       font-size: 16px;
       line-height: 1;
       color: #000000;
@@ -245,7 +231,7 @@
       position: absolute;
       left: 0;
       top:  0;
-      font-family: 'Vivaldi', 'Eulyoo1945-Regular', serif;
+      font-family: 'CustomEnglish', 'Eulyoo1945-Regular', serif;
       font-size: 16px;
       line-height: 1;
       color: #000000;
@@ -278,7 +264,7 @@
       position: absolute;
       left: 0;
       top:  0;
-      font-family: 'Vivaldi', 'Eulyoo1945-Regular', serif;
+      font-family: 'CustomEnglish', 'Eulyoo1945-Regular', serif;
       font-size: 17px;
       line-height: 1.55;
       color: #000000;
@@ -361,7 +347,7 @@
 
     .expanded-panel-text {
       padding: 12px 18px 50px 18px;
-      font-family: 'Vivaldi', 'Eulyoo1945-Regular', serif;
+      font-family: 'CustomEnglish', 'Eulyoo1945-Regular', serif;
       font-size: 16px;
       line-height: 1.7;
       color: #000000;
@@ -2266,7 +2252,7 @@
       if (pendingText && pathPts.length >= 2) {
         const fontPx = 16 * scale;
         if (fontPx >= 4) {
-          octx.font = `${fontPx}px Vivaldi, Eulyoo1945-Regular, serif`;
+          octx.font = `${fontPx}px CustomEnglish, Eulyoo1945-Regular, serif`;
           octx.textBaseline = "middle";
           octx.textAlign = "left";
 
@@ -2346,7 +2332,7 @@
         ".text-volume-glyph, .text-decay-glyph, .text-ripple-glyph"
       );
       const glyphFontPx = 16 * scale;
-      octx.font = `${glyphFontPx}px Vivaldi, Eulyoo1945-Regular, serif`;
+      octx.font = `${glyphFontPx}px CustomEnglish, Eulyoo1945-Regular, serif`;
       octx.textBaseline = "top";
       for (const g of glyphs) {
         const r = g.getBoundingClientRect();
@@ -2361,7 +2347,7 @@
 
       const sentBlocks = document.querySelectorAll(".text-sentence-block");
       const sentFontPx = 17 * scale;
-      octx.font = `${sentFontPx}px Vivaldi, Eulyoo1945-Regular, serif`;
+      octx.font = `${sentFontPx}px CustomEnglish, Eulyoo1945-Regular, serif`;
       for (const sb of sentBlocks) {
         const cs = window.getComputedStyle(sb);
         const op = parseFloat(cs.opacity);
@@ -2398,7 +2384,7 @@
 
       const textBlocks = document.querySelectorAll(".reveal-text-content");
       const textBoxFontPx = 16 * scale;
-      octx.font = `${textBoxFontPx}px Vivaldi, Eulyoo1945-Regular, serif`;
+      octx.font = `${textBoxFontPx}px CustomEnglish, Eulyoo1945-Regular, serif`;
       for (const tb of textBlocks) {
         const txt = tb.textContent;
         if (!txt) continue;
@@ -2424,7 +2410,7 @@
       }
 
       const hudEl = document.getElementById("hud");
-      octx.font = "15px GravesendSansLight, sans-serif";
+      octx.font = "15px CustomEnglish, sans-serif";
       octx.fillStyle = "#000000";
       const lines = hudEl.innerText.split("\n");
       let hy = H - 14 - (lines.length - 1) * 18 - 4;
