@@ -2501,6 +2501,43 @@
               }
               return { dy, rot, alpha };
             };
+          } else if (holdSentenceStyle === "unfold") {
+            // 펼쳐짐: 글자들이 가운데 한 점에 압축되어 있다가 자기 자리로 펼쳐짐
+            // 책 펴는 듯한, 한 권의 응축된 것이 풀려나는 느낌
+            wavePerChar = (i, total) => {
+              const ph = phaseOf(cycleT);
+              // 글자별 시간차 (가운데 글자가 먼저, 양 끝이 나중에 펼쳐짐)
+              const center = (total - 1) / 2;
+              const distFromCenter = Math.abs(i - center) / Math.max(1, center);
+              const stagger = distFromCenter * 0.35;
+
+              let amount, alpha, scale;
+              if (ph.stage === "appear") {
+                const t = Math.max(0, Math.min(1, (ph.t - stagger) / (1 - stagger)));
+                const eu = easeOutCubic(t);
+                amount = 1 - eu;  // 1=압축, 0=펼침
+                alpha = eu * 0.95;
+                scale = 0.5 + eu * 0.5;
+              } else if (ph.stage === "hold") {
+                amount = 0;
+                alpha = 0.86 + Math.sin(sec * 0.8 + i * 0.2 + b.phase) * 0.13;
+                scale = 1.0;
+              } else {
+                const t = Math.max(0, Math.min(1, (ph.t - stagger) / (1 - stagger)));
+                const eu = easeInCubic(t);
+                amount = eu;
+                alpha = (1 - eu) * 0.95;
+                scale = 1 - eu * 0.5;
+              }
+
+              // 글자가 가운데로 끌려가는 방향 — 인덱스가 center보다 작으면 오른쪽으로, 크면 왼쪽으로
+              const direction = i < center ? 1 : -1;
+              const compressDist = (distFromCenter * 60 + 20) * amount;
+              const dx = direction * compressDist;
+              // 살짝 위로 압축됐다가 자리잡으며 내려옴
+              const dy = amount * 4;
+              return { dx, dy, alpha, scale };
+            };
           } else { // "breathe" 기본 (79용)
             // 흐릿한 안개에서 나타남 → 일제히 호흡 → 다시 안개로
             wavePerChar = (i, total) => {
@@ -2911,20 +2948,31 @@
     const root = document.getElementById("reveal-root");
 
     /* ─────────────────────────────────────────────
-       인스턴스 좌표 & 모션 매핑 (9개 reveal)
+       인스턴스 좌표 & 모션 매핑 (10개 reveal)
        ─────────────────────────────────────────────
-       3×3 격자에서 약간씩 어긋난 비대칭 배치 (수평/수직 일렬 회피).
+       4-3-3 비대칭 배치 (수평/수직 일렬 회피).
        leftPct/topPct: 화면 좌상단 기준 백분율 (CSS 좌표).
 
-       위쪽 줄 :  04 (8, 8)        05 (38, 12)       79 (68, 8)
-       중간 줄 :  06 (12, 36)      09 (42, 38)       07 (75, 35)
-       아래 줄 :  10 (18, 64)      08 (50, 65)       28 (78, 62)
+       위쪽 줄 :  03 (8, 8)    04 (32, 12)   05 (56, 8)    79 (80, 14)
+       중간 줄 :  06 (14, 38)  09 (44, 36)   07 (75, 40)
+       아래 줄 :  10 (18, 64)  08 (50, 65)   28 (78, 62)
 
-       각 reveal에 9가지 다른 sentence 모션 1:1 매핑 (한눈에 다름).
+       각 reveal에 다른 sentence 모션 + outroMode 매핑 (한눈에 다름).
        ───────────────────────────────────────────── */
 
-    const inst04 = createRevealInstance({
+    const inst03 = createRevealInstance({
       leftPct: 8, topPct: 8, size: REVEAL_SIZE,
+      sheetRow: 4,
+      name: "03",
+      framesCount: 1,
+      holdSentence: true,
+      holdSentenceStyle: "unfold",     // 가운데 압축 → 펼쳐지며 자리잡음
+      outroMode: "decay",              // 4단계 형상 순환
+      root,
+    });
+
+    const inst04 = createRevealInstance({
+      leftPct: 32, topPct: 12, size: REVEAL_SIZE,
       sheetRow: 5,
       name: "04",
       framesCount: 1,
@@ -2935,7 +2983,7 @@
     });
 
     const inst05 = createRevealInstance({
-      leftPct: 38, topPct: 12, size: REVEAL_SIZE,
+      leftPct: 56, topPct: 8, size: REVEAL_SIZE,
       sheetRow: 6,
       name: "05",
       framesCount: 1,
@@ -2946,7 +2994,7 @@
     });
 
     const inst79 = createRevealInstance({
-      leftPct: 68, topPct: 8, size: REVEAL_SIZE,
+      leftPct: 80, topPct: 14, size: REVEAL_SIZE,
       sheetRow: 80,
       name: "79",
       framesCount: 1,
@@ -2957,7 +3005,7 @@
     });
 
     const inst06 = createRevealInstance({
-      leftPct: 12, topPct: 36, size: REVEAL_SIZE,
+      leftPct: 14, topPct: 38, size: REVEAL_SIZE,
       sheetRow: 7,
       name: "06",
       framesCount: 1,
@@ -2968,7 +3016,7 @@
     });
 
     const inst09 = createRevealInstance({
-      leftPct: 42, topPct: 38, size: REVEAL_SIZE,
+      leftPct: 44, topPct: 36, size: REVEAL_SIZE,
       sheetRow: 10,
       name: "09",
       framesCount: 1,
@@ -2979,7 +3027,7 @@
     });
 
     const inst07 = createRevealInstance({
-      leftPct: 75, topPct: 35, size: REVEAL_SIZE,
+      leftPct: 75, topPct: 40, size: REVEAL_SIZE,
       sheetRow: 8,
       name: "07",
       framesCount: 1,
@@ -3026,6 +3074,7 @@
     // sheetRow ↔ 기본 이미지 파일 매핑 (시트 비어있을 때 폴백)
     // 패턴: 파일번호 + 1 = sheetRow
     const allInstances = [
+      { inst: inst03, row: 4,  fallback: "03.png" },
       { inst: inst04, row: 5,  fallback: "04.png" },
       { inst: inst05, row: 6,  fallback: "05.png" },
       { inst: inst06, row: 7,  fallback: "06.png" },
@@ -3461,6 +3510,7 @@
     function applyFallbackAll() {
       // 시트 연결 안 됐을 때 임시 텍스트
       const fallbackTexts = {
+        "03": "Words come first, then a vague after-image. The picture I want never quite arrives.",
         "04": "I am told a face is unforgettable, yet I cannot summon it. The name remains.",
         "05": "Pieces of memory arrive out of order, like letters scattered then gathered.",
         "06": "I close my eyes and the room is gone — there is no picture, only the knowing of where things are.",
