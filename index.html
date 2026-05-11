@@ -449,9 +449,15 @@
             showExpandedPanel(data.filename, data.text, e.clientX, e.clientY);
             return;
           }
-          activeHoldInstance = inst;
-          inst.startHold();
-          return;
+          // 사진이 충분히 드러난 상태일 때만 hold 시작 가능
+          // 안 드러난 상태면 일반 드래그(panning)로 fall through
+          if (inst.isRevealed && inst.isRevealed()) {
+            activeHoldInstance = inst;
+            inst.startHold();
+            return;
+          }
+          // 사진이 아직 안 드러난 → hold 안 하고 panning으로 fall through
+          break;
         }
       }
 
@@ -7070,6 +7076,24 @@
         return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
       }
 
+      // 사진이 충분히 드러났는지 검사 — trail에 충분한 페인트가 쌓였는지 (이미지 영역 안)
+      // 트레일 점은 imgArea 좌표 (sx, sy로 변환된 값)에 저장됨
+      // 즉, 0 <= x <= size, 0 <= y <= size 안에 있는 alive 트레일 점들 카운트
+      function isRevealed() {
+        if (!trail || trail.length === 0) return false;
+        // pigment 종류의 alive 점 (트레일 메인 도장)을 카운트
+        // 너무 많은 점이 살아 있으면 사진이 드러난 것
+        let aliveCount = 0;
+        for (let i = 0; i < trail.length; i++) {
+          const p = trail[i];
+          if (p.age < p.maxAge * 0.85) {  // 거의 사라지지 않은 점
+            aliveCount++;
+            if (aliveCount >= 15) return true;  // 임계값 15
+          }
+        }
+        return false;
+      }
+
       let expandImageFile = "";
       let expandText = "";
       function setExpandData(filename, text) {
@@ -7438,6 +7462,7 @@
         setText,
         getText: () => fullText,
         isInside,
+        isRevealed,
         startHold,
         stopHold,
         expandable,
