@@ -55,7 +55,10 @@
     }
     #reveal-root {
       position: absolute;
-      inset: 0;
+      left: 0;
+      top: 0;
+      width: 12000px;
+      height: 7000px;
       pointer-events: none;
     }
 
@@ -366,10 +369,12 @@
        상태값
        ───────────────────────────────────────────── */
     let distance = 100;
-    // [임시] 가상공간 좌표 시스템은 비활성화 — 이전처럼 화면 좌상단 기준 px 사용
-    // 80개 이미지가 다 채워지면 시트 기반 좌표로 다시 활성화 예정
-    let posX = 0;
-    let posY = 0;
+    // 가상공간 시작 위치: (6000, 6500) — 데이터 영역 중앙 아래쪽
+    // (이 좌표가 화면 중앙에 오도록 posX/posY 초기화)
+    const START_WORLD_X = 6000;
+    const START_WORLD_Y = 6500;
+    let posX = window.innerWidth / 2 - START_WORLD_X;
+    let posY = window.innerHeight / 2 - START_WORLD_Y;
 
     const numDistance = document.getElementById("num-distance");
     const numPosX     = document.getElementById("num-pos-x");
@@ -3005,7 +3010,7 @@
         holdSentenceStyle: "unfold",
         outroMode: "decay",
         // 시트가 없을 때 임시 위치 (px)
-        fallbackLeftPx: 115,  fallbackTopPx: 72,
+        fallbackLeftPx: 800,  fallbackTopPx: 600,
       },
       {
         name: "04", sheetRow: 5, fallback: "04.png",
@@ -3013,7 +3018,7 @@
         holdSentence: true,
         holdSentenceStyle: "typewriter",
         outroMode: "coordinates",
-        fallbackLeftPx: 461,  fallbackTopPx: 108,
+        fallbackLeftPx: 3200, fallbackTopPx: 1200,
       },
       {
         name: "05", sheetRow: 6, fallback: "05.png",
@@ -3021,7 +3026,7 @@
         holdSentence: true,
         holdSentenceStyle: "assemble",
         outroMode: "outline",
-        fallbackLeftPx: 806,  fallbackTopPx: 72,
+        fallbackLeftPx: 5600, fallbackTopPx: 800,
       },
       {
         name: "79", sheetRow: 80, fallback: "79.png",
@@ -3029,7 +3034,7 @@
         holdSentence: true,
         holdSentenceStyle: "breathe",
         outroMode: "volume",
-        fallbackLeftPx: 1152, fallbackTopPx: 126,
+        fallbackLeftPx: 8000, fallbackTopPx: 1400,
       },
       {
         name: "06", sheetRow: 7, fallback: "06.png",
@@ -3037,7 +3042,7 @@
         holdSentence: true,
         holdSentenceStyle: "cascade",
         outroMode: "ripple",
-        fallbackLeftPx: 202,  fallbackTopPx: 342,
+        fallbackLeftPx: 1400, fallbackTopPx: 3800,
       },
       {
         name: "09", sheetRow: 10, fallback: "09.png",
@@ -3045,7 +3050,7 @@
         holdSentence: true,
         holdSentenceStyle: "flicker",
         outroMode: "gravity",
-        fallbackLeftPx: 634,  fallbackTopPx: 324,
+        fallbackLeftPx: 4400, fallbackTopPx: 3600,
       },
       {
         name: "07", sheetRow: 8, fallback: "07.png",
@@ -3053,7 +3058,7 @@
         holdSentence: true,
         holdSentenceStyle: "swirl",
         outroMode: "decay",
-        fallbackLeftPx: 1080, fallbackTopPx: 360,
+        fallbackLeftPx: 7500, fallbackTopPx: 4000,
       },
       {
         name: "10", sheetRow: 11, fallback: "10.png",
@@ -3061,7 +3066,7 @@
         holdSentence: true,
         holdSentenceStyle: "slide",
         outroMode: "ripple",
-        fallbackLeftPx: 259,  fallbackTopPx: 576,
+        fallbackLeftPx: 1800, fallbackTopPx: 6400,
       },
       {
         name: "08", sheetRow: 9, fallback: "08.png",
@@ -3069,7 +3074,7 @@
         holdSentence: true,
         holdSentenceStyle: "materialize",
         outroMode: "volume",
-        fallbackLeftPx: 720,  fallbackTopPx: 585,
+        fallbackLeftPx: 5000, fallbackTopPx: 6500,
       },
       {
         name: "28", sheetRow: 29, fallback: "28.png",
@@ -3078,7 +3083,7 @@
         holdSentence: true,
         holdSentenceStyle: "tumble",
         outroMode: "residue",
-        fallbackLeftPx: 1123, fallbackTopPx: 558,
+        fallbackLeftPx: 7800, fallbackTopPx: 6200,
       },
     ];
 
@@ -3205,10 +3210,6 @@
         });
         instanceByName[cfg.name] = inst;
         allInstances.push({ inst, row: cfg.sheetRow, fallback: cfg.fallback });
-        // 궤적 콜백 등록 (캡처 시 텍스트 누적용)
-        if (inst.setOnInfluenceEnter && typeof recordTrajectory === "function") {
-          inst.setOnInfluenceEnter(recordTrajectory);
-        }
       });
     }
 
@@ -3399,8 +3400,11 @@
       console.info(`[trajectory] entered ${inst.name}, total ${trajectory.length}`);
     }
 
-    // 콜백 등록은 buildInstances 안에서 인스턴스 생성과 함께 처리됨
-    // (이 시점엔 인스턴스가 아직 안 만들어졌으므로 빈 루프)
+    for (const inst of revealInstances) {
+      if (inst.setOnInfluenceEnter) {
+        inst.setOnInfluenceEnter(recordTrajectory);
+      }
+    }
 
     setInterval(() => {
       let anyIn = false;
@@ -3664,11 +3668,11 @@
         })
         .then(text => {
           const rows = parseCSV(text);
-          // [임시] 시트 기반 좌표 계산 비활성화 — 80개 다 채워질 때까지 fallback 좌표 사용
-          // const positions = computePositionsFromSheet(rows);
-          // buildInstances(positions);
-          buildInstances({});  // 빈 객체 → 모두 fallbackLeftPx/topPx 사용
-          // 텍스트와 이미지만 시트에서 적용
+          // 1) 시트의 작성일자/시간으로 좌표 계산
+          const positions = computePositionsFromSheet(rows);
+          // 2) 계산된 위치로 인스턴스 생성
+          buildInstances(positions);
+          // 3) 텍스트와 이미지 적용
           applyRowsToInstances(rows);
         })
         .catch(err => {
