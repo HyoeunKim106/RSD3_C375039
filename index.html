@@ -55,10 +55,7 @@
     }
     #reveal-root {
       position: absolute;
-      left: 0;
-      top: 0;
-      width: 12000px;
-      height: 7000px;
+      inset: 0;
       pointer-events: none;
     }
 
@@ -369,12 +366,10 @@
        상태값
        ───────────────────────────────────────────── */
     let distance = 100;
-    // 가상공간 시작 위치: (6000, 6500) — 데이터 영역 중앙 아래쪽
-    // (이 좌표가 화면 중앙에 오도록 posX/posY 초기화)
-    const START_WORLD_X = 6000;
-    const START_WORLD_Y = 6500;
-    let posX = window.innerWidth / 2 - START_WORLD_X;
-    let posY = window.innerHeight / 2 - START_WORLD_Y;
+    // [임시] 가상공간 좌표 시스템은 비활성화 — 이전처럼 화면 좌상단 기준 px 사용
+    // 80개 이미지가 다 채워지면 시트 기반 좌표로 다시 활성화 예정
+    let posX = 0;
+    let posY = 0;
 
     const numDistance = document.getElementById("num-distance");
     const numPosX     = document.getElementById("num-pos-x");
@@ -3010,7 +3005,7 @@
         holdSentenceStyle: "unfold",
         outroMode: "decay",
         // 시트가 없을 때 임시 위치 (px)
-        fallbackLeftPx: 800,  fallbackTopPx: 600,
+        fallbackLeftPx: 115,  fallbackTopPx: 72,
       },
       {
         name: "04", sheetRow: 5, fallback: "04.png",
@@ -3018,7 +3013,7 @@
         holdSentence: true,
         holdSentenceStyle: "typewriter",
         outroMode: "coordinates",
-        fallbackLeftPx: 3200, fallbackTopPx: 1200,
+        fallbackLeftPx: 461,  fallbackTopPx: 108,
       },
       {
         name: "05", sheetRow: 6, fallback: "05.png",
@@ -3026,7 +3021,7 @@
         holdSentence: true,
         holdSentenceStyle: "assemble",
         outroMode: "outline",
-        fallbackLeftPx: 5600, fallbackTopPx: 800,
+        fallbackLeftPx: 806,  fallbackTopPx: 72,
       },
       {
         name: "79", sheetRow: 80, fallback: "79.png",
@@ -3034,7 +3029,7 @@
         holdSentence: true,
         holdSentenceStyle: "breathe",
         outroMode: "volume",
-        fallbackLeftPx: 8000, fallbackTopPx: 1400,
+        fallbackLeftPx: 1152, fallbackTopPx: 126,
       },
       {
         name: "06", sheetRow: 7, fallback: "06.png",
@@ -3042,7 +3037,7 @@
         holdSentence: true,
         holdSentenceStyle: "cascade",
         outroMode: "ripple",
-        fallbackLeftPx: 1400, fallbackTopPx: 3800,
+        fallbackLeftPx: 202,  fallbackTopPx: 342,
       },
       {
         name: "09", sheetRow: 10, fallback: "09.png",
@@ -3050,7 +3045,7 @@
         holdSentence: true,
         holdSentenceStyle: "flicker",
         outroMode: "gravity",
-        fallbackLeftPx: 4400, fallbackTopPx: 3600,
+        fallbackLeftPx: 634,  fallbackTopPx: 324,
       },
       {
         name: "07", sheetRow: 8, fallback: "07.png",
@@ -3058,7 +3053,7 @@
         holdSentence: true,
         holdSentenceStyle: "swirl",
         outroMode: "decay",
-        fallbackLeftPx: 7500, fallbackTopPx: 4000,
+        fallbackLeftPx: 1080, fallbackTopPx: 360,
       },
       {
         name: "10", sheetRow: 11, fallback: "10.png",
@@ -3066,7 +3061,7 @@
         holdSentence: true,
         holdSentenceStyle: "slide",
         outroMode: "ripple",
-        fallbackLeftPx: 1800, fallbackTopPx: 6400,
+        fallbackLeftPx: 259,  fallbackTopPx: 576,
       },
       {
         name: "08", sheetRow: 9, fallback: "08.png",
@@ -3074,7 +3069,7 @@
         holdSentence: true,
         holdSentenceStyle: "materialize",
         outroMode: "volume",
-        fallbackLeftPx: 5000, fallbackTopPx: 6500,
+        fallbackLeftPx: 720,  fallbackTopPx: 585,
       },
       {
         name: "28", sheetRow: 29, fallback: "28.png",
@@ -3083,7 +3078,7 @@
         holdSentence: true,
         holdSentenceStyle: "tumble",
         outroMode: "residue",
-        fallbackLeftPx: 7800, fallbackTopPx: 6200,
+        fallbackLeftPx: 1123, fallbackTopPx: 558,
       },
     ];
 
@@ -3668,11 +3663,11 @@
         })
         .then(text => {
           const rows = parseCSV(text);
-          // 1) 시트의 작성일자/시간으로 좌표 계산
-          const positions = computePositionsFromSheet(rows);
-          // 2) 계산된 위치로 인스턴스 생성
-          buildInstances(positions);
-          // 3) 텍스트와 이미지 적용
+          // [임시] 시트 기반 좌표 계산 비활성화 — 80개 다 채워질 때까지 fallback 좌표 사용
+          // const positions = computePositionsFromSheet(rows);
+          // buildInstances(positions);
+          buildInstances({});  // 빈 객체 → 모두 fallbackLeftPx/topPx 사용
+          // 텍스트와 이미지만 시트에서 적용
           applyRowsToInstances(rows);
         })
         .catch(err => {
