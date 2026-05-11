@@ -2224,14 +2224,14 @@
           const posInSeg = Math.floor(i / 4);
           const totalPerSeg = Math.ceil(total / 4);
           const t = totalPerSeg > 1 ? posInSeg / (totalPerSeg - 1) : 0.5;
-          const W = 60, H = 30;
+          const W = 90, H = 50;
           let bx, by;
           if (segment === 0) { bx = -W/2 + t * W; by = -H/2; }
           else if (segment === 1) { bx = W/2; by = -H/2 + t * H; }
           else if (segment === 2) { bx = W/2 - t * W; by = H/2; }
           else { bx = -W/2; by = H/2 - t * H; }
-          const tremX = Math.sin(elapsed * 0.5 + i * 0.3) * 0.5;
-          const tremY = Math.cos(elapsed * 0.45 + i * 0.25) * 0.5;
+          const tremX = Math.sin(elapsed * 0.5 + i * 0.3) * 0.7;
+          const tremY = Math.cos(elapsed * 0.45 + i * 0.25) * 0.7;
           const alpha = introEased * (0.70 + Math.sin(elapsed * 0.3 + i * 0.2) * 0.10);
           const off = applyIntroOffset(g, introT);
           writeGlyph(g, bx + tremX + off.ox, by + tremY + off.oy, alpha, 0, 0.95);
@@ -2376,7 +2376,8 @@
           const vectorAngle = seed(i, 12.9) * Math.PI * 2 + elapsed * 0.04;
           const flowPhase = elapsed * 0.5 + i * 0.4;
           const flow = (Math.sin(flowPhase) + 1) / 2;
-          const dist = 12 + flow * 8;
+          const baseDist = 28 + seed(i, 47.1) * 22;
+          const dist = baseDist + flow * 12;
           const x = Math.cos(vectorAngle) * dist;
           const y = Math.sin(vectorAngle) * dist * 0.6;
           const rot = vectorAngle * 0.1;
@@ -2483,13 +2484,13 @@
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
           const myDelay = i * 0.08;
-          const tailHeadX = Math.sin((elapsed - myDelay) * 0.25) * 30;
-          const tailHeadY = Math.cos((elapsed - myDelay) * 0.22) * 15;
-          const stringX = -((total - 1) / 2 - i) * 5;
+          const tailHeadX = Math.sin((elapsed - myDelay) * 0.25) * 45;
+          const tailHeadY = Math.cos((elapsed - myDelay) * 0.22) * 25;
+          const stringX = -((total - 1) / 2 - i) * 6;
           const stretchT = (Math.sin(elapsed * 0.18) + 1) / 2;
           const stretch = 0.85 + stretchT * 0.3;
           const x = tailHeadX + stringX * stretch;
-          const y = tailHeadY + (i - (total - 1) / 2) * 0.4;
+          const y = tailHeadY + (i - (total - 1) / 2) * 0.6;
           const alpha = introEased * (0.70 + Math.sin(elapsed * 0.4 + i * 0.2) * 0.08);
           const off = applyIntroOffset(g, introT);
           writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, 0.94);
@@ -2508,15 +2509,12 @@
         const total = decayGlyphs.length;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          // 글자를 3개 축에 분배 (가로 3개 라인)
-          const axis = i % 3;
-          const axisY = (axis - 1) * 12;  // -12, 0, 12
-          // 각 축에서 일부 글자만 또렷, 일부는 거의 사라짐
-          const posInAxis = Math.floor(i / 3);
-          const totalPerAxis = Math.ceil(total / 3);
-          // 축 위에서 균등 분포지만 일부 인덱스만 표시
-          const isFilled = (posInAxis % 3 !== 2);  // 1/3은 비어있음
-          const axisX = (posInAxis - (totalPerAxis - 1) / 2) * 10;
+          const axis = i % 5;
+          const axisY = (axis - 2) * 14;
+          const posInAxis = Math.floor(i / 5);
+          const totalPerAxis = Math.ceil(total / 5);
+          const isFilled = (posInAxis % 3 !== 2);
+          const axisX = (posInAxis - (totalPerAxis - 1) / 2) * 13;
           const breath = Math.sin(elapsed * 0.3 + i * 0.4) * 0.6;
           const alpha = introEased * (isFilled ? 0.78 : 0.15) + breath * 0.05;
           const off = applyIntroOffset(g, introT);
@@ -3056,21 +3054,21 @@
         const introT = Math.min(1, elapsed / 1.5);
         const introEased = 1 - Math.pow(1 - introT, 3);
         const total = decayGlyphs.length;
-        // 5글자씩 한 항목
         const perItem = 5;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
           const item = Math.floor(i / perItem);
           const posInItem = i % perItem;
           const totalItems = Math.ceil(total / perItem);
-          // 체크된 항목: 시간에 따라 위에서 아래로 진행
-          const checkProgress = (elapsed * 0.2) % (totalItems + 1);
+          const colItems = Math.ceil(totalItems / 2);
+          const myCol = item < colItems ? 0 : 1;
+          const myColItem = item - myCol * colItems;
+          const colX = myCol === 0 ? -30 : 12;
+          const x = colX + posInItem * 8;
+          const y = (myColItem - (colItems - 1) / 2) * 11;
+          const checkProgress = (elapsed * 0.25) % totalItems;
           const isChecked = item < checkProgress;
           const isCurrent = Math.floor(checkProgress) === item;
-          // 좌측 정렬
-          const x = -25 + posInItem * 8;
-          const y = (item - (totalItems - 1) / 2) * 10;
-          // 체크 표시 (현재 항목은 점멸)
           const checkBlink = isCurrent ? (Math.sin(elapsed * 4) + 1) / 2 : 0;
           const alpha = introEased * (isChecked ? 0.85 : 0.45) + checkBlink * 0.15;
           const scale = isChecked ? 0.95 : 0.90;
@@ -3224,21 +3222,18 @@
         const introT = Math.min(1, elapsed / 1.5);
         const introEased = 1 - Math.pow(1 - introT, 3);
         const total = decayGlyphs.length;
-        // 5글자씩 한 로그 항목
-        const perLog = 5;
+        const perLog = 7;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
           const logIdx = Math.floor(i / perLog);
           const posInLog = i % perLog;
           const totalLogs = Math.ceil(total / perLog);
-          // 좌측 정렬, 위에서 아래로 누적
-          const x = -28 + posInLog * 8;
-          const y = (logIdx - (totalLogs - 1) / 2) * 9;
-          // 새 로그 등장 시 잠깐 점멸 후 고정
+          const indent = (logIdx % 2) * 8;
+          const x = -32 + indent + posInLog * 9;
+          const y = (logIdx - (totalLogs - 1) / 2) * 11;
           const logBirth = (elapsed * 0.4) % totalLogs;
           const isNew = Math.floor(logBirth) === logIdx;
           const newBlink = isNew ? Math.sin(elapsed * 8) * 0.15 : 0;
-          // 입력 완료된 항목은 정적
           const alpha = introEased * (0.74 + newBlink);
           const off = applyIntroOffset(g, introT);
           writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, 0.92);
@@ -3253,16 +3248,13 @@
         const total = decayGlyphs.length;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          // 글자별 입출력 사이클 (인덱스마다 다른 위상)
           const ioPhase = elapsed * 0.5 + i * 0.4;
-          const outside = Math.max(0, Math.sin(ioPhase) - 0.5) / 0.5;  // 50% 정도만 밖에
-          // 중앙 저장 위치: 작은 영역 안
+          const outside = Math.max(0, Math.sin(ioPhase) - 0.5) / 0.5;
           const storeAngle = (i / total) * Math.PI * 2;
-          const storeX = Math.cos(storeAngle) * 8;
-          const storeY = Math.sin(storeAngle) * 5;
-          // 밖으로 나갈 때 위치
-          const outX = storeX * 3;
-          const outY = storeY * 3;
+          const storeX = Math.cos(storeAngle) * 14;
+          const storeY = Math.sin(storeAngle) * 10;
+          const outX = storeX * 3.5;
+          const outY = storeY * 3.5;
           const x = storeX + (outX - storeX) * outside;
           const y = storeY + (outY - storeY) * outside;
           const alpha = introEased * (0.60 + outside * 0.25);
@@ -3280,23 +3272,25 @@
         const total = decayGlyphs.length;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          // 회로 위치: ㄷ자 경로
           const myT = i / Math.max(1, total - 1);
           let x, y;
-          if (myT < 0.33) {
-            // 위 가로
-            x = (myT * 3 - 0.5) * 60;
-            y = -18;
-          } else if (myT < 0.66) {
-            // 우측 세로
-            x = 30;
-            y = ((myT - 0.33) * 3 - 0.5) * 36;
+          if (myT < 0.25) {
+            const t = myT * 4;
+            x = (t - 0.5) * 80;
+            y = -25;
+          } else if (myT < 0.50) {
+            const t = (myT - 0.25) * 4;
+            x = 40;
+            y = -25 + t * 50;
+          } else if (myT < 0.75) {
+            const t = (myT - 0.50) * 4;
+            x = 40 - t * 80;
+            y = 25;
           } else {
-            // 아래 가로
-            x = 30 - ((myT - 0.66) * 3) * 60;
-            y = 18;
+            const t = (myT - 0.75) * 4;
+            x = -40;
+            y = 25 - t * 50;
           }
-          // 신호 흐름: 한 글자씩 차례로 점등
           const signalPos = (elapsed * 0.4) % 1;
           const dist = Math.abs(myT - signalPos);
           const onSignal = Math.exp(-dist * dist * 50);
@@ -3370,20 +3364,16 @@
         const total = decayGlyphs.length;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          // 글자별 다른 위상으로 빠르게 위치 재배치
           const rePhase = elapsed * 0.8 + i * 0.3;
-          // 위치가 0.5초마다 새로 결정됨 (Math.floor)
           const slot = Math.floor(rePhase) + i;
-          const slotX = (slot * 17.3 % 60) - 30;
-          const slotY = (slot * 11.7 % 36) - 18;
-          // 상태: 활성/대기/처리 (인덱스 % 3)
+          const slotX = (slot * 17.3 % 90) - 45;
+          const slotY = (slot * 11.7 % 52) - 26;
           const state = (i + Math.floor(elapsed * 0.6)) % 3;
           const stateAlpha = state === 0 ? 0.85 : (state === 1 ? 0.40 : 0.65);
-          // 부드럽게 보간 (다음 slot으로)
           const fract = rePhase - Math.floor(rePhase);
           const nextSlot = slot + 1;
-          const nextX = (nextSlot * 17.3 % 60) - 30;
-          const nextY = (nextSlot * 11.7 % 36) - 18;
+          const nextX = (nextSlot * 17.3 % 90) - 45;
+          const nextY = (nextSlot * 11.7 % 52) - 26;
           const x = slotX + (nextX - slotX) * easeInOut(fract);
           const y = slotY + (nextY - slotY) * easeInOut(fract);
           const alpha = introEased * stateAlpha;
@@ -3664,28 +3654,23 @@
         const total = decayGlyphs.length;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          // 큐브의 8개 꼭짓점 + 추가 꼭짓점들 (인덱스 기반 deterministic)
           const cubeCorners = [
             [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
             [-1, -1, 1],  [1, -1, 1],  [1, 1, 1],  [-1, 1, 1],
           ];
           const cornerIdx = i % 8;
-          const layer = Math.floor(i / 8);  // 추가 큐브 레이어
-          const cx3 = cubeCorners[cornerIdx][0] * (25 - layer * 4);
-          const cy3 = cubeCorners[cornerIdx][1] * (15 - layer * 2);
-          const cz3 = cubeCorners[cornerIdx][2] * (15 - layer * 2);
-          // 시점 회전 (yaw + 약간의 pitch)
+          const layer = Math.floor(i / 8);
+          const cx3 = cubeCorners[cornerIdx][0] * (40 - layer * 5);
+          const cy3 = cubeCorners[cornerIdx][1] * (28 - layer * 3);
+          const cz3 = cubeCorners[cornerIdx][2] * (28 - layer * 3);
           const yaw = elapsed * 0.15;
           const pitch = Math.sin(elapsed * 0.08) * 0.2;
-          // yaw 회전
           const rx = cx3 * Math.cos(yaw) + cz3 * Math.sin(yaw);
           const rz = -cx3 * Math.sin(yaw) + cz3 * Math.cos(yaw);
-          // pitch 회전
           const ry = cy3 * Math.cos(pitch) - rz * Math.sin(pitch);
           const finalZ = cy3 * Math.sin(pitch) + rz * Math.cos(pitch);
-          // 깊이 기반 alpha/scale
-          const depthScale = 0.7 + finalZ / 40 + 0.3;
-          const alpha = introEased * (0.40 + Math.max(0, finalZ / 25) * 0.35);
+          const depthScale = 0.7 + finalZ / 50 + 0.3;
+          const alpha = introEased * (0.40 + Math.max(0, finalZ / 30) * 0.35);
           const off = applyIntroOffset(g, introT);
           writeGlyph(g, rx + off.ox, ry + off.oy, alpha, 0, Math.max(0.6, depthScale));
         }
@@ -3859,25 +3844,19 @@
         const total = decayGlyphs.length;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          // 글자를 4개 흐름 그룹에 분배
           const group = i % 4;
-          // 각 그룹별 다른 방향
           const groupAngles = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
           const angle = groupAngles[group] + Math.sin(elapsed * 0.2 + group) * 0.3;
-          // 글자가 자기 방향으로 천천히 떠다님 (수렴-분산)
           const flowPhase = elapsed * 0.5 + i * 0.3;
-          const flow = (Math.sin(flowPhase) + 1) / 2;  // 0~1
-          // 그룹 내 위치
+          const flow = (Math.sin(flowPhase) + 1) / 2;
           const posInGroup = Math.floor(i / 4);
-          const groupCenterDist = 8 + posInGroup * 3;
+          const groupCenterDist = 18 + posInGroup * 6;
           const baseX = Math.cos(angle) * groupCenterDist;
           const baseY = Math.sin(angle) * groupCenterDist * 0.7;
-          // 방향으로 추진
-          const driveX = Math.cos(angle) * flow * 6;
-          const driveY = Math.sin(angle) * flow * 4;
+          const driveX = Math.cos(angle) * flow * 14;
+          const driveY = Math.sin(angle) * flow * 10;
           const x = baseX + driveX;
           const y = baseY + driveY;
-          // 화살표 기울기
           const rot = angle * 0.15;
           const alpha = introEased * (0.65 + flow * 0.20);
           const scale = 0.92 + flow * 0.05;
@@ -3892,7 +3871,6 @@
         const introT = Math.min(1, elapsed / 1.5);
         const introEased = 1 - Math.pow(1 - introT, 3);
         const total = decayGlyphs.length;
-        // 두 주기 겹친 간격 변화 (불규칙)
         const spreadA = (Math.sin(elapsed * 0.3) + 1) / 2;
         const spreadB = (Math.sin(elapsed * 0.5 + 1.3) + 1) / 2;
         const spreadFactor = spreadA * 0.6 + spreadB * 0.4;
@@ -3900,17 +3878,12 @@
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
           const fromCenter = i - center;
-          // 글자 사이 간격 — 변화하는 spread
-          const baseSpacing = 6 + spreadFactor * 6;
-          const x = fromCenter * baseSpacing / Math.max(1, center) * 4;
-          // 글자별로 위/아래 살짝 — 눈금 인상
-          const tickY = (i % 3 - 1) * 4;
-          // 눈금처럼 짧게 떨림
-          const tickPhase = elapsed * 0.5 + i * 0.3;
-          const tick = Math.sin(tickPhase) * 0.5;
+          const x = fromCenter * (8 + spreadFactor * 6);
+          const tickRow = i % 3;
+          const tickY = (tickRow - 1) * 18 + Math.sin(elapsed * 0.5 + i * 0.3) * 1.5;
           const alpha = introEased * 0.75;
           const off = applyIntroOffset(g, introT);
-          writeGlyph(g, x + off.ox, tickY + tick + off.oy, alpha, 0, 0.93);
+          writeGlyph(g, x + off.ox, tickY + off.oy, alpha, 0, 0.93);
         }
       }
 
@@ -3920,19 +3893,16 @@
         const introT = Math.min(1, elapsed / 1.5);
         const introEased = 1 - Math.pow(1 - introT, 3);
         const total = decayGlyphs.length;
-        // 글자가 원형 분포 (3개 동심원)
         const sweepAngle = (elapsed * 0.8) % (Math.PI * 2);
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          const ring = i % 3;  // 0=가까운, 1=중간, 2=먼
-          const radius = 12 + ring * 9;
+          const ring = i % 4;
+          const radius = 15 + ring * 10;
           const angle = (i / total) * Math.PI * 2;
           const x = Math.cos(angle) * radius;
-          const y = Math.sin(angle) * radius * 0.55;
-          // 스캔 라인과의 각도 차
+          const y = Math.sin(angle) * radius * 0.6;
           let angleDiff = Math.abs(angle - sweepAngle);
           if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
-          // 스캔 통과 시 잠깐 점등
           const onScan = Math.exp(-angleDiff * angleDiff * 12);
           const alpha = introEased * (0.30 + onScan * 0.55);
           const scale = 0.88 + onScan * 0.12;
@@ -3985,13 +3955,10 @@
         const total = decayGlyphs.length;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          // 글자별 다른 위상으로 큰 원 경로
           const myDelay = i * 0.15;
           const pathPhase = (elapsed - myDelay) * 0.4;
-          // 8자 경로 (Lissajous)
-          const x = Math.sin(pathPhase) * 28;
-          const y = Math.sin(pathPhase * 2) * 14;
-          // 잔상: 알파를 시간에 따라 조금씩 변화
+          const x = Math.sin(pathPhase) * 45;
+          const y = Math.sin(pathPhase * 2) * 25;
           const trailFade = Math.max(0, Math.min(1, (elapsed - myDelay) * 0.3));
           const alpha = introEased * (0.40 + trailFade * 0.35);
           const off = applyIntroOffset(g, introT);
@@ -4030,19 +3997,16 @@
         const total = decayGlyphs.length;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          // 4개 "방" 영역
           const room = i % 4;
           const posInRoom = Math.floor(i / 4);
-          const roomBaseX = [-25, 25, 25, -25][room];
-          const roomBaseY = [-12, -12, 12, 12][room];
-          // 방 안 위치 (작은 그리드)
+          const roomBaseX = [-40, 40, 40, -40][room];
+          const roomBaseY = [-22, -22, 22, 22][room];
           const innerCol = posInRoom % 3;
           const innerRow = Math.floor(posInRoom / 3);
-          const innerX = (innerCol - 1) * 6;
-          const innerY = (innerRow - 1) * 5;
-          // 미세 떨림
-          const tremX = Math.sin(elapsed * 0.4 + i * 0.3) * 0.5;
-          const tremY = Math.cos(elapsed * 0.35 + i * 0.25) * 0.5;
+          const innerX = (innerCol - 1) * 8;
+          const innerY = (innerRow - 1) * 7;
+          const tremX = Math.sin(elapsed * 0.4 + i * 0.3) * 0.6;
+          const tremY = Math.cos(elapsed * 0.35 + i * 0.25) * 0.6;
           const alpha = introEased * 0.72;
           const off = applyIntroOffset(g, introT);
           writeGlyph(g, roomBaseX + innerX + tremX + off.ox, roomBaseY + innerY + tremY + off.oy, alpha, 0, 0.90);
@@ -4188,10 +4152,8 @@
         const total = decayGlyphs.length;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          // 글자별 base 위치 (deterministic)
           const baseAngle = seed(i, 12.9) * Math.PI * 2;
-          const baseR = 12 + seed(i, 78.2) * 22;
-          // 시간에 따라 R/angle이 느리게 변화 — 관계가 재편됨
+          const baseR = 18 + seed(i, 78.2) * 32;
           const radiusT = (Math.sin(elapsed * 0.2 + i * 0.3) + 1) / 2;
           const angleShift = Math.sin(elapsed * 0.15 + i * 0.4) * 0.4;
           const r = baseR * (0.85 + radiusT * 0.25);
@@ -4322,21 +4284,18 @@
         const introT = Math.min(1, elapsed / 1.5);
         const introEased = 1 - Math.pow(1 - introT, 3);
         const total = decayGlyphs.length;
-        // 전체 나침반이 천천히 회전
         const compassAngle = Math.sin(elapsed * 0.15) * 0.5;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          // 글자별 나침반 위 각도 (균등 분포)
           const myAngle = (i / total) * Math.PI * 2 + compassAngle;
-          const r = 20 + (i % 3) * 5;
+          const ring = i % 3;
+          const r = 18 + ring * 12;
           const x = Math.cos(myAngle) * r;
-          const y = Math.sin(myAngle) * r * 0.55;
-          // 정렬 후 잠깐 흔들림 (방향 탐색)
+          const y = Math.sin(myAngle) * r * 0.65;
           const settle = (Math.sin(elapsed * 0.4 + i * 0.5) + 1) / 2;
           const wobble = (1 - settle) * 0.8;
           const tremX = Math.sin(elapsed * 1.5 + i) * wobble;
           const tremY = Math.cos(elapsed * 1.3 + i) * wobble;
-          // 글자가 자기 방향 가리킴 (회전)
           const rot = myAngle * 0.1;
           const alpha = introEased * (0.65 + settle * 0.15);
           const off = applyIntroOffset(g, introT);
@@ -4350,36 +4309,29 @@
         const introT = Math.min(1, elapsed / 1.5);
         const introEased = 1 - Math.pow(1 - introT, 3);
         const total = decayGlyphs.length;
+        const hubAngles = [-Math.PI / 2, Math.PI / 6, Math.PI * 5 / 6];
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          // 처음 3개는 허브, 나머지는 주변 노드
           if (i < 3) {
-            // 허브: 중앙 삼각형 위치
-            const hubAngles = [-Math.PI / 2, Math.PI / 6, Math.PI * 5 / 6];
-            const x = Math.cos(hubAngles[i]) * 18;
-            const y = Math.sin(hubAngles[i]) * 12;
+            const x = Math.cos(hubAngles[i]) * 30;
+            const y = Math.sin(hubAngles[i]) * 22;
             const alpha = introEased * 0.92;
             const off = applyIntroOffset(g, introT);
             writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, 1.10);
           } else {
-            // 주변 노드: 가장 가까운 허브 주변
             const myHub = (i - 3) % 3;
-            const hubAngles = [-Math.PI / 2, Math.PI / 6, Math.PI * 5 / 6];
-            const hubX = Math.cos(hubAngles[myHub]) * 18;
-            const hubY = Math.sin(hubAngles[myHub]) * 12;
-            // 허브 주위에 분포
+            const hubX = Math.cos(hubAngles[myHub]) * 30;
+            const hubY = Math.sin(hubAngles[myHub]) * 22;
             const nodeIdx = Math.floor((i - 3) / 3);
             const nodeAngle = nodeIdx * 0.8 + elapsed * 0.05;
-            const nodeR = 12 + nodeIdx * 2;
+            const nodeR = 20 + nodeIdx * 4;
             const x = hubX + Math.cos(nodeAngle) * nodeR;
             const y = hubY + Math.sin(nodeAngle) * nodeR * 0.6;
-            // 가끔 관계 재편 (다른 허브로 살짝 끌림)
             const swapPhase = elapsed * 0.2 + i * 0.3;
             const swap = Math.max(0, Math.sin(swapPhase) - 0.7) / 0.3;
             const alpha = introEased * (0.55 + swap * 0.20);
-            const scale = 0.85;
             const off = applyIntroOffset(g, introT);
-            writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, scale);
+            writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, 0.85);
           }
         }
       }
@@ -4393,16 +4345,12 @@
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
           const myT = total > 1 ? i / (total - 1) : 0.5;
-          // 가로 일렬 + sin 곡면
-          const x = (myT - 0.5) * 80;
-          // 두 주기 합쳐서 굴곡진 곡면
-          const surfaceA = Math.sin(myT * Math.PI * 2 + elapsed * 0.3) * 8;
-          const surfaceB = Math.sin(myT * Math.PI * 4 + elapsed * 0.2) * 4;
+          const x = (myT - 0.5) * 100;
+          const surfaceA = Math.sin(myT * Math.PI * 2 + elapsed * 0.3) * 14;
+          const surfaceB = Math.sin(myT * Math.PI * 4 + elapsed * 0.2) * 8;
           const y = surfaceA + surfaceB;
-          // 압축/이완: 글자 간격 곡선
           const compress = 0.8 + Math.sin(myT * Math.PI * 2 + elapsed * 0.25) * 0.2;
           const adjustedX = x * compress;
-          // 굴곡 따라 글자 미세 회전 (표면 노멀)
           const rot = Math.cos(myT * Math.PI * 2 + elapsed * 0.3) * 0.08;
           const alpha = introEased * 0.75;
           const off = applyIntroOffset(g, introT);
@@ -4418,30 +4366,26 @@
         const total = decayGlyphs.length;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          // 1/3은 "기준값" (정적), 2/3은 "변화값" (재시뮬레이션)
           const isFixed = i % 3 === 0;
           if (isFixed) {
-            // 기준 노드: 사각 그리드, 정적
             const idx = Math.floor(i / 3);
-            const cols = 5;
+            const cols = 6;
             const col = idx % cols;
             const row = Math.floor(idx / cols);
-            const x = (col - (cols - 1) / 2) * 10;
-            const y = (row - 1) * 9;
-            const breath = Math.sin(elapsed * 0.3 + i * 0.2) * 0.2;
+            const x = (col - (cols - 1) / 2) * 13;
+            const y = (row - 1) * 12;
+            const breath = Math.sin(elapsed * 0.3 + i * 0.2) * 0.3;
             const alpha = introEased * 0.78;
             const off = applyIntroOffset(g, introT);
             writeGlyph(g, x + off.ox, y + breath + off.oy, alpha, 0, 0.96);
           } else {
-            // 변화 노드: 시뮬레이션 — 위치가 계속 갱신
             const simPhase = elapsed * 0.5 + i * 0.3;
             const cyclePos = Math.floor(simPhase);
             const fract = simPhase - cyclePos;
-            // 글자가 새 위치로 보간
-            const targetX = ((cyclePos * 17 + i * 23) % 50) - 25;
-            const targetY = ((cyclePos * 11 + i * 13) % 28) - 14;
-            const nextX = (((cyclePos + 1) * 17 + i * 23) % 50) - 25;
-            const nextY = (((cyclePos + 1) * 11 + i * 13) % 28) - 14;
+            const targetX = ((cyclePos * 17 + i * 23) % 70) - 35;
+            const targetY = ((cyclePos * 11 + i * 13) % 40) - 20;
+            const nextX = (((cyclePos + 1) * 17 + i * 23) % 70) - 35;
+            const nextY = (((cyclePos + 1) * 11 + i * 13) % 40) - 20;
             const x = targetX + (nextX - targetX) * easeInOut(fract);
             const y = targetY + (nextY - targetY) * easeInOut(fract);
             const alpha = introEased * (0.55 + Math.sin(simPhase * 2) * 0.10);
