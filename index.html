@@ -25,13 +25,6 @@
       font-style: normal;
       font-display: swap;
     }
-    @font-face {
-      font-family: 'VivaldiCustom';
-      src: url('./assets/vivaldi.ttf') format('truetype');
-      font-weight: 400;
-      font-style: normal;
-      font-display: swap;
-    }
 
     /* ───────── 공통 색상 변수 ───────── */
     :root {
@@ -163,8 +156,8 @@
     }
     .reveal-text-content {
       padding: 14px 16px;
-      font-family: 'VivaldiCustom';
-      font-size: 16px;
+      font-family: 'Vicentino';
+      font-size: 14px;
       line-height: 1.55;
       color: var(--ink);
       white-space: pre-wrap;
@@ -212,8 +205,8 @@
       position: absolute;
       left: 0;
       top:  0;
-      font-family: 'VivaldiCustom';
-      font-size: 16px;
+      font-family: 'Vicentino';
+      font-size: 14px;
       line-height: 1;
       color: var(--ink-outro);
       white-space: pre;
@@ -242,8 +235,8 @@
       position: absolute;
       left: 0;
       top:  0;
-      font-family: 'VivaldiCustom';
-      font-size: 16px;
+      font-family: 'Vicentino';
+      font-size: 14px;
       line-height: 1;
       color: var(--ink-outro);
       white-space: pre;
@@ -270,8 +263,8 @@
       position: absolute;
       left: 0;
       top:  0;
-      font-family: 'VivaldiCustom';
-      font-size: 16px;
+      font-family: 'Vicentino';
+      font-size: 14px;
       line-height: 1;
       color: var(--ink-outro);
       white-space: pre;
@@ -359,8 +352,8 @@
 
     .expanded-panel-text {
       padding: 12px 18px 50px 18px;
-      font-family: 'VivaldiCustom';
-      font-size: 16px;
+      font-family: 'Vicentino';
+      font-size: 14px;
       line-height: 1.7;
       color: var(--ink-deep);
       white-space: pre-wrap;
@@ -4849,8 +4842,8 @@
         sentTempCtx.imageSmoothingEnabled = true;
         sentTempCtx.imageSmoothingQuality = "high";
 
-        const FONT_PX = 17;
-        const LINE_HEIGHT = FONT_PX * 1.15;
+        const FONT_PX = 15;
+        const LINE_HEIGHT = FONT_PX * 1.55;
         const MAX_WIDTH = size - 40;
         const cx = size / 2;
         const cyBase = size / 2;
@@ -6970,7 +6963,7 @@
           sentenceCtx.translate(cx + swayX, cyBase + y);
           sentenceCtx.scale(scale, scale);
           sentenceCtx.fillStyle = INK_HOLD;
-          sentenceCtx.font = `${FONT_PX}px VivaldiCustom`;
+          sentenceCtx.font = `${FONT_PX}px Vicentino`;
           sentenceCtx.textBaseline = "middle";
           drawWrappedTextPerChar(
             sentenceCtx, b.text, 0, 0,
@@ -6989,7 +6982,7 @@
           sentTempCtx.translate(cx + swayX, cyBase + y);
           sentTempCtx.scale(scale, scale);
           sentTempCtx.fillStyle = "#ffffff";
-          sentTempCtx.font = `${FONT_PX}px VivaldiCustom`;
+          sentTempCtx.font = `${FONT_PX}px Vicentino`;
           sentTempCtx.textBaseline = "middle";
           drawWrappedTextPerChar(
             sentTempCtx, b.text, 0, 0,
@@ -7993,9 +7986,8 @@
       // 캡처 전에 사용할 모든 폰트가 로드되었는지 보장 (캔버스에 그릴 때 fallback 방지)
       try {
         await Promise.all([
-          document.fonts.load("16px VivaldiCustom"),
+          document.fonts.load("14px Vicentino"),
           document.fonts.load("15px CelestiaAntiqua"),
-          document.fonts.load("16px Vicentino"),
         ]);
       } catch (e) {
         console.warn("[capture] font load failed:", e);
@@ -8063,12 +8055,12 @@
       // 궤적 텍스트 → reveal/글리프/HUD 순으로 그림 (캔버스 = viewport)
       octx.globalCompositeOperation = "source-over";
 
-      // 궤적 따라 흐르는 텍스트 — Vivaldi
+      // 궤적 따라 흐르는 텍스트 — Vicentino
       // 폰트는 화면에서 보이는 그대로의 크기(14px)로 고정 → 줌아웃해도 작아지지 않음
       if (pendingText && pathPts.length >= 2) {
-        const fontPx = 16;
+        const fontPx = 14;
         if (fontPx >= 4) {
-          octx.font = `${fontPx}px VivaldiCustom`;
+          octx.font = `${fontPx}px Vicentino`;
           octx.textBaseline = "middle";
           octx.textAlign = "left";
           octx.fillStyle = INK_OUTRO;  // 캡처 시 궤적 텍스트 컬러: #00cc9b
@@ -8153,13 +8145,13 @@
         } catch (e) {}
       }
 
-      // 동적 글리프들 — Vivaldi (volume/decay/ripple 모션)
+      // 동적 글리프들 — Vicentino (volume/decay/ripple 모션)
       // 폰트는 화면에서 보이는 14px 그대로 (줌 무관)
       const glyphs = document.querySelectorAll(
         ".text-volume-glyph, .text-decay-glyph, .text-ripple-glyph"
       );
-      const glyphFontPx = 16;
-      octx.font = `${glyphFontPx}px VivaldiCustom`;
+      const glyphFontPx = 14;
+      octx.font = `${glyphFontPx}px Vicentino`;
       octx.textBaseline = "top";
       for (const g of glyphs) {
         const r = g.getBoundingClientRect();
@@ -8177,11 +8169,11 @@
       }
       octx.globalAlpha = 1;
 
-      // reveal-text-content (흰 배경 박스) — Vivaldi, 일반 모드
+      // reveal-text-content (흰 배경 박스) — Vicentino, 일반 모드
       // 폰트와 패딩은 화면 px 그대로 (14, 16) — 줌 무관
       const textBlocks = document.querySelectorAll(".reveal-text-content");
-      const textBoxFontPx = 16;
-      octx.font = `${textBoxFontPx}px VivaldiCustom`;
+      const textBoxFontPx = 14;
+      octx.font = `${textBoxFontPx}px Vicentino`;
       octx.fillStyle = INK_COLOR;
       for (const tb of textBlocks) {
         const txt = tb.textContent;
