@@ -101,6 +101,7 @@
       text-transform: uppercase;
     }
     .hud .row { display: block; }
+    .hud .row-position { color: var(--ink-outro); }
 
     /* ───────── Reveal Image ───────── */
     .reveal {
@@ -355,7 +356,7 @@
 
   <div class="hud" id="hud">
     <span class="row">DISTANCE <span class="num" id="num-distance">100%</span></span>
-    <span class="row">POSITION X:<span class="num after-colon" id="num-pos-x">000</span> Y:<span class="num after-colon" id="num-pos-y">000</span></span>
+    <span class="row row-position">POSITION X:<span class="num after-colon" id="num-pos-x">000</span> Y:<span class="num after-colon" id="num-pos-y">000</span></span>
   </div>
 
   <button id="capture-btn" type="button" aria-label="Capture trajectory"></button>
@@ -3084,6 +3085,28 @@
         outroMode: "residue",
         fallbackLeftPx: 7800, fallbackTopPx: 6200,
       },
+      // ── 추가 인스턴스: 01, 02, 11~27 (19개) ──
+      // 시트의 작성일자/시간이 있으면 자동 배치되고, 없으면 아래 fallback grid로 분산.
+      // sheetRow는 파일명 숫자 + 1 (헤더 행 보정). 모션은 일단 모두 동일 ("breathe" + "decay").
+      { name: "01", sheetRow: 2,  fallback: "01.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 1200,  fallbackTopPx: 1400 },
+      { name: "02", sheetRow: 3,  fallback: "02.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 2400,  fallbackTopPx: 2000 },
+      { name: "11", sheetRow: 12, fallback: "11.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 3600,  fallbackTopPx: 2600 },
+      { name: "12", sheetRow: 13, fallback: "12.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 4800,  fallbackTopPx: 1800 },
+      { name: "13", sheetRow: 14, fallback: "13.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 6000,  fallbackTopPx: 2400 },
+      { name: "14", sheetRow: 15, fallback: "14.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 7200,  fallbackTopPx: 1600 },
+      { name: "15", sheetRow: 16, fallback: "15.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 8400,  fallbackTopPx: 2200 },
+      { name: "16", sheetRow: 17, fallback: "16.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 9600,  fallbackTopPx: 2800 },
+      { name: "17", sheetRow: 18, fallback: "17.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 10500, fallbackTopPx: 1500 },
+      { name: "18", sheetRow: 19, fallback: "18.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 2000,  fallbackTopPx: 3400 },
+      { name: "19", sheetRow: 20, fallback: "19.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 3200,  fallbackTopPx: 4400 },
+      { name: "20", sheetRow: 21, fallback: "20.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 5800,  fallbackTopPx: 4200 },
+      { name: "21", sheetRow: 22, fallback: "21.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 6800,  fallbackTopPx: 4600 },
+      { name: "22", sheetRow: 23, fallback: "22.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 8800,  fallbackTopPx: 4400 },
+      { name: "23", sheetRow: 24, fallback: "23.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 10000, fallbackTopPx: 3800 },
+      { name: "24", sheetRow: 25, fallback: "24.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 1200,  fallbackTopPx: 5400 },
+      { name: "25", sheetRow: 26, fallback: "25.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 3400,  fallbackTopPx: 5800 },
+      { name: "26", sheetRow: 27, fallback: "26.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 6400,  fallbackTopPx: 5800 },
+      { name: "27", sheetRow: 28, fallback: "27.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 9400,  fallbackTopPx: 5600 },
     ];
 
     // 시드 기반 deterministic random (rowIndex로 일관된 jitter)
@@ -3568,7 +3591,7 @@
           octx.font = `${fontPx}px Vicentino`;
           octx.textBaseline = "middle";
           octx.textAlign = "left";
-          octx.fillStyle = INK_DEEP;
+          octx.fillStyle = INK_OUTRO;  // 캡처 시 궤적 텍스트 컬러: #00cc9b
 
           // sampleAt: 캔버스 좌표계로 반환 (worldToCanvas 사용)
           function sampleAt(s) {
@@ -3706,13 +3729,15 @@
       }
 
       // HUD — CelestiaAntiqua (캔버스 좌하단에 고정 배치)
+      //   DISTANCE 행은 #776c54, POSITION 행은 #00cc9b
       const hudEl = document.getElementById("hud");
       octx.font = "15px CelestiaAntiqua";
-      octx.fillStyle = INK_COLOR;
       const lines = hudEl.innerText.split("\n");
       let hy = canvasH - 14 - (lines.length - 1) * 18 - 4;
       for (const ln of lines) {
-        octx.fillText(ln.toUpperCase(), 16, hy);
+        const upper = ln.toUpperCase();
+        octx.fillStyle = upper.startsWith("POSITION") ? INK_OUTRO : INK_COLOR;
+        octx.fillText(upper, 16, hy);
         hy += 18;
       }
 
@@ -3757,6 +3782,8 @@
     function applyFallbackAll() {
       // 시트 연결 안 됐을 때: fallback 위치로 인스턴스 생성 + 임시 텍스트
       const fallbackTexts = {
+        "01": "Memory comes as a knowing, not an image. The fact of it is enough.",
+        "02": "I remember the weight of the chair, the slant of the room — never the colors.",
         "03": "Words come first, then a vague after-image. The picture I want never quite arrives.",
         "04": "I am told a face is unforgettable, yet I cannot summon it. The name remains.",
         "05": "Pieces of memory arrive out of order, like letters scattered then gathered.",
@@ -3765,6 +3792,23 @@
         "08": "Childhood comes back as facts, never as scenes. I lived it but cannot revisit.",
         "09": "Memory ripples back like water — the image dissolves, returns, and dissolves again.",
         "10": "What others see as pictures, I hold as descriptions: outline, weight, and quiet certainty.",
+        "11": "Faces dissolve the moment they leave the room. I know who I love by the trace they leave behind.",
+        "12": "Dreams arrive as feelings without scenery. I wake remembering the temperature, not the place.",
+        "13": "When I read, no scene appears. The words are themselves the place I am in.",
+        "14": "I cannot picture my mother's hands, but I know exactly how they moved.",
+        "15": "Counting sheep was always a riddle to me. There were no sheep, only the word.",
+        "16": "Grief without images is a soft, steady thing. Nothing flashes; nothing returns.",
+        "17": "I navigate by map, not by memory of streets. The path is a list, not a view.",
+        "18": "When I miss someone, I miss the idea of them — the shape of their attention.",
+        "19": "Photographs surprise me. They show me what I lived but cannot replay.",
+        "20": "I dream in narration. A voice tells me what is happening, and I believe it.",
+        "21": "The past is filed, not screened. I open the folder, but there is no film.",
+        "22": "My imagination is a list of properties. The apple is red, round, slightly heavy.",
+        "23": "When I close my eyes the world does not vanish. It simply ceases to be looked at.",
+        "24": "I trust the inventory of memory more than its pictures, because pictures were never given.",
+        "25": "What I remember is the order of things, the sequence, the before and after.",
+        "26": "Sometimes I wonder if everyone is pretending to see, and only I am telling the truth.",
+        "27": "Loss arrives as absence, not as the missing face. There is nothing to picture being gone.",
         "28": "Without the ability to see the lost loved one or relive times with them, they do tend fade from mind quicker.",
         "79": "I can imagine an apple in front of me. I know where the skin is. I know how big it is. I can't see it.",
       };
