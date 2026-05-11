@@ -3309,6 +3309,1035 @@
               return { alpha, scale };
             };
           }
+          // ─────────────────────────────────────────────
+          // 31.png ~ 50.png: SDAM 기억 정리 방법 20가지 (한국어 낱자 단위)
+          // ─────────────────────────────────────────────
+          else if (holdSentenceStyle === "coords-confirm") {
+            // 31. 좌표로 위치 확인 — 글자가 좌표점처럼, 미세하게 자리를 찾아 이동
+            wavePerChar = (i, total) => {
+              // 글자별 정확 좌표를 향한 미세 이동 (좌표 보정)
+              const targetX = seed(i, 12.9) * 4 - 2;  // -2 ~ 2 px의 좌표 보정값
+              const targetY = seed(i, 78.2) * 4 - 2;
+              // 사이클 안에서 글자가 좌표를 찾음 (한 글자씩 시간차)
+              const myDelay = (i / Math.max(1, total)) * 0.4;
+              const localT = Math.max(0, Math.min(1, (cycleT - myDelay) / 0.4));
+              const confirm = easeInOut(localT);
+              const dx = targetX * confirm + Math.sin(sec * 0.5 + i * 0.4) * 0.4;
+              const dy = targetY * confirm + Math.cos(sec * 0.4 + i * 0.3) * 0.4;
+              // 좌표 확정된 글자는 alpha 0.95, 미확정 글자는 0.65
+              const alpha = 0.65 + confirm * 0.30;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "fit-frame") {
+            // 32. 틀에 맞춰 짜 넣기 — 어긋남 → 딱딱 맞춰 들어감 → 다시 어긋남
+            wavePerChar = (i, total) => {
+              // 사이클: 어긋남(35%) → 정렬(30%) → 유지(20%) → 다시 어긋남(15%)
+              let fit;
+              if (cycleT < 0.35) fit = 0;
+              else if (cycleT < 0.65) fit = easeInOut((cycleT - 0.35) / 0.30);
+              else if (cycleT < 0.85) fit = 1;
+              else fit = 1 - easeInOut((cycleT - 0.85) / 0.15);
+              // 어긋난 상태: 글자별 랜덤 오프셋
+              const offX = (seed(i, 31.4) - 0.5) * 8;
+              const offY = (seed(i, 67.3) - 0.5) * 5;
+              const dx = offX * (1 - fit);
+              const dy = offY * (1 - fit);
+              // 틀에 맞춰지면 살짝 위로 정렬 (그리드 라인 인상)
+              const scale = 1 + fit * 0.02;
+              const alpha = 0.72 + fit * 0.20;
+              return { dx, dy, scale, alpha };
+            };
+          } else if (holdSentenceStyle === "folders") {
+            // 33. 폴더별로 정리하기 — 글자가 그룹별로 묶여 폴더 안에
+            wavePerChar = (i, total) => {
+              // 4글자씩 한 그룹 (폴더)
+              const folderIdx = Math.floor(i / 4);
+              const posInFolder = i % 4;
+              const folderCount = Math.ceil(total / 4);
+              // 폴더 별 위치 — 가로로 늘어선 폴더들
+              const folderX = (folderIdx - (folderCount - 1) / 2) * 60;
+              const folderY = posInFolder * 4 - 6;  // 폴더 안에서 한 줄에 4글자 stacking
+              let toFolder;
+              if (cycleT < 0.20) toFolder = 0;
+              else if (cycleT < 0.45) toFolder = easeInOut((cycleT - 0.20) / 0.25);
+              else if (cycleT < 0.75) toFolder = 1;
+              else toFolder = 1 - easeInOut((cycleT - 0.75) / 0.25);
+              const dx = folderX * toFolder;
+              const dy = folderY * toFolder;
+              const alpha = 0.75 + Math.sin(sec * 0.5 + i * 0.2) * 0.10;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "answer-key") {
+            // 34. 정답지만 보고 알기 — 일부만 정답처럼 빠르게 선명, 나머지는 흐릿
+            wavePerChar = (i, total) => {
+              // 정답 인덱스: 1.8초마다 다른 글자가 "정답" 처리됨
+              const answerPhase = Math.floor(sec / 1.8);
+              // 매 페이즈마다 어떤 인덱스가 정답인지 (총 글자의 1/4)
+              const myIsAnswer = ((i * 3 + answerPhase * 7) % total) < (total / 4);
+              // 정답 글자: 페이즈 시작 직후 강하게 점멸, 페이드
+              const phaseT = (sec / 1.8) % 1;
+              let intensity;
+              if (myIsAnswer && phaseT < 0.3) {
+                intensity = Math.sin(phaseT / 0.3 * Math.PI);  // 0→1→0
+              } else {
+                intensity = 0;
+              }
+              const alpha = 0.30 + intensity * 0.65 + (myIsAnswer ? 0.10 : 0);
+              const scale = 1 + intensity * 0.10;
+              return { alpha, scale };
+            };
+          } else if (holdSentenceStyle === "integrate") {
+            // 35. 지식으로 통합하기 — 흩어진 조각 → 안정된 덩어리로 모임
+            wavePerChar = (i, total) => {
+              // 시작 위치: 글자별 흩어짐
+              const scatterX = (seed(i, 31.4) - 0.5) * 70;
+              const scatterY = (seed(i, 67.3) - 0.5) * 40;
+              // 사이클: 흩어짐(20%) → 통합 과정(50%) → 안정(20%) → 다시 흩어짐 직전(10%)
+              let integrated;
+              if (cycleT < 0.20) integrated = 0;
+              else if (cycleT < 0.70) integrated = easeInOut((cycleT - 0.20) / 0.50);
+              else if (cycleT < 0.90) integrated = 1;
+              else integrated = 1 - easeInOut((cycleT - 0.90) / 0.10);
+              const dx = scatterX * (1 - integrated);
+              const dy = scatterY * (1 - integrated);
+              const alpha = 0.50 + integrated * 0.42;
+              const scale = 0.90 + integrated * 0.10;
+              return { dx, dy, alpha, scale };
+            };
+          } else if (holdSentenceStyle === "route-map") {
+            // 36. 지도로 경로 파악 — 글자가 길의 노드/구간처럼 배치
+            wavePerChar = (i, total) => {
+              // 짝수 인덱스: 노드(원래 위치 유지, 또렷), 홀수: 길의 중간(살짝 위/아래로 휘어짐)
+              const isNode = i % 2 === 0;
+              // 사이클: 문장(25%) → 지도(50%) → 다시 문장(25%)
+              let toMap;
+              if (cycleT < 0.20) toMap = easeInOut(cycleT / 0.20);
+              else if (cycleT < 0.75) toMap = 1;
+              else toMap = 1 - easeInOut((cycleT - 0.75) / 0.25);
+              // 비노드는 길의 굽이로 위아래 살짝 휨
+              const bendY = isNode ? 0 : (i % 4 === 1 ? -10 : 10);
+              const dy = bendY * toMap + Math.sin(sec * 0.4 + i * 0.2) * 0.3;
+              const scale = isNode ? (1 + toMap * 0.06) : (1 - toMap * 0.06);
+              const alpha = isNode ? 0.90 : 0.72;
+              return { dy, scale, alpha };
+            };
+          } else if (holdSentenceStyle === "clues") {
+            // 37. 힌트 보고 길 찾기 — 힌트 글자 먼저 → 주변으로 확산
+            wavePerChar = (i, total) => {
+              // 힌트 인덱스: 5글자마다 한 글자
+              const clueStep = 5;
+              const isClue = i % clueStep === 0;
+              const nearestClue = Math.floor(i / clueStep) * clueStep;
+              const distFromClue = Math.abs(i - nearestClue);
+              // 사이클: 힌트만 보임(15%) → 주변 확산(45%) → 모두 보임(30%) → 페이드(10%)
+              let visible;
+              if (cycleT < 0.15) {
+                visible = isClue ? 1 : 0;
+              } else if (cycleT < 0.60) {
+                // 힌트에서 가까운 글자부터 차례로 켜짐
+                const local = (cycleT - 0.15) / 0.45;
+                visible = local * clueStep > distFromClue ? 1 : (local * clueStep > distFromClue - 0.5 ? 0.5 : 0);
+              } else if (cycleT < 0.90) {
+                visible = 1;
+              } else {
+                visible = 1 - (cycleT - 0.90) / 0.10;
+              }
+              const alpha = 0.15 + visible * 0.80;
+              const scale = isClue ? (1 + Math.sin(sec * 0.8 + i * 0.2) * 0.04) : 1;
+              return { alpha, scale };
+            };
+          } else if (holdSentenceStyle === "filter-facts") {
+            // 38. 사실 위주로 거르기 — 감정 글자 흐려지고, 사실 글자만 또렷
+            wavePerChar = (i, total) => {
+              // 감정/사실 분류: 인덱스 % 3
+              const isFact = (i % 3) !== 0;  // 2/3은 사실
+              // 사이클: 모두 보임(20%) → 흔들림+섞임(20%) → 필터링(30%) → 사실만(30%)
+              let filterT;
+              if (cycleT < 0.20) filterT = 0;
+              else if (cycleT < 0.40) {
+                filterT = (cycleT - 0.20) / 0.20;
+                // 흔들림 단계
+                const wobbleAmt = filterT;
+                const dx = Math.sin(sec * 4 + i) * 2 * wobbleAmt;
+                const dy = Math.cos(sec * 3.5 + i) * 1.5 * wobbleAmt;
+                return { dx, dy, alpha: 0.78 - filterT * 0.2 };
+              }
+              else if (cycleT < 0.70) filterT = (cycleT - 0.40) / 0.30 + 1;  // 1~2: 필터링 진행
+              else filterT = 2;  // 사실만 남음
+              const inFilter = Math.min(1, filterT);
+              const removed = Math.max(0, filterT - 1);
+              const alpha = isFact ? (0.78 + removed * 0.15) : (0.78 - removed * 0.65);
+              const scale = isFact ? (1 + removed * 0.04) : (1 - removed * 0.20);
+              return { alpha, scale };
+            };
+          } else if (holdSentenceStyle === "report") {
+            // 39. 상태 보고서 작성 — 보고서 양식처럼 줄/항목 배치
+            wavePerChar = (i, total) => {
+              // 보고서 레이아웃: 4글자씩 한 행, 행마다 들여쓰기 다르게
+              const row = Math.floor(i / 4);
+              const col = i % 4;
+              const isHeader = row === 0;
+              const reportX = col * 16 - 24;  // 4글자가 가로로 늘어섬
+              const reportY = row * 12 - (Math.ceil(total / 4) - 1) * 6;
+              const indent = isHeader ? 0 : 6;  // 헤더 외에는 들여쓰기
+              let toReport;
+              if (cycleT < 0.25) toReport = easeInOut(cycleT / 0.25);
+              else if (cycleT < 0.75) toReport = 1;
+              else toReport = 1 - easeInOut((cycleT - 0.75) / 0.25);
+              const dx = (reportX + indent) * toReport;
+              const dy = reportY * toReport;
+              const alpha = 0.75 + (isHeader ? 0.10 : 0);
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "read-line") {
+            // 40. 글로 읽고 이해하기 — 좌→우 읽기 스캔, 읽힌 글자가 잠시 또렷
+            wavePerChar = (i, total) => {
+              // 글자별 읽기 시간
+              const myReadTime = total > 0 ? i / total : 0;
+              // 한 사이클에 두 번 읽힘 (왕복 아니고 다시 좌→우)
+              const readT = (sec * 0.45) % 1;  // 0~1 진행, 약 2.2초 주기
+              const dist = readT - myReadTime;
+              let intensity;
+              if (dist >= 0 && dist < 0.10) {
+                // 막 읽힌 직후 — 또렷
+                intensity = 1 - dist / 0.10;
+              } else if (dist >= 0.10 && dist < 0.30) {
+                // 점차 흐려짐
+                intensity = 0;
+              } else {
+                intensity = 0;
+              }
+              const alpha = 0.45 + intensity * 0.50;
+              const scale = 1 + intensity * 0.06;
+              const dy = -intensity * 0.8;
+              return { dy, alpha, scale };
+            };
+          } else if (holdSentenceStyle === "vague-locate") {
+            // 41. 희미하게 위치 잡기 — 글자들이 흐릿하게 흔들리며 대략 위치만 잡음
+            wavePerChar = (i, total) => {
+              // 글자들이 본 위치 주변을 계속 떠다님 — 절대 고정되지 않음
+              const dx = Math.sin(sec * 0.6 + i * 0.4) * 2.2 + Math.cos(sec * 0.35 + i * 0.7) * 1.4;
+              const dy = Math.cos(sec * 0.55 + i * 0.3) * 1.8 + Math.sin(sec * 0.4 + i * 0.5) * 1.2;
+              // alpha도 미세하게 호흡 — 흐릿한 인상
+              const alpha = 0.55 + Math.sin(sec * 0.8 + i * 0.3) * 0.12;
+              const scale = 0.95 + Math.sin(sec * 0.45 + i * 0.2) * 0.03;
+              return { dx, dy, alpha, scale };
+            };
+          } else if (holdSentenceStyle === "mesh") {
+            // 42. 그물망처럼 연결 — 글자들이 빽빽한 그물처럼 짝지어 진동
+            wavePerChar = (i, total) => {
+              // 글자별 다른 위상으로 sin 진동 — 그물의 매듭처럼 동시 진동
+              const phase = i * 0.7;
+              // 사이클: 문장(20%) → 망(60%) → 문장(20%)
+              let toMesh;
+              if (cycleT < 0.20) toMesh = easeInOut(cycleT / 0.20);
+              else if (cycleT < 0.80) toMesh = 1;
+              else toMesh = 1 - easeInOut((cycleT - 0.80) / 0.20);
+              // 그물의 매듭처럼 글자가 위/아래로 분기 (인접 글자끼리 반대 방향)
+              const branchY = (i % 2 === 0 ? -1 : 1) * 6 * toMesh;
+              // 미세 진동
+              const meshX = Math.sin(sec * 1.1 + phase) * 1.0 * toMesh;
+              const meshY = Math.cos(sec * 1.0 + phase) * 0.8 * toMesh;
+              const dx = meshX;
+              const dy = branchY + meshY;
+              const alpha = 0.78 + Math.sin(sec * 0.7 + i * 0.2) * 0.08;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "output-only") {
+            // 43. 결과물만 저장하기 — 중간 과정 빠르게 사라지고 최종만 남음
+            wavePerChar = (i, total) => {
+              // 사이클: 빠른 움직임(40%) → 페이드(10%) → 최종 결과 또렷(40%) → 페이드(10%)
+              let stage;
+              if (cycleT < 0.40) stage = "process";
+              else if (cycleT < 0.50) stage = "fading";
+              else if (cycleT < 0.90) stage = "output";
+              else stage = "preReset";
+
+              let dx = 0, dy = 0, alpha = 0, scale = 1;
+              if (stage === "process") {
+                // 빠르고 산만한 움직임 (글자가 휙휙)
+                dx = Math.sin(sec * 5 + i * 0.8) * 8;
+                dy = Math.cos(sec * 4.5 + i * 0.7) * 5;
+                alpha = 0.30 + Math.sin(sec * 7 + i) * 0.15;
+                scale = 0.95;
+              } else if (stage === "fading") {
+                // 중간 과정 빠르게 사라짐
+                const t = (cycleT - 0.40) / 0.10;
+                dx = Math.sin(sec * 5 + i * 0.8) * 8 * (1 - t);
+                dy = Math.cos(sec * 4.5 + i * 0.7) * 5 * (1 - t);
+                alpha = 0.30 - t * 0.20;
+              } else if (stage === "output") {
+                // 결과만 또렷
+                const t = (cycleT - 0.50) / 0.40;
+                const reveal = Math.min(1, t * 4);
+                alpha = 0.10 + reveal * 0.85;
+                scale = 0.92 + reveal * 0.08;
+              } else {
+                const t = (cycleT - 0.90) / 0.10;
+                alpha = 0.95 - t * 0.85;
+              }
+              return { dx, dy, alpha, scale };
+            };
+          } else if (holdSentenceStyle === "ask-around") {
+            // 44. 주변에 물어보기 — 글자들이 주변으로 흩어졌다 다시 모임
+            wavePerChar = (i, total) => {
+              // 글자별 바깥 방향 (위/아래/좌/우 중 랜덤)
+              const angle = seed(i, 12.9) * Math.PI * 2;
+              const dist = 25 + seed(i, 78.2) * 15;
+              const outX = Math.cos(angle) * dist;
+              const outY = Math.sin(angle) * dist;
+              // 사이클: 모임(25%) → 밖으로(25%) → 확인(25%) → 다시 모임(25%)
+              let outward;
+              if (cycleT < 0.25) outward = 0;
+              else if (cycleT < 0.45) outward = easeInOut((cycleT - 0.25) / 0.20);
+              else if (cycleT < 0.70) outward = 1;
+              else outward = 1 - easeInOut((cycleT - 0.70) / 0.30);
+              const dx = outX * outward;
+              const dy = outY * outward;
+              // 바깥에 있을 땐 살짝 작아짐 + 알파 감소 (외부 메아리 느낌)
+              const scale = 1 - outward * 0.15;
+              const alpha = 0.85 - outward * 0.25;
+              return { dx, dy, alpha, scale };
+            };
+          } else if (holdSentenceStyle === "puzzle") {
+            // 45. 수수께끼 풀듯 추측 — 글자가 퍼즐처럼 자리 찾기, 시도+망설임
+            wavePerChar = (i, total) => {
+              // 글자별 자리 찾기 도착 시간 (다른 시간차)
+              const myDelay = seed(i, 31.4) * 0.5;
+              const localT = Math.max(0, Math.min(1, (cycleT - myDelay) / (1 - myDelay)));
+              // 자리 잡기 전: 흔들리며 망설임
+              // localT 0~0.7: 흔들림, 0.7~0.9: 도착, 0.9~1: 정착
+              let dx, dy, alpha, scale;
+              if (localT < 0.7) {
+                // 망설임 — 위치가 계속 바뀜
+                const tryX = Math.sin(sec * 2.5 + i * 1.7) * 6 + Math.sin(sec * 0.7 + i * 0.3) * 8;
+                const tryY = Math.cos(sec * 2.3 + i * 1.5) * 4 + Math.cos(sec * 0.6 + i * 0.4) * 5;
+                dx = tryX;
+                dy = tryY;
+                alpha = 0.50 + Math.sin(sec * 3 + i) * 0.15;
+                scale = 0.95;
+              } else if (localT < 0.9) {
+                // 자리에 다가감
+                const t = (localT - 0.7) / 0.2;
+                const e = 1 - Math.pow(1 - t, 2);
+                const tryX = Math.sin(sec * 2.5 + i * 1.7) * 6 * (1 - e);
+                const tryY = Math.cos(sec * 2.3 + i * 1.5) * 4 * (1 - e);
+                dx = tryX;
+                dy = tryY;
+                alpha = 0.65 + e * 0.25;
+                scale = 0.95 + e * 0.05;
+              } else {
+                // 정착
+                dx = Math.sin(sec * 0.5 + i * 0.2) * 0.3;
+                dy = Math.cos(sec * 0.4 + i * 0.2) * 0.3;
+                alpha = 0.90;
+                scale = 1;
+              }
+              return { dx, dy, alpha, scale };
+            };
+          } else if (holdSentenceStyle === "fragments") {
+            // 46. 강렬한 조각 남기기 — 일부만 강하게 번쩍, 나머지 약함
+            wavePerChar = (i, total) => {
+              // "강렬한" 인덱스: 1.5초마다 다른 글자가 선택됨
+              const flashPhase = Math.floor(sec / 1.5);
+              const myFlash = ((i * 5 + flashPhase * 11) % total) < (total / 5);
+              const phaseT = (sec / 1.5) % 1;
+              let intensity = 0;
+              if (myFlash) {
+                if (phaseT < 0.10) {
+                  intensity = phaseT / 0.10;  // 빠르게 켜짐
+                } else if (phaseT < 0.50) {
+                  intensity = 1;  // 유지
+                } else if (phaseT < 0.70) {
+                  intensity = 1 - (phaseT - 0.50) / 0.20;  // 부드럽게 페이드
+                }
+              }
+              const alpha = 0.20 + intensity * 0.78;
+              const scale = 1 + intensity * 0.18;  // 강렬한 조각은 살짝 커짐
+              const dy = -intensity * 1.5;
+              return { dy, alpha, scale };
+            };
+          } else if (holdSentenceStyle === "cool-down") {
+            // 47. 감정 온도 빼기 — 떨림/빛 → 차분하고 무색하게
+            wavePerChar = (i, total) => {
+              // 사이클: 떨림+빛(30%) → 식어감(40%) → 차분(30%)
+              let warmth;
+              if (cycleT < 0.30) warmth = 1;
+              else if (cycleT < 0.70) warmth = 1 - easeInOut((cycleT - 0.30) / 0.40);
+              else warmth = 0;
+              // 따뜻한 상태: 미세 떨림 + 알파 호흡
+              const wobbleX = Math.sin(sec * 2 + i * 0.6) * 1.2 * warmth;
+              const wobbleY = Math.cos(sec * 1.7 + i * 0.5) * 0.8 * warmth;
+              const dx = wobbleX;
+              const dy = wobbleY;
+              // 식은 상태: 균일 간격 (글자가 정확한 위치로 수렴)
+              const alpha = 0.65 + warmth * 0.25;
+              const scale = 1 + warmth * 0.03;
+              return { dx, dy, alpha, scale };
+            };
+          } else if (holdSentenceStyle === "compute-feeling") {
+            // 48. 머리로 감정 계산 — 부드러운 드리프트 → 논리적 정렬
+            wavePerChar = (i, total) => {
+              // 사이클: 감정 드리프트(35%) → 정렬 변환(30%) → 논리 구조(35%)
+              let toLogic;
+              if (cycleT < 0.35) toLogic = 0;
+              else if (cycleT < 0.65) toLogic = easeInOut((cycleT - 0.35) / 0.30);
+              else toLogic = 1;
+              // 감정 상태: 부드러운 드리프트
+              const driftX = Math.sin(sec * 0.5 + i * 0.3) * 2.5 * (1 - toLogic);
+              const driftY = Math.cos(sec * 0.45 + i * 0.25) * 1.8 * (1 - toLogic);
+              // 논리 상태: 글자가 일정 단계로 정렬 (3글자씩 그룹)
+              const groupIdx = Math.floor(i / 3);
+              const posInGroup = i % 3;
+              const logicX = posInGroup * 12 - 12;
+              const logicY = groupIdx * 8 - (Math.floor(total / 6)) * 4;
+              const dx = driftX + logicX * toLogic * 0.3;
+              const dy = driftY + logicY * toLogic * 0.3;
+              const alpha = 0.70 + toLogic * 0.15;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "excerpt") {
+            // 49. 필요한 부분 발췌 — 일부 글자만 앞으로 떠오르고 나머지 흐려짐
+            wavePerChar = (i, total) => {
+              // 발췌 인덱스: 3초마다 다른 글자 그룹
+              const excerptPhase = Math.floor(sec / 3.0);
+              const myExcerpt = ((i * 2 + excerptPhase * 5) % total) < (total / 3);
+              const phaseT = (sec / 3.0) % 1;
+              // 사이클: 풀 문장(20%) → 발췌됨(60%) → 풀 문장(20%)
+              let extraction;
+              if (phaseT < 0.20) extraction = 0;
+              else if (phaseT < 0.80) extraction = easeInOut((phaseT - 0.20) / 0.10);
+              else extraction = 1 - easeInOut((phaseT - 0.80) / 0.20);
+              extraction = Math.min(1, extraction);
+              if (myExcerpt) {
+                // 발췌된 글자: 앞으로 (위로 살짝) + 또렷
+                const dy = -extraction * 4;
+                const scale = 1 + extraction * 0.08;
+                const alpha = 0.78 + extraction * 0.20;
+                return { dy, alpha, scale };
+              } else {
+                // 발췌되지 않은 글자: 흐려짐
+                const alpha = 0.78 - extraction * 0.50;
+                const scale = 1 - extraction * 0.05;
+                return { alpha, scale };
+              }
+            };
+          } else if (holdSentenceStyle === "unseen-impact") {
+            // 50. 보이지 않는 충격 — 글자들이 갑자기 흔들리고 다시 조용해짐
+            wavePerChar = (i, total) => {
+              // 충격 주기: 약 2.5초마다 한 번
+              const IMPACT = 2.5;
+              const phaseT = (sec % IMPACT) / IMPACT;
+              let impact;
+              if (phaseT < 0.05) {
+                // 강한 흔들림
+                impact = phaseT / 0.05;
+              } else if (phaseT < 0.30) {
+                // 감쇠
+                impact = 1 - (phaseT - 0.05) / 0.25;
+              } else {
+                impact = 0;
+              }
+              // 충격은 글자별로 약간 다른 방향
+              const angle = seed(i, 12.9) * Math.PI * 2;
+              const dx = Math.cos(angle) * impact * 4 + Math.sin(sec * 8 + i * 2) * impact * 1.5;
+              const dy = Math.sin(angle) * impact * 4 + Math.cos(sec * 7 + i * 2) * impact * 1.2;
+              const rot = (seed(i, 31) - 0.5) * impact * 0.15;
+              const alpha = 0.80 - impact * 0.15;
+              const scale = 1 - impact * 0.03;
+              return { dx, dy, rot, alpha, scale };
+            };
+          }
+          // ─────────────────────────────────────────────
+          // 51.png ~ 70.png: SDAM 기억 정리 방법 20가지 (한국어 낱자 단위)
+          // ─────────────────────────────────────────────
+          else if (holdSentenceStyle === "lesson-only") {
+            // 51. 교훈만 남기기 — 사이클 내내 세부 글자 점점 빠지고 결론 부분만 남음
+            wavePerChar = (i, total) => {
+              // "교훈" 인덱스: 문장 후반부 (마지막 30%)가 핵심 결론
+              const isLesson = i / Math.max(1, total - 1) >= 0.7;
+              // 사이클: 풀 표시(25%) → 디테일 빠짐(40%) → 교훈만(25%) → 복원(10%)
+              let reduction;
+              if (cycleT < 0.25) reduction = 0;
+              else if (cycleT < 0.65) reduction = easeInOut((cycleT - 0.25) / 0.40);
+              else if (cycleT < 0.90) reduction = 1;
+              else reduction = 1 - easeInOut((cycleT - 0.90) / 0.10);
+              const alpha = isLesson ? (0.85 + reduction * 0.10) : (0.85 - reduction * 0.75);
+              const scale = isLesson ? (1 + reduction * 0.05) : (1 - reduction * 0.25);
+              const dy = isLesson ? Math.sin(sec * 0.6 + i * 0.2) * 0.4 : 0;
+              return { dy, alpha, scale };
+            };
+          } else if (holdSentenceStyle === "sound-pulse") {
+            // 52. 소리에 집중하기 — 글자들이 파형/펄스처럼 진동
+            wavePerChar = (i, total) => {
+              // 진행 파형: 좌→우로 흐르는 파동
+              const waveSpeed = 2.5;
+              const wavePhase = (i / Math.max(1, total - 1)) * Math.PI * 3 - sec * waveSpeed;
+              const amp = Math.sin(wavePhase);
+              const dy = amp * 2.5;
+              const scale = 1 + Math.abs(amp) * 0.08;
+              const alpha = 0.70 + Math.abs(amp) * 0.25;
+              // 미세한 박자 떨림
+              const dx = Math.sin(sec * 8 + i * 0.5) * 0.4;
+              return { dx, dy, alpha, scale };
+            };
+          } else if (holdSentenceStyle === "to-sentence") {
+            // 53. 문장으로 변환하기 — 흩어진 조각 → 문장 구조로 정리
+            wavePerChar = (i, total) => {
+              // 글자별 흩어진 시작 위치
+              const scatterX = (seed(i, 31.4) - 0.5) * 60;
+              const scatterY = (seed(i, 67.3) - 0.5) * 50;
+              const rotStart = (seed(i, 47.9) - 0.5) * 0.8;
+              // 글자별 도착 순서 (좌→우, 약간의 jitter)
+              const myDelay = (i / Math.max(1, total)) * 0.45 + seed(i, 11) * 0.1;
+              // 사이클: 변환 진행(70%) → 정렬 유지(25%) → 다시 흩어짐 직전(5%)
+              let progress;
+              if (cycleT < 0.70) {
+                const local = Math.max(0, Math.min(1, (cycleT - myDelay * 0.5) / 0.55));
+                progress = 1 - Math.pow(1 - local, 2.5);
+              } else if (cycleT < 0.95) {
+                progress = 1;
+              } else {
+                progress = 1 - easeInOut((cycleT - 0.95) / 0.05);
+              }
+              const dx = scatterX * (1 - progress);
+              const dy = scatterY * (1 - progress);
+              const rot = rotStart * (1 - progress);
+              const alpha = 0.45 + progress * 0.50;
+              return { dx, dy, rot, alpha };
+            };
+          } else if (holdSentenceStyle === "line-up") {
+            // 54. 차례대로 줄 세우기 — 어수선 → 줄 정렬
+            wavePerChar = (i, total) => {
+              // 글자별 시작 오프셋 (랜덤 흩어짐)
+              const offX = (seed(i, 12.9) - 0.5) * 14;
+              const offY = (seed(i, 78.2) - 0.5) * 16;
+              // 사이클: 어수선(20%) → 차례 정렬(40%) → 줄(30%) → 다시 흩어짐(10%)
+              let aligned;
+              if (cycleT < 0.20) aligned = 0;
+              else if (cycleT < 0.60) {
+                // 인덱스 순서로 자리 잡음
+                const local = (cycleT - 0.20) / 0.40;
+                const myT = i / Math.max(1, total - 1);
+                aligned = Math.max(0, Math.min(1, (local - myT * 0.3) / 0.7));
+                aligned = 1 - Math.pow(1 - aligned, 3);
+              } else if (cycleT < 0.90) {
+                aligned = 1;
+              } else {
+                aligned = 1 - easeInOut((cycleT - 0.90) / 0.10);
+              }
+              const dx = offX * (1 - aligned);
+              const dy = offY * (1 - aligned);
+              const alpha = 0.65 + aligned * 0.30;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "concept-flat") {
+            // 55. 개념으로만 소유 — 평면적, 추상적, 감각 최소
+            wavePerChar = (i, total) => {
+              // 거의 정적, 매우 작은 움직임만
+              const dx = Math.sin(sec * 0.25 + i * 0.1) * 0.4;
+              const dy = Math.cos(sec * 0.22 + i * 0.08) * 0.3;
+              const alpha = 0.72 + Math.sin(sec * 0.3 + i * 0.1) * 0.05;
+              // scale은 1로 고정 (평면)
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "recede") {
+            // 56. 멀리서 관찰하기 — 글자들이 작아지며 간격 벌어짐
+            wavePerChar = (i, total) => {
+              // 사이클: 가까움(20%) → 물러남(40%) → 멀리(30%) → 다시 가까이(10%)
+              let distance;
+              if (cycleT < 0.20) distance = 0;
+              else if (cycleT < 0.60) distance = easeInOut((cycleT - 0.20) / 0.40);
+              else if (cycleT < 0.90) distance = 1;
+              else distance = 1 - easeInOut((cycleT - 0.90) / 0.10);
+              // 멀어질수록 글자가 작아지고 간격 벌어짐
+              const center = (total - 1) / 2;
+              const fromCenter = i - center;
+              const spread = fromCenter * 2.5 * distance;
+              const scale = 1 - distance * 0.25;  // 1 → 0.75
+              const alpha = 0.85 - distance * 0.20;
+              const dy = Math.sin(sec * 0.4 + i * 0.2) * 0.3;
+              return { dx: spread, dy, alpha, scale };
+            };
+          } else if (holdSentenceStyle === "rotate-3d") {
+            // 57. 구조물 돌려보기 — 글자들이 회전 (가짜 3D — 글자별 다른 위상)
+            wavePerChar = (i, total) => {
+              // 글자들이 가상의 원기둥 위에 있다 가정. 시간에 따라 회전
+              const cylinderPos = i / Math.max(1, total - 1);  // 0~1
+              const rotAngle = sec * 0.5;
+              // 글자별 원기둥 표면 위치 — 사인으로 앞/뒤
+              const angle = cylinderPos * Math.PI * 2 - rotAngle;
+              const depth = Math.cos(angle);  // -1(뒤) ~ 1(앞)
+              const sideX = Math.sin(angle) * 30;
+              // 사이클: 평면 문장(25%) → 회전 구조(60%) → 다시 평면(15%)
+              let toStructure;
+              if (cycleT < 0.25) toStructure = easeInOut(cycleT / 0.25);
+              else if (cycleT < 0.85) toStructure = 1;
+              else toStructure = 1 - easeInOut((cycleT - 0.85) / 0.15);
+              const dx = sideX * toStructure;
+              // depth 따라 scale 변화 (앞쪽 큼, 뒤쪽 작음)
+              const scale = 1 + depth * 0.15 * toStructure;
+              const alpha = 0.55 + (depth + 1) / 2 * 0.40;
+              const rot = -angle * 0.15 * toStructure;
+              return { dx, alpha, scale, rot };
+            };
+          } else if (holdSentenceStyle === "trait-list") {
+            // 58. 특징 리스트 만들기 — 글자들이 항목별 목록으로 분절
+            wavePerChar = (i, total) => {
+              // 3글자씩 한 "항목"으로 묶음
+              const itemIdx = Math.floor(i / 3);
+              const posInItem = i % 3;
+              // 사이클: 문장(25%) → 리스트(50%) → 문장(25%)
+              let toList;
+              if (cycleT < 0.20) toList = easeInOut(cycleT / 0.20);
+              else if (cycleT < 0.75) toList = 1;
+              else toList = 1 - easeInOut((cycleT - 0.75) / 0.25);
+              // 리스트 위치: 항목마다 줄 바뀜, 들여쓰기
+              const itemX = -30 + posInItem * 12;  // 같은 항목 내 글자
+              const itemY = itemIdx * 12 - (Math.ceil(total / 3) - 1) * 6;
+              const dx = itemX * toList;
+              const dy = itemY * toList;
+              const alpha = 0.78;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "volume-sense") {
+            // 59. 부피 느껴보기 — 글자들이 앞뒤로 움직이며 부피 인상
+            wavePerChar = (i, total) => {
+              // 글자별 깊이 (인덱스 기반 sin 패턴)
+              const depthPhase = i * 0.6 + sec * 0.4;
+              const depth = Math.sin(depthPhase);  // -1(뒤) ~ 1(앞)
+              // 깊이에 따라 scale + alpha 변화
+              const scale = 1 + depth * 0.10;
+              const alpha = 0.62 + (depth + 1) / 2 * 0.30;
+              // 글자 간격도 호흡 (커졌다 작아짐)
+              const spreadT = (Math.sin(sec * 0.45) + 1) / 2;  // 0~1
+              const center = (total - 1) / 2;
+              const fromCenter = i - center;
+              const dx = fromCenter * 2 * spreadT * 0.3;
+              const dy = depth * 1.5;
+              return { dx, dy, alpha, scale };
+            };
+          } else if (holdSentenceStyle === "restore") {
+            // 60. 조각 맞춰 복구하기 — 흩어진 조각이 모여 문장이 됨, 반복
+            wavePerChar = (i, total) => {
+              // 글자별 시작 위치
+              const scatterX = (seed(i, 12.9) - 0.5) * 50;
+              const scatterY = (seed(i, 78.2) - 0.5) * 40;
+              const rotStart = (seed(i, 47.9) - 0.5) * 0.5;
+              // 글자별 모이는 시간차 (작은 차이)
+              const myDelay = seed(i, 23.7) * 0.3;
+              // 사이클: 흩어짐(15%) → 모임(45%) → 완성(25%) → 다시 흩어짐(15%)
+              let restored;
+              if (cycleT < 0.15) restored = 0;
+              else if (cycleT < 0.60) {
+                const local = Math.max(0, Math.min(1, (cycleT - 0.15 - myDelay * 0.15) / 0.40));
+                restored = easeInOut(local);
+              } else if (cycleT < 0.85) {
+                restored = 1;
+              } else {
+                restored = 1 - easeInOut((cycleT - 0.85) / 0.15);
+              }
+              const dx = scatterX * (1 - restored);
+              const dy = scatterY * (1 - restored);
+              const rot = rotStart * (1 - restored);
+              const alpha = 0.50 + restored * 0.42;
+              return { dx, dy, rot, alpha };
+            };
+          } else if (holdSentenceStyle === "pin-address") {
+            // 61. 주소 찍기 — 글자가 지도 위 핀처럼 위치 고정
+            wavePerChar = (i, total) => {
+              // 글자별 도착 시간 (인덱스 순서로 핀 박힘)
+              const myT = total > 0 ? i / total : 0;
+              // 사이클: 도착 진행(50%) → 모두 박힘(40%) → 다시 출발(10%)
+              let pinned;
+              if (cycleT < 0.50) {
+                const local = cycleT / 0.50;
+                pinned = local > myT ? 1 : 0;
+              } else if (cycleT < 0.90) {
+                pinned = 1;
+              } else {
+                pinned = 1 - easeInOut((cycleT - 0.90) / 0.10);
+              }
+              // 도착 직전: 위에서 떨어짐
+              const dy = (1 - pinned) * -6;
+              // 박히는 순간 살짝 작아짐 (눌리는 느낌)
+              const scale = pinned > 0.5 ? 0.98 : (0.85 + pinned * 0.13);
+              const alpha = 0.30 + pinned * 0.65;
+              return { dy, scale, alpha };
+            };
+          } else if (holdSentenceStyle === "layout-mem") {
+            // 62. 레이아웃 기억하기 — 글자 위치/간격 자체가 강조됨
+            wavePerChar = (i, total) => {
+              // 글자들이 블록 단위로 위치 강조 (4글자씩 한 블록)
+              const blockIdx = Math.floor(i / 4);
+              const posInBlock = i % 4;
+              const blockOffsetX = blockIdx * 8;
+              const blockOffsetY = (posInBlock - 1.5) * 8;
+              // 사이클: 일반(25%) → 레이아웃 강조(50%) → 일반(25%)
+              let toLayout;
+              if (cycleT < 0.20) toLayout = easeInOut(cycleT / 0.20);
+              else if (cycleT < 0.80) toLayout = 1;
+              else toLayout = 1 - easeInOut((cycleT - 0.80) / 0.20);
+              const dx = blockOffsetX * toLayout * 0.5;
+              const dy = blockOffsetY * toLayout * 0.5;
+              const alpha = 0.78;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "direction-length") {
+            // 63. 방향과 길이 계산 — 글자가 방향따라 정렬, 길이 호흡
+            wavePerChar = (i, total) => {
+              // 글자들이 대각선 방향으로 이동 (방향성)
+              const dirAngle = Math.sin(sec * 0.3) * 0.4;  // 천천히 변하는 방향
+              const myDist = (i - (total - 1) / 2) * 2;
+              // 사이클 안에서 글자 간격이 늘어났다 줄어듬 (길이 계산)
+              const lengthT = (Math.sin(sec * 0.5) + 1) / 2;  // 0~1
+              const stretch = 1 + lengthT * 0.4;
+              const dx = myDist * (stretch - 1) + Math.cos(dirAngle) * lengthT * 3;
+              const dy = Math.sin(dirAngle) * lengthT * 4 + Math.sin(sec * 0.4 + i * 0.2) * 0.5;
+              const alpha = 0.75 + Math.sin(sec * 0.6 + i * 0.2) * 0.10;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "mutual-distance") {
+            // 64. 서로의 거리 재기 — 글자 사이 간격이 호흡처럼 변함
+            wavePerChar = (i, total) => {
+              // 글자별 거리 호흡: 인접 글자와 가까웠다 멀어졌다
+              const center = (total - 1) / 2;
+              const fromCenter = i - center;
+              // 두 주기 겹쳐서 불규칙한 간격 변화
+              const breath1 = Math.sin(sec * 0.5);
+              const breath2 = Math.sin(sec * 0.7 + i * 0.4);
+              const spread = (breath1 * 0.6 + breath2 * 0.4) * 6;
+              const dx = fromCenter * spread / Math.max(1, center);
+              // 글자별로 약간 다른 y 흔들림 (관계 측정 인상)
+              const dy = Math.sin(sec * 0.6 + i * 0.5) * 0.8;
+              const alpha = 0.78;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "reflected") {
+            // 65. 반사된 신호 읽기 — 글자가 살짝 늦게 도착, 잔상 느낌
+            wavePerChar = (i, total) => {
+              // 글자별 도착 지연 (인덱스 따라 다르게)
+              const echoDelay = (i % 4) * 0.15;
+              // 글자 위치가 sin으로 살짝 떠다니지만, 글자별 위상이 다름 (반사 신호)
+              const phase = sec * 0.6 - echoDelay * Math.PI;
+              const dx = Math.sin(phase + i * 0.2) * 1.8;
+              const dy = Math.cos(phase * 0.85 + i * 0.15) * 1.2 + 1;
+              // 알파도 신호 도착처럼 변동
+              const alpha = 0.55 + Math.sin(phase + i * 0.3) * 0.20 + 0.10;
+              const scale = 0.95 + Math.sin(phase + i * 0.2) * 0.04;
+              return { dx, dy, alpha, scale };
+            };
+          } else if (holdSentenceStyle === "procedure") {
+            // 66. 행동 순서 기억 — 글자들이 차례로(1, 2, 3...) 점등
+            wavePerChar = (i, total) => {
+              // 사이클을 글자 수로 나눠 차례차례 활성화
+              const stepLen = 1 / Math.max(1, total + 4);  // 마지막 약간 여유
+              const myStart = i * stepLen;
+              const myEnd = myStart + stepLen * 4;  // 활성 기간
+              // 활성 상태
+              let intensity;
+              if (cycleT < myStart) {
+                intensity = 0;
+              } else if (cycleT < myStart + stepLen) {
+                // 점등
+                intensity = (cycleT - myStart) / stepLen;
+              } else if (cycleT < myEnd) {
+                // 활성 유지
+                intensity = 1;
+              } else if (cycleT < myEnd + stepLen) {
+                // 페이드
+                intensity = 1 - (cycleT - myEnd) / stepLen;
+              } else {
+                intensity = 0;
+              }
+              const baseAlpha = 0.25;
+              const alpha = baseAlpha + intensity * 0.70;
+              const scale = 1 + intensity * 0.08;
+              const dy = -intensity * 1.5;
+              return { dy, alpha, scale };
+            };
+          } else if (holdSentenceStyle === "body-trace") {
+            // 67. 몸의 움직임 기록 — 글자가 부드러운 곡선 따라 이동, 잔상 인상
+            wavePerChar = (i, total) => {
+              // 글자별 다른 위상으로 큰 sin/cos 궤적
+              const traceX = Math.sin(sec * 0.4 + i * 0.5) * 6 + Math.cos(sec * 0.25 + i * 0.3) * 4;
+              const traceY = Math.cos(sec * 0.35 + i * 0.4) * 4 + Math.sin(sec * 0.5 + i * 0.6) * 3;
+              // 알파: 움직임이 클수록 살짝 흐려짐 (잔상)
+              const speed = Math.abs(Math.sin(sec * 0.4 + i * 0.5) * 0.4 + Math.cos(sec * 0.35 + i * 0.4) * 0.4);
+              const alpha = 0.72 - speed * 0.10;
+              const scale = 0.96 + Math.sin(sec * 0.5 + i * 0.3) * 0.03;
+              return { dx: traceX, dy: traceY, alpha, scale };
+            };
+          } else if (holdSentenceStyle === "stitch-space") {
+            // 68. 공간끼리 이어 붙이기 — 떨어진 덩어리들이 하나로 연결
+            wavePerChar = (i, total) => {
+              // 글자들을 3개 클러스터로 나눔
+              const cluster = Math.floor(i / Math.ceil(total / 3));
+              // 클러스터별 시작 위치 (떨어져 있음)
+              const clusterX = [-40, 0, 40][Math.min(2, cluster)];
+              const clusterY = [0, 0, 0][Math.min(2, cluster)];
+              // 사이클: 떨어진 상태(30%) → 연결(40%) → 하나(20%) → 다시 분리(10%)
+              let stitched;
+              if (cycleT < 0.30) stitched = 0;
+              else if (cycleT < 0.70) stitched = easeInOut((cycleT - 0.30) / 0.40);
+              else if (cycleT < 0.90) stitched = 1;
+              else stitched = 1 - easeInOut((cycleT - 0.90) / 0.10);
+              const dx = clusterX * (1 - stitched);
+              const dy = clusterY * (1 - stitched);
+              const alpha = 0.65 + stitched * 0.28;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "walk-blueprint") {
+            // 69. 도면 위로 걷기 — 글자가 평면도 따라 이동, 시간에 따라 위치 변경
+            wavePerChar = (i, total) => {
+              // 도면 위치: 글자별 ㄱ자 경로 (좌→우→아래→좌)
+              const myT = total > 0 ? i / total : 0;
+              // 시간에 따라 도면 위 위치가 천천히 흐름
+              const walkT = (sec * 0.08 + myT) % 1;  // 글자별로 약간 다른 위치
+              // ㄱ자 경로 좌표
+              let walkX, walkY;
+              if (walkT < 0.4) {
+                walkX = -30 + walkT / 0.4 * 60;
+                walkY = -10;
+              } else if (walkT < 0.6) {
+                walkX = 30;
+                walkY = -10 + (walkT - 0.4) / 0.2 * 20;
+              } else {
+                walkX = 30 - (walkT - 0.6) / 0.4 * 60;
+                walkY = 10;
+              }
+              // 사이클: 문장(25%) → 도면(50%) → 문장(25%)
+              let toBlueprint;
+              if (cycleT < 0.20) toBlueprint = easeInOut(cycleT / 0.20);
+              else if (cycleT < 0.80) toBlueprint = 1;
+              else toBlueprint = 1 - easeInOut((cycleT - 0.80) / 0.20);
+              const dx = walkX * toBlueprint;
+              const dy = walkY * toBlueprint;
+              const alpha = 0.78;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "cog-machine") {
+            // 70. 머릿속 기계 작동 — 정확한 기계 리듬으로 글자가 움직임
+            wavePerChar = (i, total) => {
+              // 기계 박자: 0.8초 주기로 1tick 진행
+              const TICK = 0.8;
+              const tickT = (sec % TICK) / TICK;  // 0~1
+              // tickT 0~0.2: 빠르게 움직이고, 0.2~1: 정지
+              const moveT = tickT < 0.2 ? tickT / 0.2 : 1;
+              // 글자별 다른 위상 (기어 톱니처럼)
+              const cogPhase = i % 4;
+              const tickIdx = Math.floor(sec / TICK);
+              // 글자가 4단계 회전 — tick마다 다른 dy
+              const stages = [0, -3, 0, 3];
+              const myStage = stages[(tickIdx + cogPhase) % 4];
+              const myNextStage = stages[(tickIdx + cogPhase + 1) % 4];
+              const dy = myStage + (myNextStage - myStage) * moveT;
+              // 미세 회전 (톱니 맞물림)
+              const rot = (moveT - 0.5) * 0.08 * (cogPhase % 2 === 0 ? 1 : -1);
+              const alpha = 0.80 + Math.sin(sec * 2 + i * 0.3) * 0.05;
+              return { dy, rot, alpha };
+            };
+          }
+          // ─────────────────────────────────────────────
+          // 71.png ~ 80.png: SDAM 기억 정리 방법 10가지
+          //   alightworld 톤: 느리고 부드럽고 글자가 항상 살짝 보이며 진폭은 작게
+          // ─────────────────────────────────────────────
+          else if (holdSentenceStyle === "table") {
+            // 71. 표 형식으로 담기 — 글자가 4열 셀로 부드럽게 정렬
+            wavePerChar = (i, total) => {
+              const cols = 4;
+              const col = i % cols;
+              const row = Math.floor(i / cols);
+              const totalRows = Math.ceil(total / cols);
+              const cellX = (col - (cols - 1) / 2) * 14;
+              const cellY = (row - (totalRows - 1) / 2) * 10;
+              let toTable;
+              if (cycleT < 0.22) toTable = easeInOut(cycleT / 0.22);
+              else if (cycleT < 0.78) toTable = 1;
+              else toTable = 1 - easeInOut((cycleT - 0.78) / 0.22);
+              // 정렬 중에도 미세 호흡 (alightworld 느낌)
+              const breathX = Math.sin(sec * 0.35 + i * 0.2) * 0.5;
+              const breathY = Math.cos(sec * 0.30 + i * 0.15) * 0.4;
+              const dx = cellX * toTable + breathX;
+              const dy = cellY * toTable + breathY;
+              const alpha = 0.78 + Math.sin(sec * 0.4 + i * 0.2) * 0.06;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "verbal-unfold") {
+            // 72. 말로 풀어서 보관 — 글자가 천천히 펴졌다 모임, 부드럽게 흐름
+            wavePerChar = (i, total) => {
+              const myT = i / Math.max(1, total - 1);
+              const unfoldT = (Math.sin(sec * 0.3) + 1) / 2;  // 매우 느린 호흡
+              const center = (total - 1) / 2;
+              const fromCenter = i - center;
+              const dx = fromCenter * 1.0 * unfoldT;
+              const dy = Math.sin(sec * 0.45 - myT * Math.PI * 2) * 1.2 * unfoldT
+                       + Math.sin(sec * 0.4 + i * 0.25) * 0.4;
+              const alpha = 0.78 + Math.sin(sec * 0.35 + i * 0.2) * 0.08;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "chronicle") {
+            // 73. 역사적 사실로 저장 — 연표처럼 균등 간격, 건조한 떨림만
+            wavePerChar = (i, total) => {
+              let toChrono;
+              if (cycleT < 0.22) toChrono = easeInOut(cycleT / 0.22);
+              else if (cycleT < 0.78) toChrono = 1;
+              else toChrono = 1 - easeInOut((cycleT - 0.78) / 0.22);
+              const center = (total - 1) / 2;
+              const fromCenter = i - center;
+              const chronoX = fromCenter * 2.5 * toChrono;
+              const labelY = (i % 2 === 0 ? -2 : 2) * toChrono;
+              // 건조한 떨림 (작게)
+              const dryY = Math.sin(sec * 0.4 + i * 0.18) * 0.3;
+              const alpha = 0.78 + Math.sin(sec * 0.3 + i * 0.15) * 0.05;
+              return { dx: chronoX, dy: labelY + dryY, alpha };
+            };
+          } else if (holdSentenceStyle === "coord-assign") {
+            // 74. 좌표값 설정하기 — 글자가 정확한 X/Y 위치로 천천히 lock
+            wavePerChar = (i, total) => {
+              const targetX = (seed(i, 12.9) - 0.5) * 16;
+              const targetY = (seed(i, 78.2) - 0.5) * 14;
+              const myDelay = (i / Math.max(1, total)) * 0.25;
+              const localT = Math.max(0, Math.min(1, (cycleT - myDelay) / (1 - myDelay)));
+              let lockT;
+              if (localT < 0.45) {
+                lockT = 0;
+              } else if (localT < 0.75) {
+                lockT = easeInOut((localT - 0.45) / 0.30);
+              } else {
+                lockT = 1;
+              }
+              // 부유 (lock 전): 작고 느린 떠다님
+              const floatX = Math.sin(sec * 0.4 + i * 0.4) * 1.8 * (1 - lockT);
+              const floatY = Math.cos(sec * 0.35 + i * 0.3) * 1.5 * (1 - lockT);
+              // lock 후에도 미세 호흡 (절대 정지 아님)
+              const settleX = Math.sin(sec * 0.3 + i * 0.2) * 0.3 * lockT;
+              const settleY = Math.cos(sec * 0.28 + i * 0.2) * 0.3 * lockT;
+              const dx = floatX + settleX + targetX * lockT;
+              const dy = floatY + settleY + targetY * lockT;
+              const alpha = 0.70 + lockT * 0.20;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "assemble-parts") {
+            // 75. 공간 부품 끼워맞추기 — 회전하며 부드럽게 조립
+            wavePerChar = (i, total) => {
+              const partAngle = seed(i, 23.7) * Math.PI * 2;
+              const partDist = 18 + seed(i, 91.3) * 14;
+              const partX = Math.cos(partAngle) * partDist;
+              const partY = Math.sin(partAngle) * partDist;
+              const partRot = (seed(i, 47) - 0.5) * 0.4;
+              const myDelay = seed(i, 11) * 0.3;
+              const localT = Math.max(0, Math.min(1, (cycleT - myDelay) / (0.85 - myDelay * 0.2)));
+              let assembled;
+              if (cycleT < 0.85) {
+                assembled = 1 - Math.pow(1 - localT, 2.2);
+              } else if (cycleT < 0.95) {
+                assembled = 1;
+              } else {
+                assembled = 1 - easeInOut((cycleT - 0.95) / 0.05);
+              }
+              const dx = partX * (1 - assembled);
+              const dy = partY * (1 - assembled);
+              const rot = partRot * (1 - assembled);
+              const alpha = 0.65 + assembled * 0.28;
+              return { dx, dy, rot, alpha };
+            };
+          } else if (holdSentenceStyle === "time-path") {
+            // 76. 시간을 길로 만들기 — 글자가 sin 곡선 경로 위에 배치
+            wavePerChar = (i, total) => {
+              const myT = i / Math.max(1, total - 1);
+              let toPath;
+              if (cycleT < 0.22) toPath = easeInOut(cycleT / 0.22);
+              else if (cycleT < 0.78) toPath = 1;
+              else toPath = 1 - easeInOut((cycleT - 0.78) / 0.22);
+              const pathX = (myT - 0.5) * 50;
+              const pathY = Math.sin(myT * Math.PI * 2) * 12;
+              const dx = pathX * toPath;
+              const dy = pathY * toPath + Math.sin(sec * 0.35 + i * 0.2) * 0.5;
+              // 시간 흐름: 현재 위치 근처 글자만 살짝 또렷
+              const walkPos = (sec * 0.18) % 1;
+              const dist = Math.abs(myT - walkPos);
+              const inFocus = Math.exp(-dist * dist * 25);
+              const alpha = 0.72 + inFocus * 0.20;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "map-pin") {
+            // 77. 지도의 점으로 표시 — 글자가 작은 점으로 축소, 부드럽게 복원
+            wavePerChar = (i, total) => {
+              let pointScale, pointY = 0;
+              if (cycleT < 0.22) {
+                pointScale = 1;
+              } else if (cycleT < 0.50) {
+                const u = (cycleT - 0.22) / 0.28;
+                const e = easeInOut(u);
+                pointScale = 1 - e * 0.65;  // 1 → 0.35 (alightworld 톤: 너무 작아지지 않게)
+                pointY = -e * 1.5;
+              } else if (cycleT < 0.70) {
+                pointScale = 0.35;
+                pointY = -1.5 + Math.sin(sec * 1.5 + i * 0.3) * 0.3;
+              } else {
+                const u = (cycleT - 0.70) / 0.30;
+                const e = easeInOut(u);
+                pointScale = 0.35 + e * 0.65;
+                pointY = -1.5 * (1 - e);
+              }
+              const alpha = 0.78 + Math.sin(sec * 0.4 + i * 0.2) * 0.06;
+              return { dy: pointY, alpha, scale: pointScale };
+            };
+          } else if (holdSentenceStyle === "self-center") {
+            // 78. 나를 중심으로 찾기 — 글자가 중심 주변을 천천히 궤도 운동
+            wavePerChar = (i, total) => {
+              const myAngle = (i / Math.max(1, total)) * Math.PI * 2;
+              const radiusT = (Math.sin(sec * 0.28) + 1) / 2;
+              const radius = 12 + radiusT * 18;  // 12~30px (alightworld: 작은 궤도)
+              const rotAngle = sec * 0.12;  // 매우 천천히 회전
+              const orbX = Math.cos(myAngle + rotAngle) * radius;
+              const orbY = Math.sin(myAngle + rotAngle) * radius * 0.5;
+              let toOrbit;
+              if (cycleT < 0.22) toOrbit = easeInOut(cycleT / 0.22);
+              else if (cycleT < 0.78) toOrbit = 1;
+              else toOrbit = 1 - easeInOut((cycleT - 0.78) / 0.22);
+              const dx = orbX * toOrbit;
+              const dy = orbY * toOrbit;
+              const closeness = 1 - radiusT;
+              const alpha = 0.74 + closeness * 0.14;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "you-and-me") {
+            // 79. 너와 나의 거리 재기 — 두 기준점에서 천천히 진동
+            wavePerChar = (i, total) => {
+              const isMine = i < total / 2;
+              const anchor = isMine ? -22 : 22;
+              const phase = sec * 0.35 + (isMine ? 0 : Math.PI);
+              const oscillation = Math.sin(phase) * 5;
+              let toAnchor;
+              if (cycleT < 0.22) toAnchor = easeInOut(cycleT / 0.22);
+              else if (cycleT < 0.78) toAnchor = 1;
+              else toAnchor = 1 - easeInOut((cycleT - 0.78) / 0.22);
+              const dx = (anchor + oscillation) * toAnchor;
+              const dy = Math.sin(sec * 0.45 + i * 0.2) * 0.8 * toAnchor + Math.sin(sec * 0.35 + i * 0.15) * 0.4;
+              const alpha = 0.76 + Math.sin(sec * 0.4 + i * 0.2) * 0.08;
+              return { dx, dy, alpha };
+            };
+          } else if (holdSentenceStyle === "invisible-volume") {
+            // 80. 보이지 않는 부피 감지 — 글자가 보이지 않는 형태 주위에서 밀려남
+            wavePerChar = (i, total) => {
+              // 가상의 부피(타원체)가 화면 중앙에 있다고 가정. 글자가 그 외곽을 더듬음
+              // 부피의 크기는 시간에 따라 호흡 (있다 → 더 큼 → 다시 작아짐)
+              const volumeRadius = 14 + Math.sin(sec * 0.25) * 6;
+              // 각 글자 본 위치에서 가상의 중심까지의 각도/거리 (인덱스 기반 분포)
+              const myAngle = (i / Math.max(1, total)) * Math.PI * 2 + sec * 0.08;
+              // 글자가 부피의 외곽에 살짝 밀려남 (외곽선 더듬기)
+              const pushX = Math.cos(myAngle) * volumeRadius;
+              const pushY = Math.sin(myAngle) * volumeRadius * 0.55;
+              // 미세 떨림 (감지의 망설임)
+              const tremor = Math.sin(sec * 1.5 + i * 0.5) * 0.5;
+              const dx = pushX + tremor;
+              const dy = pushY + Math.cos(sec * 1.3 + i * 0.4) * 0.4;
+              const alpha = 0.72 + Math.sin(sec * 0.4 + i * 0.2) * 0.10;
+              return { dx, dy, alpha };
+            };
+          }
           else { // "breathe" 기본 (79용)
             // 흐릿한 안개에서 나타남 → 일제히 호흡 → 다시 안개로
             wavePerChar = (i, total) => {
@@ -3904,7 +4933,7 @@
         name: "79", sheetRow: 80, fallback: "79.png",
         framesCount: 1,
         holdSentence: true,
-        holdSentenceStyle: "breathe",
+        holdSentenceStyle: "you-and-me",
         outroMode: "volume",
         fallbackLeftPx: 6750, fallbackTopPx: 1200,
       },
@@ -3980,55 +5009,55 @@
       // ── 신규 추가 (29~78, 80): breathe + decay ──
       { name: "29", sheetRow: 30, fallback: "29.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "outline-only", outroMode: "decay", fallbackLeftPx: 1235, fallbackTopPx: 852 },
       { name: "30", sheetRow: 31, fallback: "30.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "sparse", outroMode: "decay", fallbackLeftPx: 1859, fallbackTopPx: 947 },
-      { name: "31", sheetRow: 32, fallback: "31.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 2799, fallbackTopPx: 1164 },
-      { name: "32", sheetRow: 33, fallback: "32.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 3622, fallbackTopPx: 881 },
-      { name: "33", sheetRow: 34, fallback: "33.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 4206, fallbackTopPx: 854 },
-      { name: "34", sheetRow: 35, fallback: "34.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 4892, fallbackTopPx: 1082 },
-      { name: "35", sheetRow: 36, fallback: "35.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 5582, fallbackTopPx: 935 },
-      { name: "36", sheetRow: 37, fallback: "36.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 6584, fallbackTopPx: 1101 },
-      { name: "37", sheetRow: 38, fallback: "37.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 7184, fallbackTopPx: 1122 },
-      { name: "38", sheetRow: 39, fallback: "38.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 8172, fallbackTopPx: 843 },
-      { name: "39", sheetRow: 40, fallback: "39.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 8934, fallbackTopPx: 1175 },
-      { name: "40", sheetRow: 41, fallback: "40.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 1120, fallbackTopPx: 1874 },
-      { name: "41", sheetRow: 42, fallback: "41.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 2120, fallbackTopPx: 1961 },
-      { name: "42", sheetRow: 43, fallback: "42.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 2553, fallbackTopPx: 1846 },
-      { name: "43", sheetRow: 44, fallback: "43.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 3605, fallbackTopPx: 2089 },
-      { name: "44", sheetRow: 45, fallback: "44.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 4353, fallbackTopPx: 2150 },
-      { name: "45", sheetRow: 46, fallback: "45.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 5013, fallbackTopPx: 2267 },
-      { name: "46", sheetRow: 47, fallback: "46.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 5717, fallbackTopPx: 2064 },
-      { name: "47", sheetRow: 48, fallback: "47.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 6653, fallbackTopPx: 2096 },
-      { name: "48", sheetRow: 49, fallback: "48.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 7429, fallbackTopPx: 2077 },
-      { name: "49", sheetRow: 50, fallback: "49.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 8132, fallbackTopPx: 1821 },
-      { name: "50", sheetRow: 51, fallback: "50.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 8714, fallbackTopPx: 1938 },
-      { name: "51", sheetRow: 52, fallback: "51.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 1021, fallbackTopPx: 2871 },
-      { name: "52", sheetRow: 53, fallback: "52.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 1793, fallbackTopPx: 2893 },
-      { name: "53", sheetRow: 54, fallback: "53.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 2760, fallbackTopPx: 2935 },
-      { name: "54", sheetRow: 55, fallback: "54.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 3423, fallbackTopPx: 2860 },
-      { name: "55", sheetRow: 56, fallback: "55.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 4147, fallbackTopPx: 3209 },
-      { name: "56", sheetRow: 57, fallback: "56.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 5056, fallbackTopPx: 3052 },
-      { name: "57", sheetRow: 58, fallback: "57.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 5638, fallbackTopPx: 3109 },
-      { name: "58", sheetRow: 59, fallback: "58.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 6398, fallbackTopPx: 2942 },
-      { name: "59", sheetRow: 60, fallback: "59.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 7477, fallbackTopPx: 3067 },
-      { name: "60", sheetRow: 61, fallback: "60.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 8076, fallbackTopPx: 3088 },
-      { name: "61", sheetRow: 62, fallback: "61.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 8949, fallbackTopPx: 3132 },
-      { name: "62", sheetRow: 63, fallback: "62.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 1078, fallbackTopPx: 3735 },
-      { name: "63", sheetRow: 64, fallback: "63.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 1874, fallbackTopPx: 3848 },
-      { name: "64", sheetRow: 65, fallback: "64.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 2598, fallbackTopPx: 4172 },
-      { name: "65", sheetRow: 66, fallback: "65.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 3616, fallbackTopPx: 3871 },
-      { name: "66", sheetRow: 67, fallback: "66.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 4295, fallbackTopPx: 3909 },
-      { name: "67", sheetRow: 68, fallback: "67.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 5158, fallbackTopPx: 3940 },
-      { name: "68", sheetRow: 69, fallback: "68.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 5673, fallbackTopPx: 3838 },
-      { name: "69", sheetRow: 70, fallback: "69.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 6550, fallbackTopPx: 3846 },
-      { name: "70", sheetRow: 71, fallback: "70.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 7323, fallbackTopPx: 4150 },
-      { name: "71", sheetRow: 72, fallback: "71.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 8016, fallbackTopPx: 3825 },
-      { name: "72", sheetRow: 73, fallback: "72.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 9008, fallbackTopPx: 3964 },
-      { name: "73", sheetRow: 74, fallback: "73.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 1025, fallbackTopPx: 4702 },
-      { name: "74", sheetRow: 75, fallback: "74.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 1796, fallbackTopPx: 4981 },
-      { name: "75", sheetRow: 76, fallback: "75.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 2820, fallbackTopPx: 4882 },
-      { name: "76", sheetRow: 77, fallback: "76.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 3306, fallbackTopPx: 4863 },
-      { name: "77", sheetRow: 78, fallback: "77.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 4425, fallbackTopPx: 4933 },
-      { name: "78", sheetRow: 79, fallback: "78.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 5179, fallbackTopPx: 5093 },
-      { name: "80", sheetRow: 81, fallback: "80.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "breathe", outroMode: "decay", fallbackLeftPx: 5577, fallbackTopPx: 5025 },
+      { name: "31", sheetRow: 32, fallback: "31.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "coords-confirm", outroMode: "decay", fallbackLeftPx: 2799, fallbackTopPx: 1164 },
+      { name: "32", sheetRow: 33, fallback: "32.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "fit-frame", outroMode: "decay", fallbackLeftPx: 3622, fallbackTopPx: 881 },
+      { name: "33", sheetRow: 34, fallback: "33.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "folders", outroMode: "decay", fallbackLeftPx: 4206, fallbackTopPx: 854 },
+      { name: "34", sheetRow: 35, fallback: "34.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "answer-key", outroMode: "decay", fallbackLeftPx: 4892, fallbackTopPx: 1082 },
+      { name: "35", sheetRow: 36, fallback: "35.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "integrate", outroMode: "decay", fallbackLeftPx: 5582, fallbackTopPx: 935 },
+      { name: "36", sheetRow: 37, fallback: "36.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "route-map", outroMode: "decay", fallbackLeftPx: 6584, fallbackTopPx: 1101 },
+      { name: "37", sheetRow: 38, fallback: "37.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "clues", outroMode: "decay", fallbackLeftPx: 7184, fallbackTopPx: 1122 },
+      { name: "38", sheetRow: 39, fallback: "38.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "filter-facts", outroMode: "decay", fallbackLeftPx: 8172, fallbackTopPx: 843 },
+      { name: "39", sheetRow: 40, fallback: "39.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "report", outroMode: "decay", fallbackLeftPx: 8934, fallbackTopPx: 1175 },
+      { name: "40", sheetRow: 41, fallback: "40.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "read-line", outroMode: "decay", fallbackLeftPx: 1120, fallbackTopPx: 1874 },
+      { name: "41", sheetRow: 42, fallback: "41.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "vague-locate", outroMode: "decay", fallbackLeftPx: 2120, fallbackTopPx: 1961 },
+      { name: "42", sheetRow: 43, fallback: "42.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "mesh", outroMode: "decay", fallbackLeftPx: 2553, fallbackTopPx: 1846 },
+      { name: "43", sheetRow: 44, fallback: "43.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "output-only", outroMode: "decay", fallbackLeftPx: 3605, fallbackTopPx: 2089 },
+      { name: "44", sheetRow: 45, fallback: "44.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "ask-around", outroMode: "decay", fallbackLeftPx: 4353, fallbackTopPx: 2150 },
+      { name: "45", sheetRow: 46, fallback: "45.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "puzzle", outroMode: "decay", fallbackLeftPx: 5013, fallbackTopPx: 2267 },
+      { name: "46", sheetRow: 47, fallback: "46.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "fragments", outroMode: "decay", fallbackLeftPx: 5717, fallbackTopPx: 2064 },
+      { name: "47", sheetRow: 48, fallback: "47.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "cool-down", outroMode: "decay", fallbackLeftPx: 6653, fallbackTopPx: 2096 },
+      { name: "48", sheetRow: 49, fallback: "48.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "compute-feeling", outroMode: "decay", fallbackLeftPx: 7429, fallbackTopPx: 2077 },
+      { name: "49", sheetRow: 50, fallback: "49.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "excerpt", outroMode: "decay", fallbackLeftPx: 8132, fallbackTopPx: 1821 },
+      { name: "50", sheetRow: 51, fallback: "50.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "unseen-impact", outroMode: "decay", fallbackLeftPx: 8714, fallbackTopPx: 1938 },
+      { name: "51", sheetRow: 52, fallback: "51.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "lesson-only", outroMode: "decay", fallbackLeftPx: 1021, fallbackTopPx: 2871 },
+      { name: "52", sheetRow: 53, fallback: "52.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "sound-pulse", outroMode: "decay", fallbackLeftPx: 1793, fallbackTopPx: 2893 },
+      { name: "53", sheetRow: 54, fallback: "53.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "to-sentence", outroMode: "decay", fallbackLeftPx: 2760, fallbackTopPx: 2935 },
+      { name: "54", sheetRow: 55, fallback: "54.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "line-up", outroMode: "decay", fallbackLeftPx: 3423, fallbackTopPx: 2860 },
+      { name: "55", sheetRow: 56, fallback: "55.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "concept-flat", outroMode: "decay", fallbackLeftPx: 4147, fallbackTopPx: 3209 },
+      { name: "56", sheetRow: 57, fallback: "56.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "recede", outroMode: "decay", fallbackLeftPx: 5056, fallbackTopPx: 3052 },
+      { name: "57", sheetRow: 58, fallback: "57.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "rotate-3d", outroMode: "decay", fallbackLeftPx: 5638, fallbackTopPx: 3109 },
+      { name: "58", sheetRow: 59, fallback: "58.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "trait-list", outroMode: "decay", fallbackLeftPx: 6398, fallbackTopPx: 2942 },
+      { name: "59", sheetRow: 60, fallback: "59.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "volume-sense", outroMode: "decay", fallbackLeftPx: 7477, fallbackTopPx: 3067 },
+      { name: "60", sheetRow: 61, fallback: "60.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "restore", outroMode: "decay", fallbackLeftPx: 8076, fallbackTopPx: 3088 },
+      { name: "61", sheetRow: 62, fallback: "61.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "pin-address", outroMode: "decay", fallbackLeftPx: 8949, fallbackTopPx: 3132 },
+      { name: "62", sheetRow: 63, fallback: "62.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "layout-mem", outroMode: "decay", fallbackLeftPx: 1078, fallbackTopPx: 3735 },
+      { name: "63", sheetRow: 64, fallback: "63.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "direction-length", outroMode: "decay", fallbackLeftPx: 1874, fallbackTopPx: 3848 },
+      { name: "64", sheetRow: 65, fallback: "64.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "mutual-distance", outroMode: "decay", fallbackLeftPx: 2598, fallbackTopPx: 4172 },
+      { name: "65", sheetRow: 66, fallback: "65.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "reflected", outroMode: "decay", fallbackLeftPx: 3616, fallbackTopPx: 3871 },
+      { name: "66", sheetRow: 67, fallback: "66.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "procedure", outroMode: "decay", fallbackLeftPx: 4295, fallbackTopPx: 3909 },
+      { name: "67", sheetRow: 68, fallback: "67.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "body-trace", outroMode: "decay", fallbackLeftPx: 5158, fallbackTopPx: 3940 },
+      { name: "68", sheetRow: 69, fallback: "68.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "stitch-space", outroMode: "decay", fallbackLeftPx: 5673, fallbackTopPx: 3838 },
+      { name: "69", sheetRow: 70, fallback: "69.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "walk-blueprint", outroMode: "decay", fallbackLeftPx: 6550, fallbackTopPx: 3846 },
+      { name: "70", sheetRow: 71, fallback: "70.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "cog-machine", outroMode: "decay", fallbackLeftPx: 7323, fallbackTopPx: 4150 },
+      { name: "71", sheetRow: 72, fallback: "71.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "table", outroMode: "decay", fallbackLeftPx: 8016, fallbackTopPx: 3825 },
+      { name: "72", sheetRow: 73, fallback: "72.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "verbal-unfold", outroMode: "decay", fallbackLeftPx: 9008, fallbackTopPx: 3964 },
+      { name: "73", sheetRow: 74, fallback: "73.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "chronicle", outroMode: "decay", fallbackLeftPx: 1025, fallbackTopPx: 4702 },
+      { name: "74", sheetRow: 75, fallback: "74.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "coord-assign", outroMode: "decay", fallbackLeftPx: 1796, fallbackTopPx: 4981 },
+      { name: "75", sheetRow: 76, fallback: "75.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "assemble-parts", outroMode: "decay", fallbackLeftPx: 2820, fallbackTopPx: 4882 },
+      { name: "76", sheetRow: 77, fallback: "76.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "time-path", outroMode: "decay", fallbackLeftPx: 3306, fallbackTopPx: 4863 },
+      { name: "77", sheetRow: 78, fallback: "77.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "map-pin", outroMode: "decay", fallbackLeftPx: 4425, fallbackTopPx: 4933 },
+      { name: "78", sheetRow: 79, fallback: "78.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "self-center", outroMode: "decay", fallbackLeftPx: 5179, fallbackTopPx: 5093 },
+      { name: "80", sheetRow: 81, fallback: "80.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "invisible-volume", outroMode: "decay", fallbackLeftPx: 5577, fallbackTopPx: 5025 },
     ];
 
     // 시드 기반 deterministic random (rowIndex로 일관된 jitter)
