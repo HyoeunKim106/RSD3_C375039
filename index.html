@@ -2599,20 +2599,20 @@
             };
           }
 
-          // ─── 텍스트 컬러: 베이스 #6d0039 + 채도 영역 위는 #ff57a3 ───
+          // ─── 텍스트 컬러: 베이스 #6d0039 + 채도 영역 위는 밝아짐 (성능 우선) ───
           //  목표:
-          //    (a) 글자가 reveal 이미지 채도 영역(흰색 아닌 곳) 위에 있을 때 → 핑크 #ff57a3
-          //    (b) 글자가 흰 배경 / reveal 흰 영역 / reveal 바깥에 있을 때 → 원래 #6d0039
+          //    (a) 글자가 reveal 이미지 채도 영역 위에 있을 때 → 밝아짐 (핑크 톤)
+          //    (b) 글자가 흰 배경 / reveal 바깥에 있을 때 → 거의 #6d0039 그대로
           //
-          //  구현:
-          //    1) 베이스 글자 #6d0039를 source-over로 깔기 (어디서나 원래 색)
+          //  구현 (픽셀 처리 없음, blend mode 한 번):
+          //    1) 베이스 글자 #6d0039를 source-over로 깔기
           //    2) 임시 캔버스에 글자 모양 안 reveal 이미지 클리핑
-          //    3) 임시 캔버스의 흰/밝은 픽셀의 알파를 제거 (luminance 임계값 기반)
-          //    4) 임시 캔버스를 #ff57a3로 색 채움 (source-in)
-          //    5) 임시 캔버스를 메인에 source-over → 채도 영역에만 핑크가 덮임
+          //    3) 임시 캔버스를 메인에 'screen' 합성 (전체 알파 낮춤)
+          //       → 채도 영역: reveal 색이 베이스에 더해져 핑크/밝은 톤
+          //       → 흰 영역: 알파가 낮아서 베이스(#6d0039)가 거의 그대로 보임
           if (!sentTempCanvas) {
             sentTempCanvas = document.createElement("canvas");
-            sentTempCtx = sentTempCanvas.getContext("2d", { willReadFrequently: true });
+            sentTempCtx = sentTempCanvas.getContext("2d");
           }
           if (sentTempCanvas.width !== sentenceCanvas.width ||
               sentTempCanvas.height !== sentenceCanvas.height) {
@@ -2641,13 +2641,11 @@
           sentenceCtx.restore();
 
           // ── 2) 임시 캔버스: 글자 모양 안에 reveal 이미지 클리핑 ──
-          // (a) 클리어
           sentTempCtx.save();
           sentTempCtx.setTransform(1, 0, 0, 1, 0, 0);
           sentTempCtx.clearRect(0, 0, sentTempCanvas.width, sentTempCanvas.height);
           sentTempCtx.restore();
 
-          // (b) 글자 모양 (마스크용, 색 무관)
           sentTempCtx.save();
           sentTempCtx.setTransform(px.w / size, 0, 0, px.h / size, 0, 0);
           sentTempCtx.translate(cx + swayX, cyBase + y);
@@ -2661,7 +2659,6 @@
           );
           sentTempCtx.restore();
 
-          // (c) reveal 이미지를 source-in → 글자 모양 안에 이미지만
           if (canvas && canvas.width > 0) {
             sentTempCtx.save();
             sentTempCtx.setTransform(1, 0, 0, 1, 0, 0);
@@ -2670,50 +2667,15 @@
               0, 0, canvas.width, canvas.height,
               0, 0, sentTempCanvas.width, sentTempCanvas.height);
             sentTempCtx.restore();
-
-            // (d) 흰/밝은 픽셀의 알파를 제거 — luminance 기준
-            //     글자가 reveal 흰 영역(이미지 배경) 위에 있을 때, 그 픽셀은 합성 안 됨 → 베이스 #6d0039 그대로 유지
-            try {
-              const W = sentTempCanvas.width;
-              const H = sentTempCanvas.height;
-              const imgData = sentTempCtx.getImageData(0, 0, W, H);
-              const data = imgData.data;
-              // 임계: luminance 215 이상이면 거의 흰색으로 간주
-              // 215~245 구간에서 부드럽게 페이드 (이 구간 알파 비례 감소)
-              // 245 이상은 알파 0
-              const LO = 215, HI = 245;
-              const HI_LO = HI - LO;
-              for (let i = 0; i < data.length; i += 4) {
-                if (data[i + 3] === 0) continue;
-                const r = data[i], g = data[i + 1], b2 = data[i + 2];
-                const lum = 0.299 * r + 0.587 * g + 0.114 * b2;
-                if (lum >= HI) {
-                  data[i + 3] = 0;
-                } else if (lum > LO) {
-                  const t = (lum - LO) / HI_LO;
-                  data[i + 3] = Math.round(data[i + 3] * (1 - t));
-                }
-              }
-              sentTempCtx.putImageData(imgData, 0, 0);
-            } catch (e) {
-              // CORS 등으로 getImageData 실패 시 무시 (베이스 #6d0039만 보임)
-            }
-
-            // (e) #ff57a3로 색 채움 (source-in: 알파 있는 픽셀만 색이 입혀짐)
-            sentTempCtx.save();
-            sentTempCtx.setTransform(1, 0, 0, 1, 0, 0);
-            sentTempCtx.globalCompositeOperation = "source-in";
-            sentTempCtx.fillStyle = "#ff57a3";
-            sentTempCtx.fillRect(0, 0, sentTempCanvas.width, sentTempCanvas.height);
-            sentTempCtx.restore();
           }
 
-          // ── 3) 임시 캔버스를 메인에 source-over로 덮어 그림 ──
-          //   채도 영역 위 글자 픽셀만 #ff57a3로 덮임. 흰 영역과 reveal 바깥은 베이스 그대로.
+          // ── 3) 임시 캔버스를 메인에 'screen'으로 합성 ──
+          //   알파 0.55로 낮춰서 흰 영역에서 베이스 #6d0039가 거의 그대로 보이게
+          //   채도 영역에선 reveal 색이 베이스에 더해져 핑크/밝은 톤
           sentenceCtx.save();
           sentenceCtx.setTransform(1, 0, 0, 1, 0, 0);
-          sentenceCtx.globalAlpha = opacity;
-          sentenceCtx.globalCompositeOperation = "source-over";
+          sentenceCtx.globalAlpha = opacity * 0.55;
+          sentenceCtx.globalCompositeOperation = "screen";
           sentenceCtx.drawImage(sentTempCanvas, 0, 0);
           sentenceCtx.restore();
         }
