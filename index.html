@@ -1351,6 +1351,26 @@
           else if (outroMode === "outline") updateOutline(now);
           else if (outroMode === "gravity") updateGravity(now);
           else if (outroMode === "residue") updateResidue(now);
+          // ── 19개 새 outro (01~19.png용, alightworld 톤) ──
+          else if (outroMode === "o-narration") updateNarration(now);
+          else if (outroMode === "o-papers") updatePapers(now);
+          else if (outroMode === "o-broken-line") updateBrokenLine(now);
+          else if (outroMode === "o-plot-line") updatePlotLine(now);
+          else if (outroMode === "o-dead-bulb") updateDeadBulb(now);
+          else if (outroMode === "o-switch") updateSwitch(now);
+          else if (outroMode === "o-empty-center") updateEmptyCenter(now);
+          else if (outroMode === "o-label") updateLabel(now);
+          else if (outroMode === "o-blueprint") updateBlueprint(now);
+          else if (outroMode === "o-cards") updateCards(now);
+          else if (outroMode === "o-3d-map") update3DMap(now);
+          else if (outroMode === "o-spreadsheet") updateSpreadsheet(now);
+          else if (outroMode === "o-grid") updateGrid(now);
+          else if (outroMode === "o-nodes") updateNodes(now);
+          else if (outroMode === "o-vector") updateVector(now);
+          else if (outroMode === "o-mass") updateMass(now);
+          else if (outroMode === "o-mixed") updateMixed(now);
+          else if (outroMode === "o-raw-cluster") updateRawCluster(now);
+          else if (outroMode === "o-long-thread") updateLongThread(now);
           else updateDecay(now);
           decayRafId = requestAnimationFrame(tickDecay);
         };
@@ -1875,6 +1895,494 @@
             `rotate(${rot.toFixed(4)}rad) ` +
             `scale(${scale.toFixed(3)})`;
           g.el.style.opacity = opacity.toFixed(3);
+        }
+      }
+
+      // ─────────────────────────────────────────────
+      // 01~19.png용 19개 새 outro 모션 (alightworld 톤)
+      //   - 글자가 항상 살짝 보임 (alpha 최소 0.30~0.50)
+      //   - 진폭 작게, sin 주기 느리게
+      //   - 무한 루프 (사이클 또는 sin 기반)
+      //   공통 인트로: introT (0~1, 1.5초) — 글자가 scatter에서 형상으로 부드럽게 도착
+      // ─────────────────────────────────────────────
+
+      function applyIntroOffset(g, introT) {
+        if (introT >= 1) return { ox: 0, oy: 0 };
+        const arr = Math.max(0, Math.min(1, introT - g.arrivalDelay * 0.3));
+        const ae = 1 - Math.pow(1 - arr, 3);
+        return {
+          ox: (g.scatterX * 0.3) * (1 - ae),
+          oy: (g.scatterY * 0.3) * (1 - ae),
+        };
+      }
+
+      function writeGlyph(g, x, y, opacity, rot, scale) {
+        g.el.style.transform =
+          `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) ` +
+          `rotate(${(rot || 0).toFixed(4)}rad) ` +
+          `scale(${(scale || 1).toFixed(3)})`;
+        g.el.style.opacity = Math.max(0, Math.min(1, opacity)).toFixed(3);
+      }
+
+      // 01. 3인칭 소설 대본 — 글자가 문단 덩어리로 멀찍이 흩어짐, 가끔 줄 맞춤
+      function updateNarration(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const para = i % 3;
+          const paraOffset = [{ x: -60, y: -25 }, { x: 0, y: 5 }, { x: 60, y: -10 }][para];
+          const posInPara = Math.floor(i / 3);
+          const colX = (posInPara % 5) * 8 - 16;
+          const rowY = Math.floor(posInPara / 5) * 10;
+          const alignT = Math.max(0, Math.sin(elapsed * 0.35) - 0.3) / 0.7;
+          const drift = Math.sin(elapsed * 0.3 + i * 0.4) * 2 + Math.cos(elapsed * 0.25 + i * 0.3) * 1.5;
+          const driftY = Math.cos(elapsed * 0.28 + i * 0.35) * 1.2;
+          const x = (paraOffset.x + colX + drift) * (1 - alignT * 0.4);
+          const y = (paraOffset.y + rowY + driftY) * (1 - alignT * 0.3);
+          const off = applyIntroOffset(g, introT);
+          const alpha = introEased * (0.65 + Math.sin(elapsed * 0.4 + i * 0.2) * 0.10);
+          writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, 0.95);
+        }
+      }
+
+      // 02. 남겨진 서류 뭉치 — 글자들이 여러 레이어로 겹쳐 어긋남
+      function updatePapers(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const layer = i % 5;
+          const layerOffset = layer * 2 - 4;
+          const slipX = Math.sin(elapsed * 0.2 + layer * 0.8) * 4 + layerOffset;
+          const slipY = Math.cos(elapsed * 0.18 + layer * 0.6) * 3 + layerOffset * 0.7;
+          const x = g.baseX + slipX;
+          const y = g.baseY + slipY;
+          const fallY = (i % 7 === 0) ? Math.sin(elapsed * 0.15 + i * 0.2) * 3 + 2 : 0;
+          const alpha = introEased * (0.45 + (4 - layer) * 0.10);
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, x + off.ox, y + fallY + off.oy, alpha, (layer - 2) * 0.01, 1);
+        }
+      }
+
+      // 03. 뚝뚝 끊어진 선 — 짧은 가로선 조각, 간헐적으로 켜졌다 꺼짐
+      function updateBrokenLine(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const segment = Math.floor(i / 4);
+          const posInSeg = i % 4;
+          const segGapX = (segment % 3) * 40 - 40;
+          const segGapY = Math.floor(segment / 3) * 20 - 15;
+          const lineX = posInSeg * 9 - 13;
+          const segPhase = segment * 0.7 + elapsed * 0.4;
+          const on = (Math.sin(segPhase) + 1) / 2;
+          const segOn = on > 0.4 ? 1 : (on > 0.2 ? (on - 0.2) / 0.2 : 0);
+          const x = segGapX + lineX * segOn;
+          const y = segGapY;
+          const alpha = introEased * (0.30 + segOn * 0.60);
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, 0.95);
+        }
+      }
+
+      // 04. 글자로 된 줄거리 — 좌상→우하 긴 흐름선
+      function updatePlotLine(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const myT = total > 1 ? i / (total - 1) : 0.5;
+          const flowX = (myT - 0.5) * 120;
+          const flowY = (myT - 0.5) * 50;
+          const isNode = i % 5 === 0;
+          const nodeY = isNode ? -4 : 0;
+          const flowT = (elapsed * 0.12 + myT) % 1;
+          const breath = Math.sin(flowT * Math.PI) * 3;
+          const x = flowX;
+          const y = flowY + nodeY + breath;
+          const alpha = introEased * (isNode ? 0.85 : 0.65);
+          const scale = isNode ? 1.04 : 0.96;
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, scale);
+        }
+      }
+
+      // 05. 꺼진 전구 — 거의 안 보이다가 간헐 점등
+      function updateDeadBulb(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const tryPhase = elapsed * 0.6 + i * 0.7;
+          const flicker = Math.sin(tryPhase) * Math.sin(tryPhase * 3.2);
+          const onness = Math.max(0, flicker - 0.4) / 0.6;
+          const x = g.baseX + Math.sin(elapsed * 0.5 + i) * 0.5;
+          const y = g.baseY + Math.cos(elapsed * 0.4 + i) * 0.4;
+          const alpha = introEased * (0.18 + onness * 0.55);
+          const scale = 0.94 + onness * 0.04;
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, scale);
+        }
+      }
+
+      // 06. 반응형 스위치 — 그룹 단위 on/off
+      function updateSwitch(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const group = i % 4;
+          const period = 2.5 + group * 0.5;
+          const phase = (elapsed + group * 1.2) % period / period;
+          let onState;
+          if (phase < 0.45) onState = 1;
+          else if (phase < 0.50) onState = 1 - (phase - 0.45) / 0.05;
+          else if (phase < 0.95) onState = 0;
+          else onState = (phase - 0.95) / 0.05;
+          const switchOffset = onState * 2;
+          const x = g.baseX + (group % 2 === 0 ? switchOffset : -switchOffset);
+          const y = g.baseY;
+          const alpha = introEased * (0.30 + onState * 0.60);
+          const scale = 0.96 + onState * 0.06;
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, scale);
+        }
+      }
+
+      // 07. 텅 빈 마당 — 글자가 중심 피해 가장자리 분포
+      function updateEmptyCenter(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const angle = (i / total) * Math.PI * 2 + elapsed * 0.06;
+          const radius = 45 + Math.sin(elapsed * 0.2 + i * 0.4) * 5;
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius * 0.5;
+          const pullPhase = elapsed * 0.25 + i * 0.5;
+          const pullT = Math.max(0, Math.sin(pullPhase) - 0.6) / 0.4;
+          const pulled = 1 - pullT * 0.3;
+          const alpha = introEased * (0.60 + Math.sin(elapsed * 0.3 + i * 0.2) * 0.10);
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, x * pulled + off.ox, y * pulled + off.oy, alpha, 0, 0.95);
+        }
+      }
+
+      // 08. 정보 태그 — 글자가 라벨처럼 튀어나옴
+      function updateLabel(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const labelAngle = (i / total) * Math.PI * 2;
+          const labelR = 28;
+          const baseX = Math.cos(labelAngle) * labelR;
+          const baseY = Math.sin(labelAngle) * labelR * 0.6;
+          const popPhase = elapsed * 0.4 + i * 0.6;
+          const popT = Math.max(0, Math.sin(popPhase) - 0.5) / 0.5;
+          const popX = baseX + Math.cos(labelAngle) * popT * 6;
+          const popY = baseY + Math.sin(labelAngle) * popT * 4;
+          const alpha = introEased * (0.55 + popT * 0.35);
+          const scale = 0.95 + popT * 0.08;
+          const rot = popT * (labelAngle > Math.PI ? -0.05 : 0.05);
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, popX + off.ox, popY + off.oy, alpha, rot, scale);
+        }
+      }
+
+      // 09. 보이지 않는 설계도 — 글자가 직사각형 변 위 분포
+      function updateBlueprint(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const segment = i % 4;
+          const posInSeg = Math.floor(i / 4);
+          const totalPerSeg = Math.ceil(total / 4);
+          const t = totalPerSeg > 1 ? posInSeg / (totalPerSeg - 1) : 0.5;
+          const W = 60, H = 30;
+          let bx, by;
+          if (segment === 0) { bx = -W/2 + t * W; by = -H/2; }
+          else if (segment === 1) { bx = W/2; by = -H/2 + t * H; }
+          else if (segment === 2) { bx = W/2 - t * W; by = H/2; }
+          else { bx = -W/2; by = H/2 - t * H; }
+          const tremX = Math.sin(elapsed * 0.5 + i * 0.3) * 0.5;
+          const tremY = Math.cos(elapsed * 0.45 + i * 0.25) * 0.5;
+          const alpha = introEased * (0.70 + Math.sin(elapsed * 0.3 + i * 0.2) * 0.10);
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, bx + tremX + off.ox, by + tremY + off.oy, alpha, 0, 0.95);
+        }
+      }
+
+      // 10. 단어 카드 — 일렬 카드, 가끔 뒤집힘
+      function updateCards(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const cardX = (i - (total - 1) / 2) * 11;
+          const flipPhase = elapsed * 0.3 + i * 0.5;
+          const flipT = (Math.sin(flipPhase) + 1) / 2;
+          const slipX = Math.sin(flipPhase * 0.7) * 2;
+          const x = cardX + slipX;
+          const y = Math.sin(elapsed * 0.25 + i * 0.4) * 1.5;
+          const alpha = introEased * (0.65 + flipT * 0.25);
+          const scale = 0.94 + flipT * 0.06;
+          const rot = (flipT - 0.5) * 0.06;
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, x + off.ox, y + off.oy, alpha, rot, scale);
+        }
+      }
+
+      // 11. 보이지 않는 3D 지도 — 글자가 다른 깊이에 분포, 시점 회전
+      function update3DMap(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const my3dX = (seed(i, 12.9) - 0.5) * 100;
+          const my3dY = (seed(i, 78.2) - 0.5) * 50;
+          const my3dZ = seed(i, 47.3) * 2 - 1;
+          const rotAngle = elapsed * 0.1;
+          const rotX = my3dX * Math.cos(rotAngle) + my3dZ * 30 * Math.sin(rotAngle);
+          const rotZ = my3dZ * Math.cos(rotAngle) - my3dX / 30 * Math.sin(rotAngle);
+          const depthScale = 0.85 + rotZ * 0.15;
+          const x = rotX;
+          const y = my3dY;
+          const alpha = introEased * (0.50 + (rotZ + 1) / 2 * 0.40);
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, depthScale);
+        }
+      }
+
+      // 12. 엑셀 시트 — 격자 셀, 선택 행 깜빡
+      function updateSpreadsheet(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        const cols = 5;
+        const cellW = 18, cellH = 12;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          const totalRows = Math.ceil(total / cols);
+          const cellX = (col - (cols - 1) / 2) * cellW;
+          const cellY = (row - (totalRows - 1) / 2) * cellH;
+          const selRow = Math.floor(elapsed * 0.5) % Math.max(1, totalRows);
+          const isSelected = row === selRow;
+          const blink = isSelected ? (Math.sin(elapsed * 4) + 1) / 2 : 0;
+          const tremX = Math.sin(elapsed * 0.4 + i * 0.2) * 0.3;
+          const tremY = Math.cos(elapsed * 0.35 + i * 0.18) * 0.3;
+          const alpha = introEased * (0.60 + (isSelected ? 0.25 : 0) + blink * 0.10);
+          const scale = 0.94 + (isSelected ? 0.04 : 0);
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, cellX + tremX + off.ox, cellY + tremY + off.oy, alpha, 0, scale);
+        }
+      }
+
+      // 13. 표와 격자 — 격자선 교차점, 행/열 단위 호흡
+      function updateGrid(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        const cols = 6;
+        const gx = 14, gy = 12;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          const totalRows = Math.ceil(total / cols);
+          const baseX = (col - (cols - 1) / 2) * gx;
+          const baseY = (row - (totalRows - 1) / 2) * gy;
+          const colBreath = Math.sin(elapsed * 0.3 + col * 0.6) * 1.5;
+          const rowBreath = Math.cos(elapsed * 0.28 + row * 0.7) * 1.2;
+          const x = baseX + colBreath;
+          const y = baseY + rowBreath;
+          const alpha = introEased * 0.75;
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, 0.95);
+        }
+      }
+
+      // 14. 연결된 점과 점 — 글자가 점 노드로 분포
+      function updateNodes(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const nodeAngle = seed(i, 12.9) * Math.PI * 2;
+          const nodeR = 18 + seed(i, 78.2) * 25;
+          const nodeX = Math.cos(nodeAngle) * nodeR;
+          const nodeY = Math.sin(nodeAngle) * nodeR * 0.55;
+          const breath = Math.sin(elapsed * 0.4 + i * 0.5) * 1;
+          const x = nodeX + breath;
+          const y = nodeY + Math.cos(elapsed * 0.35 + i * 0.4) * 0.8;
+          const activePhase = elapsed * 0.6 + i * 0.3;
+          const active = Math.max(0, Math.sin(activePhase) - 0.6) / 0.4;
+          const alpha = introEased * (0.55 + active * 0.30);
+          const scale = 0.5 + active * 0.25;
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, scale);
+        }
+      }
+
+      // 15. 화살표와 벡터 — 글자가 방향성 있게 흐름
+      function updateVector(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const vectorAngle = seed(i, 12.9) * Math.PI * 2 + elapsed * 0.04;
+          const flowPhase = elapsed * 0.5 + i * 0.4;
+          const flow = (Math.sin(flowPhase) + 1) / 2;
+          const dist = 12 + flow * 8;
+          const x = Math.cos(vectorAngle) * dist;
+          const y = Math.sin(vectorAngle) * dist * 0.6;
+          const rot = vectorAngle * 0.1;
+          const alpha = introEased * (0.62 + flow * 0.20);
+          const scale = 0.94 + flow * 0.04;
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, x + off.ox, y + off.oy, alpha, rot, scale);
+        }
+      }
+
+      // 16. 인지된 공간 덩어리 — 3개 클러스터, 모였다 흩어짐
+      function updateMass(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        const clusterCenters = [
+          { x: -30, y: -8 }, { x: 25, y: 10 }, { x: 5, y: -18 }
+        ];
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const cluster = i % 3;
+          const cc = clusterCenters[cluster];
+          const inClusterX = (seed(i, 23.7) - 0.5) * 18;
+          const inClusterY = (seed(i, 47.1) - 0.5) * 14;
+          const merge = (Math.sin(elapsed * 0.2) + 1) / 2;
+          const mergeFactor = 0.6 + merge * 0.4;
+          const x = cc.x * mergeFactor + inClusterX;
+          const y = cc.y * mergeFactor + inClusterY;
+          const alpha = introEased * (0.68 + Math.sin(elapsed * 0.3 + i * 0.2) * 0.08);
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, 0.96);
+        }
+      }
+
+      // 17. 복합 정보 세트 — 4가지 시스템 동시 (카드/점/라벨/선)
+      function updateMixed(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const sys = i % 4;
+          let x, y, alpha, scale;
+          if (sys === 0) {
+            x = -35 + Math.sin(elapsed * 0.3 + i * 0.4) * 1.5;
+            y = (Math.floor(i / 4) - total / 8) * 8;
+            scale = 0.95;
+            alpha = 0.72;
+          } else if (sys === 1) {
+            const angle = (i / total) * Math.PI * 2 + elapsed * 0.05;
+            x = 30 + Math.cos(angle) * 12;
+            y = Math.sin(angle) * 10;
+            scale = 0.55;
+            alpha = 0.65;
+          } else if (sys === 2) {
+            x = (seed(i, 23.7) - 0.5) * 60;
+            y = -25 + (seed(i, 47.1) - 0.5) * 6;
+            scale = 0.92;
+            alpha = 0.70;
+          } else {
+            x = (Math.floor(i / 4) - total / 8) * 9;
+            y = 25 + Math.sin(elapsed * 0.4 + i * 0.5) * 1;
+            scale = 0.94;
+            alpha = 0.74;
+          }
+          const breath = Math.sin(elapsed * 0.3 + i * 0.2) * 0.06;
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, x + off.ox, y + off.oy, introEased * (alpha + breath), 0, scale);
+        }
+      }
+
+      // 18. 원시 데이터 뭉치 — 빽빽한 군집, 미세 떨림, 가끔 추출
+      function updateRawCluster(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const rawX = (seed(i, 12.9) - 0.5) * 35;
+          const rawY = (seed(i, 78.2) - 0.5) * 22;
+          const noiseX = Math.sin(elapsed * 2.5 + i * 1.7) * 1.2 + Math.cos(elapsed * 1.8 + i * 0.9) * 0.6;
+          const noiseY = Math.cos(elapsed * 2.3 + i * 1.5) * 0.9 + Math.sin(elapsed * 1.6 + i * 0.8) * 0.5;
+          const extractPhase = elapsed * 0.4 + i * 0.3;
+          const extract = Math.max(0, Math.sin(extractPhase) - 0.85) / 0.15;
+          const extractY = -extract * 6;
+          const x = rawX + noiseX;
+          const y = rawY + noiseY + extractY;
+          const alpha = introEased * (0.55 + extract * 0.30 + Math.sin(elapsed * 0.5 + i * 0.3) * 0.08);
+          const scale = 0.92 + extract * 0.10;
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, scale);
+        }
+      }
+
+      // 19. 길게 늘어진 문장 — 글자가 긴 끈처럼, 머리 따라 지연되며 따라옴
+      function updateLongThread(now) {
+        const elapsed = (now - decayStartTime) / 1000;
+        const introT = Math.min(1, elapsed / 1.5);
+        const introEased = 1 - Math.pow(1 - introT, 3);
+        const total = decayGlyphs.length;
+        for (let i = 0; i < total; i++) {
+          const g = decayGlyphs[i];
+          const myDelay = i * 0.08;
+          const tailHeadX = Math.sin((elapsed - myDelay) * 0.25) * 30;
+          const tailHeadY = Math.cos((elapsed - myDelay) * 0.22) * 15;
+          const stringX = -((total - 1) / 2 - i) * 5;
+          const stretchT = (Math.sin(elapsed * 0.18) + 1) / 2;
+          const stretch = 0.85 + stretchT * 0.3;
+          const x = tailHeadX + stringX * stretch;
+          const y = tailHeadY + (i - (total - 1) / 2) * 0.4;
+          const alpha = introEased * (0.70 + Math.sin(elapsed * 0.4 + i * 0.2) * 0.08);
+          const off = applyIntroOffset(g, introT);
+          writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, 0.94);
         }
       }
 
@@ -4486,7 +4994,8 @@
               outroMode === "coordinates" ||
               outroMode === "outline" ||
               outroMode === "gravity" ||
-              outroMode === "residue") {
+              outroMode === "residue" ||
+              outroMode.startsWith("o-")) {
             buildDecayText(fullText);
           } else if (outroMode === "ripple") {
             buildRippleText(fullText);
@@ -4910,7 +5419,7 @@
         framesCount: 1,
         holdSentence: true,
         holdSentenceStyle: "connect",
-        outroMode: "decay",
+        outroMode: "o-broken-line",
         fallbackLeftPx: 750, fallbackTopPx: 666,
       },
       {
@@ -4918,7 +5427,7 @@
         framesCount: 1,
         holdSentence: true,
         holdSentenceStyle: "keyword",
-        outroMode: "coordinates",
+        outroMode: "o-plot-line",
         fallbackLeftPx: 2625, fallbackTopPx: 1066,
       },
       {
@@ -4926,7 +5435,7 @@
         framesCount: 1,
         holdSentence: true,
         holdSentenceStyle: "spotlight",
-        outroMode: "outline",
+        outroMode: "o-dead-bulb",
         fallbackLeftPx: 4625, fallbackTopPx: 666,
       },
       {
@@ -4942,7 +5451,7 @@
         framesCount: 1,
         holdSentence: true,
         holdSentenceStyle: "signal",
-        outroMode: "ripple",
+        outroMode: "o-switch",
         fallbackLeftPx: 1125, fallbackTopPx: 3200,
       },
       {
@@ -4950,7 +5459,7 @@
         framesCount: 1,
         holdSentence: true,
         holdSentenceStyle: "floorplan",
-        outroMode: "gravity",
+        outroMode: "o-blueprint",
         fallbackLeftPx: 3625, fallbackTopPx: 3066,
       },
       {
@@ -4958,7 +5467,7 @@
         framesCount: 1,
         holdSentence: true,
         holdSentenceStyle: "logic",
-        outroMode: "decay",
+        outroMode: "o-empty-center",
         fallbackLeftPx: 6250, fallbackTopPx: 3333,
       },
       {
@@ -4966,7 +5475,7 @@
         framesCount: 1,
         holdSentence: true,
         holdSentenceStyle: "skeleton",
-        outroMode: "ripple",
+        outroMode: "o-cards",
         fallbackLeftPx: 1500, fallbackTopPx: 5400,
       },
       {
@@ -4974,7 +5483,7 @@
         framesCount: 1,
         holdSentence: true,
         holdSentenceStyle: "label",
-        outroMode: "volume",
+        outroMode: "o-label",
         fallbackLeftPx: 4125, fallbackTopPx: 5466,
       },
       {
@@ -4987,17 +5496,17 @@
         fallbackLeftPx: 6500, fallbackTopPx: 5200,
       },
       // ── 기존 추가 인스턴스 (01, 02, 11~27): breathe + decay ──
-      { name: "01", sheetRow: 2, fallback: "01.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "distant-read", outroMode: "decay", fallbackLeftPx: 1000, fallbackTopPx: 1200 },
-      { name: "02", sheetRow: 3, fallback: "02.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "scan", outroMode: "decay", fallbackLeftPx: 2000, fallbackTopPx: 1733 },
-      { name: "11", sheetRow: 12, fallback: "11.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "dictionary", outroMode: "decay", fallbackLeftPx: 3000, fallbackTopPx: 2266 },
-      { name: "12", sheetRow: 13, fallback: "12.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "measure", outroMode: "decay", fallbackLeftPx: 4000, fallbackTopPx: 1533 },
-      { name: "13", sheetRow: 14, fallback: "13.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "chart", outroMode: "decay", fallbackLeftPx: 5000, fallbackTopPx: 2066 },
-      { name: "14", sheetRow: 15, fallback: "14.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "cells", outroMode: "decay", fallbackLeftPx: 6000, fallbackTopPx: 1400 },
-      { name: "15", sheetRow: 16, fallback: "15.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "network", outroMode: "decay", fallbackLeftPx: 7000, fallbackTopPx: 1933 },
-      { name: "16", sheetRow: 17, fallback: "16.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "body-distance", outroMode: "decay", fallbackLeftPx: 8000, fallbackTopPx: 2400 },
-      { name: "17", sheetRow: 18, fallback: "17.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "certainty", outroMode: "decay", fallbackLeftPx: 8750, fallbackTopPx: 1333 },
-      { name: "18", sheetRow: 19, fallback: "18.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "branches", outroMode: "decay", fallbackLeftPx: 1687, fallbackTopPx: 2933 },
-      { name: "19", sheetRow: 20, fallback: "19.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "facts", outroMode: "decay", fallbackLeftPx: 2687, fallbackTopPx: 3800 },
+      { name: "01", sheetRow: 2, fallback: "01.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "distant-read", outroMode: "o-narration", fallbackLeftPx: 1000, fallbackTopPx: 1200 },
+      { name: "02", sheetRow: 3, fallback: "02.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "scan", outroMode: "o-papers", fallbackLeftPx: 2000, fallbackTopPx: 1733 },
+      { name: "11", sheetRow: 12, fallback: "11.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "dictionary", outroMode: "o-3d-map", fallbackLeftPx: 3000, fallbackTopPx: 2266 },
+      { name: "12", sheetRow: 13, fallback: "12.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "measure", outroMode: "o-spreadsheet", fallbackLeftPx: 4000, fallbackTopPx: 1533 },
+      { name: "13", sheetRow: 14, fallback: "13.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "chart", outroMode: "o-grid", fallbackLeftPx: 5000, fallbackTopPx: 2066 },
+      { name: "14", sheetRow: 15, fallback: "14.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "cells", outroMode: "o-nodes", fallbackLeftPx: 6000, fallbackTopPx: 1400 },
+      { name: "15", sheetRow: 16, fallback: "15.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "network", outroMode: "o-vector", fallbackLeftPx: 7000, fallbackTopPx: 1933 },
+      { name: "16", sheetRow: 17, fallback: "16.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "body-distance", outroMode: "o-mass", fallbackLeftPx: 8000, fallbackTopPx: 2400 },
+      { name: "17", sheetRow: 18, fallback: "17.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "certainty", outroMode: "o-mixed", fallbackLeftPx: 8750, fallbackTopPx: 1333 },
+      { name: "18", sheetRow: 19, fallback: "18.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "branches", outroMode: "o-raw-cluster", fallbackLeftPx: 1687, fallbackTopPx: 2933 },
+      { name: "19", sheetRow: 20, fallback: "19.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "facts", outroMode: "o-long-thread", fallbackLeftPx: 2687, fallbackTopPx: 3800 },
       { name: "20", sheetRow: 21, fallback: "20.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "transcribe", outroMode: "decay", fallbackLeftPx: 4812, fallbackTopPx: 3600 },
       { name: "21", sheetRow: 22, fallback: "21.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "essence", outroMode: "decay", fallbackLeftPx: 5687, fallbackTopPx: 3933 },
       { name: "22", sheetRow: 23, fallback: "22.png", framesCount: 1, holdSentence: true, holdSentenceStyle: "indirect", outroMode: "decay", fallbackLeftPx: 7375, fallbackTopPx: 3733 },
