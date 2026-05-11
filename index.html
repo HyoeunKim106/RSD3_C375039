@@ -2669,13 +2669,17 @@
             sentTempCtx.restore();
           }
 
-          // ── 3) 임시 캔버스를 메인에 'screen'으로 합성 ──
-          //   알파 0.55로 낮춰서 흰 영역에서 베이스 #6d0039가 거의 그대로 보이게
-          //   채도 영역에선 reveal 색이 베이스에 더해져 핑크/밝은 톤
+          // ── 3) 임시 캔버스를 메인에 'multiply'로 합성 ──
+          //   multiply: 픽셀별 채널 곱셈
+          //   - 흰 픽셀 (255,255,255) × 베이스 = 베이스 그대로 → 흰 영역에선 #6d0039 유지
+          //   - 빨강 픽셀 × 베이스 = 어두운 자주/적색 (빨강 영향)
+          //   - 파랑 픽셀 × 베이스 = 어두운 보라 (파랑 영향)
+          //   - 노랑 픽셀 × 베이스 = 자주 + 노랑 = 갈색/올리브
+          //   → 이미지의 각 색상마다 글자에 다른 색조가 입혀짐
           sentenceCtx.save();
           sentenceCtx.setTransform(1, 0, 0, 1, 0, 0);
-          sentenceCtx.globalAlpha = opacity * 0.55;
-          sentenceCtx.globalCompositeOperation = "screen";
+          sentenceCtx.globalAlpha = opacity;
+          sentenceCtx.globalCompositeOperation = "multiply";
           sentenceCtx.drawImage(sentTempCanvas, 0, 0);
           sentenceCtx.restore();
         }
