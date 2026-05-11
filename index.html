@@ -2081,7 +2081,7 @@
         }
       }
 
-      // 05. 꺼진 전구 — 거의 안 보이다가 간헐 점등
+      // 05. 꺼진 전구 — 글자가 흩어진 위치, 간헐 점등
       function updateDeadBulb(now) {
         const elapsed = (now - decayStartTime) / 1000;
         const introT = Math.min(1, elapsed / 1.5);
@@ -2089,11 +2089,18 @@
         const total = decayGlyphs.length;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
+          // 글자별 흩어진 위치 (deterministic, 본 위치와 무관)
+          const bulbX = (seed(i, 12.9) - 0.5) * 70;
+          const bulbY = (seed(i, 78.2) - 0.5) * 40;
+          // 점등 시도 (덜컥거림)
           const tryPhase = elapsed * 0.6 + i * 0.7;
           const flicker = Math.sin(tryPhase) * Math.sin(tryPhase * 3.2);
           const onness = Math.max(0, flicker - 0.4) / 0.6;
-          const x = g.baseX + Math.sin(elapsed * 0.5 + i) * 0.5;
-          const y = g.baseY + Math.cos(elapsed * 0.4 + i) * 0.4;
+          // 미세 흔들림
+          const wobX = Math.sin(elapsed * 0.5 + i) * 0.8;
+          const wobY = Math.cos(elapsed * 0.4 + i) * 0.6;
+          const x = bulbX + wobX;
+          const y = bulbY + wobY;
           const alpha = introEased * (0.18 + onness * 0.55);
           const scale = 0.94 + onness * 0.04;
           const off = applyIntroOffset(g, introT);
@@ -2404,7 +2411,7 @@
         }
       }
 
-      // 18. 원시 데이터 뭉치 — 빽빽한 군집, 미세 떨림, 가끔 추출
+      // 18. 원시 데이터 뭉치 — 더 넓은 군집, 미세 떨림, 가끔 추출
       function updateRawCluster(now) {
         const elapsed = (now - decayStartTime) / 1000;
         const introT = Math.min(1, elapsed / 1.5);
@@ -2412,13 +2419,13 @@
         const total = decayGlyphs.length;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          const rawX = (seed(i, 12.9) - 0.5) * 35;
-          const rawY = (seed(i, 78.2) - 0.5) * 22;
-          const noiseX = Math.sin(elapsed * 2.5 + i * 1.7) * 1.2 + Math.cos(elapsed * 1.8 + i * 0.9) * 0.6;
-          const noiseY = Math.cos(elapsed * 2.3 + i * 1.5) * 0.9 + Math.sin(elapsed * 1.6 + i * 0.8) * 0.5;
+          const rawX = (seed(i, 12.9) - 0.5) * 55;
+          const rawY = (seed(i, 78.2) - 0.5) * 35;
+          const noiseX = Math.sin(elapsed * 2.5 + i * 1.7) * 1.4 + Math.cos(elapsed * 1.8 + i * 0.9) * 0.8;
+          const noiseY = Math.cos(elapsed * 2.3 + i * 1.5) * 1.1 + Math.sin(elapsed * 1.6 + i * 0.8) * 0.6;
           const extractPhase = elapsed * 0.4 + i * 0.3;
           const extract = Math.max(0, Math.sin(extractPhase) - 0.85) / 0.15;
-          const extractY = -extract * 6;
+          const extractY = -extract * 8;
           const x = rawX + noiseX;
           const y = rawY + noiseY + extractY;
           const alpha = introEased * (0.55 + extract * 0.30 + Math.sin(elapsed * 0.5 + i * 0.3) * 0.08);
@@ -2680,22 +2687,24 @@
         }
       }
 
-      // 27. 대기 중인 신호 — 낮은 밝기, 글자가 천천히 부유하며 펄스
+      // 27. 대기 중인 신호 — 글자가 원형 둘레에 분포, 천천히 회전 + 펄스
       function updateStandby(now) {
         const elapsed = (now - decayStartTime) / 1000;
         const introT = Math.min(1, elapsed / 1.5);
         const introEased = 1 - Math.pow(1 - introT, 3);
         const total = decayGlyphs.length;
-        // 전체 대기 펄스 (느리게)
-        const standbyPulse = (Math.sin(elapsed * 0.5) + 1) / 2;  // 0~1
+        // 전체 대기 펄스
+        const standbyPulse = (Math.sin(elapsed * 0.5) + 1) / 2;
         const standbyOn = standbyPulse * 0.35;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          // 본 위치 근처에서 부드럽게 부유 (계속 이어짐)
-          const x = g.baseX + Math.sin(elapsed * 0.35 + i * 0.4) * 2.5 + Math.cos(elapsed * 0.2 + i * 0.2) * 1.5;
-          const y = g.baseY + Math.cos(elapsed * 0.3 + i * 0.3) * 2 + Math.sin(elapsed * 0.4 + i * 0.5) * 1.2;
-          // 글자별 약간 시간차의 대기 펄스
-          const phase = (i / total) * Math.PI;
+          // 글자가 원형 분포 (천천히 회전)
+          const myAngle = (i / total) * Math.PI * 2 + elapsed * 0.08;
+          const radius = 30 + Math.sin(elapsed * 0.3 + i * 0.4) * 4;
+          const x = Math.cos(myAngle) * radius;
+          const y = Math.sin(myAngle) * radius * 0.55;
+          // 글자별 시간차 대기 펄스
+          const phase = (i / total) * Math.PI * 2;
           const myStandby = standbyOn * (0.7 + Math.sin(elapsed * 0.5 + phase) * 0.3);
           const alpha = introEased * (0.30 + myStandby);
           const off = applyIntroOffset(g, introT);
@@ -2861,27 +2870,27 @@
         }
       }
 
-      // 33. 내장된 지식 꾸러미 — 응축된 덩어리 + 가끔 펼쳐졌다 접힘
+      // 33. 내장된 지식 꾸러미 — 응축 ↔ 더 큰 펼침
       function updatePacked(now) {
         const elapsed = (now - decayStartTime) / 1000;
         const introT = Math.min(1, elapsed / 1.5);
         const introEased = 1 - Math.pow(1 - introT, 3);
         const total = decayGlyphs.length;
-        // 펼쳐짐 정도 (천천히 호흡)
-        const unfoldT = (Math.sin(elapsed * 0.25) + 1) / 2;  // 0~1
+        const unfoldT = (Math.sin(elapsed * 0.25) + 1) / 2;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          // 응축 위치 (중심 근처)
+          // 응축: 중심 원형 작은 둘레
           const compactAngle = (i / total) * Math.PI * 2;
-          const compactR = 8;
+          const compactR = 6;
           const compactX = Math.cos(compactAngle) * compactR;
           const compactY = Math.sin(compactAngle) * compactR * 0.7;
-          // 펼친 위치 (더 멀리)
-          const expandX = compactX * 3.5;
-          const expandY = compactY * 3.5;
+          // 펼침: 훨씬 넓게 (인덱스별 다른 거리)
+          const expandR = 25 + (i % 5) * 5;  // 25~45
+          const expandX = Math.cos(compactAngle) * expandR;
+          const expandY = Math.sin(compactAngle) * expandR * 0.7;
           const x = compactX + (expandX - compactX) * unfoldT;
           const y = compactY + (expandY - compactY) * unfoldT;
-          const alpha = introEased * (0.70 - unfoldT * 0.10);  // 접혀있을 때 더 또렷
+          const alpha = introEased * (0.70 - unfoldT * 0.10);
           const scale = 0.92 + unfoldT * 0.06;
           const off = applyIntroOffset(g, introT);
           writeGlyph(g, x + off.ox, y + off.oy, alpha, 0, scale);
@@ -3093,7 +3102,7 @@
       // 40~59.png용 20개 새 outro 모션 (alightworld 톤)
       // ─────────────────────────────────────────────
 
-      // 40. 반투명한 그림자 — 본 위치에서 미세 부유, alpha 낮음 (잔상감)
+      // 40. 반투명한 그림자 — 글자가 좌우로 천천히 이동하며 잔상감
       function updateShadow(now) {
         const elapsed = (now - decayStartTime) / 1000;
         const introT = Math.min(1, elapsed / 1.5);
@@ -3101,15 +3110,18 @@
         const total = decayGlyphs.length;
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          // 본 위치에서 매우 천천히 떠다님 (그림자 부유)
-          const driftX = Math.sin(elapsed * 0.18 + i * 0.3) * 2.5;
-          const driftY = Math.cos(elapsed * 0.15 + i * 0.25) * 2;
-          // 글자별 그림자 지연 — 위치가 살짝 어긋남
-          const shadowOffsetX = Math.sin((elapsed - 0.4) * 0.18 + i * 0.3) * 2.5;
-          const shadowOffsetY = Math.cos((elapsed - 0.4) * 0.15 + i * 0.25) * 2;
-          // 평균 위치 (그림자와 본체의 사이) — 한 글리프밖에 없으니 약간의 부유
-          const x = g.baseX + driftX;
-          const y = g.baseY + driftY;
+          // 글자가 가로로 천천히 이동 (그림자가 다른 위치에 흘러가는 인상)
+          const slideX = Math.sin(elapsed * 0.18) * 30;
+          const slideY = Math.cos(elapsed * 0.12) * 12;
+          // 글자별 다른 위상으로 위치 분산 (대각선 분포)
+          const myT = total > 1 ? i / (total - 1) : 0.5;
+          const spreadX = (myT - 0.5) * 60;
+          const spreadY = (myT - 0.5) * 20;
+          // 미세 부유
+          const driftX = Math.sin(elapsed * 0.4 + i * 0.5) * 1.5;
+          const driftY = Math.cos(elapsed * 0.35 + i * 0.4) * 1;
+          const x = spreadX + slideX + driftX;
+          const y = spreadY + slideY + driftY;
           // alpha 매우 낮게 (반투명 인상)
           const alpha = introEased * (0.32 + Math.sin(elapsed * 0.35 + i * 0.2) * 0.08);
           const off = applyIntroOffset(g, introT);
@@ -3649,24 +3661,21 @@
         }
       }
 
-      // 58. 덩어리감 (Volume) — 글자가 응축된 매스, 천천히 호흡
+      // 58. 덩어리감 (Volume) — 글자가 더 큰 구체 표면 분포, 천천히 회전
       function updateMassVolume(now) {
         const elapsed = (now - decayStartTime) / 1000;
         const introT = Math.min(1, elapsed / 1.5);
         const introEased = 1 - Math.pow(1 - introT, 3);
         const total = decayGlyphs.length;
-        // 매스 호흡 (느림)
         const volumeT = (Math.sin(elapsed * 0.25) + 1) / 2;
-        const volumeRadius = 14 + volumeT * 6;  // 14~20
+        const volumeRadius = 24 + volumeT * 12;  // 24~36
         for (let i = 0; i < total; i++) {
           const g = decayGlyphs[i];
-          // 글자가 구체 위에 분포 (가짜 3D)
           const phi = seed(i, 12.9) * Math.PI;
-          const theta = seed(i, 78.2) * Math.PI * 2 + elapsed * 0.1;
+          const theta = seed(i, 78.2) * Math.PI * 2 + elapsed * 0.18;
           const x = Math.sin(phi) * Math.cos(theta) * volumeRadius;
           const y = Math.sin(phi) * Math.sin(theta) * volumeRadius * 0.6;
           const z = Math.cos(phi);
-          // 깊이 기반 scale/alpha
           const depthScale = 0.8 + z * 0.2;
           const alpha = introEased * (0.55 + (z + 1) / 2 * 0.30);
           const off = applyIntroOffset(g, introT);
