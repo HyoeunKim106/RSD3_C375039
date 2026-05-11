@@ -3449,35 +3449,134 @@
       const dpr = window.devicePixelRatio || 1;
       const SF = Math.max(2, dpr * 2);
 
-      const out = document.createElement("canvas");
-      out.width = Math.round(W * SF);
-      out.height = Math.round(H * SF);
-      const octx = out.getContext("2d");
-      octx.imageSmoothingEnabled = true;
-      octx.imageSmoothingQuality = "high";
-      octx.scale(SF, SF);
-      octx.fillStyle = "#ffffff";
-      octx.fillRect(0, 0, W, H);
-
+      // 캡처 시점 scale 고정 — 폰트 크기 유지의 기준
       const scale = distance / 100;
       const cx_view = W / 2;
       const cy_view = H / 2;
 
+      // 화면 좌표 ↔ world 좌표 변환 (현재 화면 기준)
       function worldToScreen(wx, wy) {
         return {
           x: (wx - cx_view) * scale + cx_view + posX,
           y: (wy - cy_view) * scale + cy_view + posY,
         };
       }
+      function screenToWorldLocal(sx, sy) {
+        return {
+          x: (sx - cx_view - posX) / scale + cx_view,
+          y: (sy - cy_view - posY) / scale + cy_view,
+        };
+      }
 
-      // 디버그: 캡처 시점에 궤적 상태 출력
       console.info(`[capture] pendingText.length=${pendingText.length}, pathPts.length=${pathPts.length}`);
 
-      // [FIX ③] 궤적 텍스트를 reveal 이미지보다 먼저 그림 — 흰 배경 위에 또렷이.
-      // 이렇게 하면 reveal 이미지가 위에 깔리면서 일부 글자가 가려지지만,
-      // reveal 영역 바깥(=대부분의 캔버스 공간)에선 글자가 또렷하게 보임.
-      // 그리고 source-over로 그리므로 multiply 가시성 문제도 해결.
+      // ─────────────────────────────────────────────
+      // [전체 궤적 캡처] 캔버스 크기 결정
+      // 1) 현재 화면 영역 (viewport) → world bbox로 변환
+      // 2) 궤적이 지나간 모든 world 좌표 추가
+      // 3) reveal 영역들의 world bbox도 추가 (궤적 위의 reveal만)
+      // 4) 패딩 추가
+      // ─────────────────────────────────────────────
 
+      // 캡처 시점 viewport의 world bbox
+      const vTopLeft = screenToWorldLocal(0, 0);
+      const vBotRight = screenToWorldLocal(W, H);
+      let wMinX = Math.min(vTopLeft.x, vBotRight.x);
+      let wMaxX = Math.max(vTopLeft.x, vBotRight.x);
+      let wMinY = Math.min(vTopLeft.y, vBotRight.y);
+      let wMaxY = Math.max(vTopLeft.y, vBotRight.y);
+
+      // 궤적의 모든 world 좌표 포함
+      for (const p of pathPts) {
+        if (p.worldX < wMinX) wMinX = p.worldX;
+        if (p.worldX > wMaxX) wMaxX = p.worldX;
+        if (p.worldY < wMinY) wMinY = p.worldY;
+        if (p.worldY > wMaxY) wMaxY = p.worldY;
+      }
+
+      // 궤적이 지나간 영역 안에 들어있는 reveal들의 world bbox도 포함
+      // (reveal-img-area의 화면 위치를 world로 역변환)
+      const revealAreas = document.querySelectorAll(".reveal-img-area");
+      const revealWorldBoxes = [];
+      for (const ra of revealAreas) {
+        const r = ra.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) continue;
+        const tl = screenToWorldLocal(r.left, r.top);
+        const br = screenToWorldLocal(r.right, r.bottom);
+        const box = {
+          minX: Math.min(tl.x, br.x), maxX: Math.max(tl.x, br.x),
+          minY: Math.min(tl.y, br.y), maxY: Math.max(tl.y, br.y),
+        };
+        revealWorldBoxes.push({ el: ra, box });
+        // 이 reveal 박스가 (현재 화면 + 궤적) 영역과 겹치면 캡처 영역에 포함
+        // 단순히: 모든 reveal을 일단 후보로 두고, 아래 필터링 단계에서 결정
+      }
+
+      // 화면 좌표 기준 패딩 (글자 잘리지 않게)
+      // 폰트 14px이지만 일부 글리프(volume/decay)가 본 위치 주변 80px까지 떠다님
+      const PADDING_SCREEN = 120;
+      const paddingWorld = PADDING_SCREEN / scale;
+      wMinX -= paddingWorld;
+      wMaxX += paddingWorld;
+      wMinY -= paddingWorld;
+      wMaxY += paddingWorld;
+
+      // 캡처할 reveal 결정: 위 bbox와 겹치는 것들
+      const visibleReveals = revealWorldBoxes.filter(({ box }) =>
+        !(box.maxX < wMinX || box.minX > wMaxX || box.maxY < wMinY || box.minY > wMaxY)
+      );
+      // 겹친 reveal까지 포함하도록 bbox 확장
+      for (const { box } of visibleReveals) {
+        if (box.minX < wMinX) wMinX = box.minX;
+        if (box.maxX > wMaxX) wMaxX = box.maxX;
+        if (box.minY < wMinY) wMinY = box.minY;
+        if (box.maxY > wMaxY) wMaxY = box.maxY;
+      }
+
+      // 캔버스 크기 (현재 scale에서의 화면 픽셀)
+      const canvasW = Math.ceil((wMaxX - wMinX) * scale);
+      const canvasH = Math.ceil((wMaxY - wMinY) * scale);
+
+      // 안전장치: 너무 크면 다운스케일 (브라우저 캔버스 최대 ~16384)
+      // SF 적용 후 픽셀이 16384 넘으면 SF를 줄임
+      let effSF = SF;
+      const MAX_PIXEL = 16384;
+      const longEdgePx = Math.max(canvasW, canvasH) * effSF;
+      if (longEdgePx > MAX_PIXEL) {
+        effSF = Math.max(1, MAX_PIXEL / Math.max(canvasW, canvasH));
+      }
+
+      console.info(`[capture] canvas=${canvasW}x${canvasH} (SF=${effSF.toFixed(2)})`);
+
+      const out = document.createElement("canvas");
+      out.width = Math.round(canvasW * effSF);
+      out.height = Math.round(canvasH * effSF);
+      const octx = out.getContext("2d");
+      octx.imageSmoothingEnabled = true;
+      octx.imageSmoothingQuality = "high";
+      octx.scale(effSF, effSF);
+      octx.fillStyle = "#ffffff";
+      octx.fillRect(0, 0, canvasW, canvasH);
+
+      // ─────────────────────────────────────────────
+      // 새 좌표 매핑: world → 캔버스 (캡처 시점 scale 유지)
+      // canvasX = (worldX - wMinX) * scale
+      // 그리고 기존 화면 좌표 → 캔버스 좌표 변환도 필요
+      //   (화면 좌표는 worldToScreen 거친 결과 = world * scale + 화면 오프셋)
+      //   screen → world → canvas로 다시 매핑
+      // ─────────────────────────────────────────────
+      function worldToCanvas(wx, wy) {
+        return {
+          x: (wx - wMinX) * scale,
+          y: (wy - wMinY) * scale,
+        };
+      }
+      function screenToCanvas(sx, sy) {
+        const w = screenToWorldLocal(sx, sy);
+        return worldToCanvas(w.x, w.y);
+      }
+
+      // 궤적 텍스트 → reveal/글리프/HUD 순으로 그림 (전체 캔버스 좌표계 사용)
       octx.globalCompositeOperation = "source-over";
 
       // 궤적 따라 흐르는 텍스트 — Vicentino
@@ -3489,12 +3588,13 @@
           octx.textAlign = "left";
           octx.fillStyle = INK_DEEP;
 
+          // sampleAt: 캔버스 좌표계로 반환 (worldToCanvas 사용)
           function sampleAt(s) {
             if (s <= pathPts[0].sScreen) {
               const p0 = pathPts[0];
               const p1 = pathPts[1] || p0;
-              const a = worldToScreen(p0.worldX, p0.worldY);
-              const b = worldToScreen(p1.worldX, p1.worldY);
+              const a = worldToCanvas(p0.worldX, p0.worldY);
+              const b = worldToCanvas(p1.worldX, p1.worldY);
               return { x: a.x, y: a.y, ang: Math.atan2(b.y - a.y, b.x - a.x) };
             }
             for (let i = 1; i < pathPts.length; i++) {
@@ -3503,8 +3603,8 @@
                 const p1 = pathPts[i];
                 const span = p1.sScreen - p0.sScreen;
                 const t = span > 0 ? (s - p0.sScreen) / span : 0;
-                const a = worldToScreen(p0.worldX, p0.worldY);
-                const b = worldToScreen(p1.worldX, p1.worldY);
+                const a = worldToCanvas(p0.worldX, p0.worldY);
+                const b = worldToCanvas(p1.worldX, p1.worldY);
                 return {
                   x: a.x + (b.x - a.x) * t,
                   y: a.y + (b.y - a.y) * t,
@@ -3514,8 +3614,8 @@
             }
             const last = pathPts[pathPts.length - 1];
             const prev = pathPts[pathPts.length - 2] || last;
-            const a = worldToScreen(prev.worldX, prev.worldY);
-            const b = worldToScreen(last.worldX, last.worldY);
+            const a = worldToCanvas(prev.worldX, prev.worldY);
+            const b = worldToCanvas(last.worldX, last.worldY);
             return { x: b.x, y: b.y, ang: Math.atan2(b.y - a.y, b.x - a.x) };
           }
 
@@ -3550,16 +3650,21 @@
       }
 
       // (2) reveal 이미지 캔버스 + sentence 캔버스를 궤적 위에 합성
-      //     reveal 이미지는 알파를 가지고 있어서 글자가 reveal 영역에서만 부분적으로 가림.
-      //     이렇게 하면 reveal 이미지 자체는 또렷히 보이고, 궤적은 reveal 바깥에서 보임.
+      //     각 reveal의 화면 위치를 캔버스 좌표로 변환해서 그림
       const revealCanvases = document.querySelectorAll(
         ".reveal-base-area canvas, .reveal-img-area canvas, .text-sentence canvas"
       );
       for (const c of revealCanvases) {
         const r = c.getBoundingClientRect();
         if (r.width <= 0 || r.height <= 0) continue;
+        // 화면 좌표 → 캔버스 좌표 (좌상단, 우하단을 따로 변환해서 크기 정확히 계산)
+        const tl = screenToCanvas(r.left, r.top);
+        const br = screenToCanvas(r.right, r.bottom);
+        const drawW = br.x - tl.x;
+        const drawH = br.y - tl.y;
+        if (drawW <= 0 || drawH <= 0) continue;
         try {
-          octx.drawImage(c, r.left, r.top, r.width, r.height);
+          octx.drawImage(c, tl.x, tl.y, drawW, drawH);
         } catch (e) {}
       }
 
@@ -3575,10 +3680,14 @@
         const cs = window.getComputedStyle(g);
         const op = parseFloat(cs.opacity);
         if (!isFinite(op) || op <= 0.01) continue;
-        if (r.left > W || r.right < 0 || r.top > H || r.bottom < 0) continue;
+        // 캔버스 영역 안에 있는지 확인 (캔버스 좌표 기준)
+        const pos = screenToCanvas(r.left, r.top);
+        if (pos.x > canvasW || pos.x + r.width * 0 < -50 || pos.y > canvasH || pos.y < -50) {
+          // 글리프는 작으니 매우 보수적으로 클리핑
+        }
         octx.globalAlpha = op;
         octx.fillStyle = cs.color || INK_COLOR;
-        octx.fillText(g.textContent, r.left, r.top);
+        octx.fillText(g.textContent, pos.x, pos.y);
       }
       octx.globalAlpha = 1;
 
@@ -3592,31 +3701,34 @@
         if (!txt) continue;
         const r = tb.getBoundingClientRect();
         if (r.width <= 0 || r.height <= 0) continue;
+        const tl = screenToCanvas(r.left, r.top);
+        const br = screenToCanvas(r.right, r.bottom);
+        const boxW = br.x - tl.x;
         const lineHeight = textBoxFontPx * 1.55;
-        const maxWidth = r.width - 32 * scale;
+        const maxWidth = boxW - 32 * scale;
         const words = txt.split(/(\s+)/);
         let line = "";
-        let y = r.top + 14 * scale;
+        let y = tl.y + 14 * scale;
         for (const w of words) {
           const testLine = line + w;
           const m = octx.measureText(testLine);
           if (m.width > maxWidth && line.length > 0) {
-            octx.fillText(line, r.left + 16 * scale, y);
+            octx.fillText(line, tl.x + 16 * scale, y);
             y += lineHeight;
             line = w.replace(/^\s+/, "");
           } else {
             line = testLine;
           }
         }
-        if (line) octx.fillText(line, r.left + 16 * scale, y);
+        if (line) octx.fillText(line, tl.x + 16 * scale, y);
       }
 
-      // HUD — CelestiaAntiqua
+      // HUD — CelestiaAntiqua (캔버스 좌하단에 고정 배치)
       const hudEl = document.getElementById("hud");
       octx.font = "15px CelestiaAntiqua";
       octx.fillStyle = INK_COLOR;
       const lines = hudEl.innerText.split("\n");
-      let hy = H - 14 - (lines.length - 1) * 18 - 4;
+      let hy = canvasH - 14 - (lines.length - 1) * 18 - 4;
       for (const ln of lines) {
         octx.fillText(ln.toUpperCase(), 16, hy);
         hy += 18;
