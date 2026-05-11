@@ -28,10 +28,10 @@
 
     /* ───────── 공통 색상 변수 ───────── */
     :root {
-      --ink: #776c54;       /* HUD / 정적 텍스트 / 캡처 trail 공통 색상 */
-      --ink-deep: #776c54;  /* multiply 블렌드용 (정적 텍스트) */
-      --ink-hold: #616dff;  /* 클릭 중 sentence 모션 — 유화물감 오버레이 */
-      --ink-outro: #00cc9b; /* 클릭 후 outro 모션 (volume / decay / ripple 등) */
+      --ink: #720067;       /* 모든 텍스트 통일 색상 */
+      --ink-deep: #720067;
+      --ink-hold: #720067;
+      --ink-outro: #720067;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -265,7 +265,7 @@
       z-index: 10;          /* reveal-text-box(1)와 reveal-img-area(2)보다 위 */
       will-change: transform;
     }
-    /* sentence는 캔버스 기반이라 stage/block CSS는 더 이상 필요 없음 */
+    /* 유화 번짐 효과는 sentence 캔버스 안에서 JS로 합성됨 (mix-blend-mode 미사용) */
 
     /* ───────── 확장 패널 ───────── */
     .expanded-panel {
@@ -355,7 +355,6 @@
   </div>
 
   <div class="hud" id="hud">
-    <span class="row">DISTANCE <span class="num" id="num-distance">100%</span></span>
     <span class="row row-position">POSITION X:<span class="num after-colon" id="num-pos-x">000</span> Y:<span class="num after-colon" id="num-pos-y">000</span></span>
   </div>
 
@@ -365,10 +364,10 @@
     /* ─────────────────────────────────────────────
        잉크 색상 상수 (캔버스 캡처용)
        ───────────────────────────────────────────── */
-    const INK_COLOR = "#776c54";   // 정적 텍스트 / HUD / 캡처 trail
-    const INK_DEEP  = "#776c54";   // multiply 블렌드용 (정적)
-    const INK_HOLD  = "#616dff";   // 클릭 중 sentence 모션 (유화 오버레이)
-    const INK_OUTRO = "#00cc9b";   // 클릭 후 outro 모션
+    const INK_COLOR = "#720067";   // 모든 텍스트 통일 색상
+    const INK_DEEP  = "#720067";
+    const INK_HOLD  = "#720067";
+    const INK_OUTRO = "#720067";
 
     /* ─────────────────────────────────────────────
        상태값
@@ -381,7 +380,6 @@
     let posX = window.innerWidth / 2 - START_WORLD_X;
     let posY = window.innerHeight / 2 - START_WORLD_Y;
 
-    const numDistance = document.getElementById("num-distance");
     const numPosX     = document.getElementById("num-pos-x");
     const numPosY     = document.getElementById("num-pos-y");
 
@@ -395,7 +393,6 @@
     const worldEl = document.getElementById("world");
 
     function renderHUD() {
-      numDistance.textContent = `${Math.round(distance)}%`;
       numPosX.textContent = fmt3(posX);
       numPosY.textContent = fmt3(posY);
       const scale = distance / 100;
@@ -2602,41 +2599,36 @@
             };
           }
 
-          // ─── 유화물감 오버레이 합성 ───
-          //  기존: 글자모양 안에 reveal 이미지 비치는 color-burn 효과
-          //  변경: #616dff 잉크가 reveal 이미지 위에 유화처럼 번지며 얹힘
-          //  방법: 두 레이어 multiply
-          //    Layer A: 살짝 크고 흐릿한 잉크 (번짐의 헤일로)
-          //    Layer B: 또렷한 잉크 (본체)
-          //  → 두 레이어가 multiply로 reveal 이미지 위에 깔리면
-          //    이미지의 명암을 따라 잉크가 진해지거나 옅어져서 유화 느낌
+          // ─── 유화물감 번짐 합성 ───
+          //  목표:
+          //    (a) 글자가 reveal 이미지 채도/밝기 영역 위에 있을 때 → 이미지 색이 글자에 번져 더 밝아짐
+          //    (b) 글자가 흰 배경(reveal 바깥) 위에 있을 때 → 원래 #616dff 그대로
+          //
+          //  구현:
+          //    1) 베이스 글자 #616dff를 source-over로 깔기 (어디서나 원래 색)
+          //    2) 임시 캔버스에 같은 글자 모양을 만들고 그 안에 reveal 이미지를 source-in 클리핑
+          //       → 글자 모양 안에 reveal 픽셀만 있는 비트맵 (reveal 바깥은 알파 0)
+          //    3) 그 임시 캔버스를 메인에 'screen' 합성
+          //       → 알파 있는 픽셀(=글자가 reveal 위에 있는 곳)만 베이스에 더해져 밝아짐
+          //       → 알파 0 픽셀(=글자가 reveal 바깥)은 합성되지 않아 베이스 그대로
+          if (!sentTempCanvas) {
+            sentTempCanvas = document.createElement("canvas");
+            sentTempCtx = sentTempCanvas.getContext("2d");
+          }
+          if (sentTempCanvas.width !== sentenceCanvas.width ||
+              sentTempCanvas.height !== sentenceCanvas.height) {
+            sentTempCanvas.width  = sentenceCanvas.width;
+            sentTempCanvas.height = sentenceCanvas.height;
+          }
+          sentTempCtx.setTransform(px.w / size, 0, 0, px.h / size, 0, 0);
+          sentTempCtx.imageSmoothingEnabled = true;
+          sentTempCtx.imageSmoothingQuality = "high";
+
+          // ── 1) 베이스 글자 #616dff (source-over) ──
           sentenceCtx.save();
           sentenceCtx.setTransform(1, 0, 0, 1, 0, 0);
           sentenceCtx.globalAlpha = opacity;
-
-          // Layer A: 번짐 헤일로 — 살짝 큰 사이즈 + 낮은 알파 + multiply
-          //   filter blur로 가장자리를 부드럽게 (브라우저 지원 시)
-          sentenceCtx.globalCompositeOperation = "multiply";
-          sentenceCtx.setTransform(px.w / size, 0, 0, px.h / size, 0, 0);
-          sentenceCtx.translate(cx + swayX, cyBase + y);
-          sentenceCtx.scale(scale * 1.04, scale * 1.04);  // 4% 크게 → 번짐
-          sentenceCtx.fillStyle = INK_HOLD;
-          sentenceCtx.font = `${FONT_PX}px Vicentino`;
-          sentenceCtx.textBaseline = "middle";
-          const prevFilter1 = sentenceCtx.filter;
-          try { sentenceCtx.filter = "blur(1.6px)"; } catch (e) {}
-          const haloAlpha = 0.42;
-          sentenceCtx.globalAlpha = opacity * haloAlpha;
-          drawWrappedTextPerChar(
-            sentenceCtx, b.text, 0, 0,
-            MAX_WIDTH, FONT_PX, LINE_HEIGHT, wavePerChar
-          );
-          try { sentenceCtx.filter = prevFilter1 || "none"; } catch (e) {}
-
-          // Layer B: 본체 잉크 — 또렷한 사이즈 + multiply
-          sentenceCtx.setTransform(1, 0, 0, 1, 0, 0);
-          sentenceCtx.globalAlpha = opacity;
-          sentenceCtx.globalCompositeOperation = "multiply";
+          sentenceCtx.globalCompositeOperation = "source-over";
           sentenceCtx.setTransform(px.w / size, 0, 0, px.h / size, 0, 0);
           sentenceCtx.translate(cx + swayX, cyBase + y);
           sentenceCtx.scale(scale, scale);
@@ -2647,6 +2639,46 @@
             sentenceCtx, b.text, 0, 0,
             MAX_WIDTH, FONT_PX, LINE_HEIGHT, wavePerChar
           );
+          sentenceCtx.restore();
+
+          // ── 2) 임시 캔버스: 글자 모양 안에 reveal 이미지 클리핑 ──
+          // (a) 클리어
+          sentTempCtx.save();
+          sentTempCtx.setTransform(1, 0, 0, 1, 0, 0);
+          sentTempCtx.clearRect(0, 0, sentTempCanvas.width, sentTempCanvas.height);
+          sentTempCtx.restore();
+
+          // (b) 글자 모양만 그림 (색은 아무거나, 마스크 역할)
+          sentTempCtx.save();
+          sentTempCtx.setTransform(px.w / size, 0, 0, px.h / size, 0, 0);
+          sentTempCtx.translate(cx + swayX, cyBase + y);
+          sentTempCtx.scale(scale, scale);
+          sentTempCtx.fillStyle = "#ffffff";
+          sentTempCtx.font = `${FONT_PX}px Vicentino`;
+          sentTempCtx.textBaseline = "middle";
+          drawWrappedTextPerChar(
+            sentTempCtx, b.text, 0, 0,
+            MAX_WIDTH, FONT_PX, LINE_HEIGHT, wavePerChar
+          );
+          sentTempCtx.restore();
+
+          // (c) reveal 이미지를 source-in으로 합성 → 글자 모양 안에 이미지만 남음
+          if (canvas && canvas.width > 0) {
+            sentTempCtx.save();
+            sentTempCtx.setTransform(1, 0, 0, 1, 0, 0);
+            sentTempCtx.globalCompositeOperation = "source-in";
+            sentTempCtx.drawImage(canvas,
+              0, 0, canvas.width, canvas.height,
+              0, 0, sentTempCanvas.width, sentTempCanvas.height);
+            sentTempCtx.restore();
+          }
+
+          // ── 3) 임시 캔버스를 메인에 'screen' 합성 (번짐 강도 조절용 알파) ──
+          sentenceCtx.save();
+          sentenceCtx.setTransform(1, 0, 0, 1, 0, 0);
+          sentenceCtx.globalAlpha = opacity * 0.85;  // 번짐 강도 (1.0 = 최대)
+          sentenceCtx.globalCompositeOperation = "screen";
+          sentenceCtx.drawImage(sentTempCanvas, 0, 0);
           sentenceCtx.restore();
         }
       }
@@ -3477,80 +3509,15 @@
       console.info(`[capture] pendingText.length=${pendingText.length}, pathPts.length=${pathPts.length}`);
 
       // ─────────────────────────────────────────────
-      // [전체 궤적 캡처] 캔버스 크기 결정
-      // 1) 현재 화면 영역 (viewport) → world bbox로 변환
-      // 2) 궤적이 지나간 모든 world 좌표 추가
-      // 3) reveal 영역들의 world bbox도 추가 (궤적 위의 reveal만)
-      // 4) 패딩 추가
+      // [캡처 공간 = 화면(viewport) 그대로]
+      // 캔버스 크기 = W × H (현재 보고 있는 화면 그대로)
+      // 모든 좌표는 화면(client) 좌표 그대로 사용 → 글자 크기는 14px 고정
+      // 화면 밖으로 나간 궤적은 잘림 (의도된 동작)
       // ─────────────────────────────────────────────
 
-      // 캡처 시점 viewport의 world bbox
-      const vTopLeft = screenToWorldLocal(0, 0);
-      const vBotRight = screenToWorldLocal(W, H);
-      let wMinX = Math.min(vTopLeft.x, vBotRight.x);
-      let wMaxX = Math.max(vTopLeft.x, vBotRight.x);
-      let wMinY = Math.min(vTopLeft.y, vBotRight.y);
-      let wMaxY = Math.max(vTopLeft.y, vBotRight.y);
-
-      // 궤적의 모든 world 좌표 포함
-      for (const p of pathPts) {
-        if (p.worldX < wMinX) wMinX = p.worldX;
-        if (p.worldX > wMaxX) wMaxX = p.worldX;
-        if (p.worldY < wMinY) wMinY = p.worldY;
-        if (p.worldY > wMaxY) wMaxY = p.worldY;
-      }
-
-      // 궤적이 지나간 영역 안에 들어있는 reveal들의 world bbox도 포함
-      // (reveal-img-area의 화면 위치를 world로 역변환)
-      const revealAreas = document.querySelectorAll(".reveal-img-area");
-      const revealWorldBoxes = [];
-      for (const ra of revealAreas) {
-        const r = ra.getBoundingClientRect();
-        if (r.width <= 0 || r.height <= 0) continue;
-        const tl = screenToWorldLocal(r.left, r.top);
-        const br = screenToWorldLocal(r.right, r.bottom);
-        const box = {
-          minX: Math.min(tl.x, br.x), maxX: Math.max(tl.x, br.x),
-          minY: Math.min(tl.y, br.y), maxY: Math.max(tl.y, br.y),
-        };
-        revealWorldBoxes.push({ el: ra, box });
-        // 이 reveal 박스가 (현재 화면 + 궤적) 영역과 겹치면 캡처 영역에 포함
-        // 단순히: 모든 reveal을 일단 후보로 두고, 아래 필터링 단계에서 결정
-      }
-
-      // 화면 좌표 기준 패딩 (글자 잘리지 않게)
-      // 폰트 14px이지만 일부 글리프(volume/decay)가 본 위치 주변 80px까지 떠다님
-      const PADDING_SCREEN = 120;
-      const paddingWorld = PADDING_SCREEN / scale;
-      wMinX -= paddingWorld;
-      wMaxX += paddingWorld;
-      wMinY -= paddingWorld;
-      wMaxY += paddingWorld;
-
-      // 캡처할 reveal 결정: 위 bbox와 겹치는 것들
-      const visibleReveals = revealWorldBoxes.filter(({ box }) =>
-        !(box.maxX < wMinX || box.minX > wMaxX || box.maxY < wMinY || box.minY > wMaxY)
-      );
-      // 겹친 reveal까지 포함하도록 bbox 확장
-      for (const { box } of visibleReveals) {
-        if (box.minX < wMinX) wMinX = box.minX;
-        if (box.maxX > wMaxX) wMaxX = box.maxX;
-        if (box.minY < wMinY) wMinY = box.minY;
-        if (box.maxY > wMaxY) wMaxY = box.maxY;
-      }
-
-      // 캔버스 크기 (현재 scale에서의 화면 픽셀)
-      const canvasW = Math.ceil((wMaxX - wMinX) * scale);
-      const canvasH = Math.ceil((wMaxY - wMinY) * scale);
-
-      // 안전장치: 너무 크면 다운스케일 (브라우저 캔버스 최대 ~16384)
-      // SF 적용 후 픽셀이 16384 넘으면 SF를 줄임
-      let effSF = SF;
-      const MAX_PIXEL = 16384;
-      const longEdgePx = Math.max(canvasW, canvasH) * effSF;
-      if (longEdgePx > MAX_PIXEL) {
-        effSF = Math.max(1, MAX_PIXEL / Math.max(canvasW, canvasH));
-      }
+      const canvasW = W;
+      const canvasH = H;
+      const effSF = SF;
 
       console.info(`[capture] canvas=${canvasW}x${canvasH} (SF=${effSF.toFixed(2)})`);
 
@@ -3564,25 +3531,16 @@
       octx.fillStyle = "#ffffff";
       octx.fillRect(0, 0, canvasW, canvasH);
 
-      // ─────────────────────────────────────────────
-      // 새 좌표 매핑: world → 캔버스 (캡처 시점 scale 유지)
-      // canvasX = (worldX - wMinX) * scale
-      // 그리고 기존 화면 좌표 → 캔버스 좌표 변환도 필요
-      //   (화면 좌표는 worldToScreen 거친 결과 = world * scale + 화면 오프셋)
-      //   screen → world → canvas로 다시 매핑
-      // ─────────────────────────────────────────────
+      // 좌표 매핑: 화면 좌표 그대로 캔버스 좌표로 (1:1)
       function worldToCanvas(wx, wy) {
-        return {
-          x: (wx - wMinX) * scale,
-          y: (wy - wMinY) * scale,
-        };
+        // 궤적은 world 좌표로 저장돼 있으니 worldToScreen 거쳐 화면 좌표 = 캔버스 좌표
+        return worldToScreen(wx, wy);
       }
       function screenToCanvas(sx, sy) {
-        const w = screenToWorldLocal(sx, sy);
-        return worldToCanvas(w.x, w.y);
+        return { x: sx, y: sy };
       }
 
-      // 궤적 텍스트 → reveal/글리프/HUD 순으로 그림 (전체 캔버스 좌표계 사용)
+      // 궤적 텍스트 → reveal/글리프/HUD 순으로 그림 (캔버스 = viewport)
       octx.globalCompositeOperation = "source-over";
 
       // 궤적 따라 흐르는 텍스트 — Vicentino
